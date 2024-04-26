@@ -32,7 +32,7 @@ class CreateApiTokenTest extends TestCase
             ->call('createApiToken');
 
         $this->assertCount(1, $user->fresh()->tokens);
-        $this->assertEquals('Test Token', $user->fresh()->tokens->first()->name);
+        $this->assertEquals('Test Token', $user->fresh()->tokens->first()->first_name);
         $this->assertTrue($user->fresh()->tokens->first()->can('read'));
         $this->assertFalse($user->fresh()->tokens->first()->can('delete'));
     }
