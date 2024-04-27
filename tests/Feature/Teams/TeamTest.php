@@ -17,7 +17,7 @@ class TeamTest extends TestCase
     /**
      * Test teams database has correct columns
      */
-    public function teams_database_has_expected_columns()
+    public function test_teams_database_has_expected_columns()
     {
         $this->assertTrue(
           Schema::hasColumns('teams', [
@@ -26,7 +26,7 @@ class TeamTest extends TestCase
     }
 
     /**
-     * A basic feature test example.
+     * A team can be created test
      */
     public function test_a_team_can_be_created(): void
     {
@@ -42,6 +42,22 @@ class TeamTest extends TestCase
         $response = $this->post('/teams', $attributes);
 
         $this->assertDatabaseHas('teams', $attributes);
+    }
+
+    /**
+     * Creating a team requires a user id test
+     */
+    public function test_creating_a_team_requires_a_user_id(): void
+    {
+        // $this->withoutExceptionHandling();
+
+        $attributes = [
+            'name' => 'Test Team',
+        ];
+
+        $response = $this->post('/teams', $attributes);
+
+        $this->assertDatabaseMissing('teams', $attributes);
     }
 
     /**
@@ -62,17 +78,30 @@ class TeamTest extends TestCase
     }
 
     /**
-     * A basic feature test example.
+     * A team can have many users
      */
-    // public function test_a_user_can_belong_to_a_team(): void
-    // {
-    //     $this->withoutExceptionHandling();
+    public function test_a_team_can_have_users(): void
+    {
+        $this->withoutExceptionHandling();
 
-    //     $user = User::factory()->create();
-    //     $user2 = User::factory()->create();
+        $user = User::factory()->create();
+        $user2 = User::factory()->create();
+        $team = Team::factory([
+            'user_id' => $user->id
+        ])->create();
 
-    //     $response = $this->get('/');
+        $team->users()->attach($user2);
 
-    //     $response->assertStatus(200);
-    // }
+        $this->assertEquals(1, $team->users->count());
+
+        $user3 = User::factory()->create();
+        $user4 = User::factory()->create();
+
+        $team->users()->attach([
+            $user3->id,
+            $user4->id,
+        ]);
+
+        $this->assertEquals(3, $team->users->count());
+    }
 }
