@@ -10,6 +10,43 @@ use Tests\TestCase;
 
 class UserTeamTest extends TestCase
 {
+
+    /**
+     * An authenticated user can create a team test
+     */
+    public function test_an_authenticated_user_can_create_a_team(): void
+    {
+        $this->withoutExceptionHandling();
+
+        $user = $this->signIn();
+
+        $attributes = [
+            'user_id' => $user->id,
+            'name' => $user->first_name . ' ' . $user->last_name . "'s Team",
+        ];
+
+        $response = $this->post('/teams', $attributes);
+
+        $this->assertDatabaseHas('teams', $attributes);
+    }
+
+    /**
+     * A user must be authenticated to create a team test
+     */
+    public function test_an_unauthenticated_user_can_create_a_team(): void
+    {
+        $this->withoutExceptionHandling();
+
+        $attributes = [
+            'user_id' => 2,
+            'name' => "Test Team",
+        ];
+
+        $response = $this->post('/teams', $attributes);
+
+        $this->assertDatabaseMissing('teams', $attributes);
+    }
+
     /**
      * Test a user can have a team / be the owner of a team - One to Many Relationship
      */
