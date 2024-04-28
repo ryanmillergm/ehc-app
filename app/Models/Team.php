@@ -21,10 +21,18 @@ class Team extends Model
     ];
 
     /**
-     * Get the post that owns the comment.
+     * Get the user that owns the team.
      */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * The users that belong to the team.
+     */
+    public function users()
+    {
+        return $this->belongsToMany(User::class);
     }
 }
