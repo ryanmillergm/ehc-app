@@ -66,10 +66,18 @@ class User extends Authenticatable
     }
 
     /**
-     * Get the teams for the user.
+     * Get the teams a user owns or has created.
      */
     public function teams(): HasMany
     {
         return $this->hasMany(Team::class);
+    }
+
+    /**
+     * The teams that a user belongs to.
+     */
+    public function assignedTeams()
+    {
+        return $this->belongsToMany(Team::class);
     }
 }
