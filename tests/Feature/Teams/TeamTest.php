@@ -92,7 +92,7 @@ class TeamTest extends TestCase
 
         $team->users()->attach($user2);
 
-        $this->assertEquals(1, $team->users->count());
+        $this->assertEquals(1, $team->users()->get()->count());
 
         $user3 = User::factory()->create();
         $user4 = User::factory()->create();
@@ -102,6 +102,36 @@ class TeamTest extends TestCase
             $user4->id,
         ]);
 
-        $this->assertEquals(3, $team->users->count());
+        // $team_count = $team->loadCount('users')->users_count;
+        $this->assertEquals(3, $team->users()->get()->count());
+    }
+
+    /**
+     * A user can be removed from a team
+     */
+    public function test_a_team_member_can_be_removed(): void
+    {
+        $this->withoutExceptionHandling();
+
+        $user = User::factory()->create();
+        $user2 = User::factory()->create();
+        $user3 = User::factory()->create();
+        $user4 = User::factory()->create();
+
+        $team = Team::factory([
+            'user_id' => $user->id
+        ])->create();
+
+        $team->users()->attach([
+            $user2->id,
+            $user3->id,
+            $user4->id,
+        ]);
+
+        $this->assertEquals(3, $team->users()->get()->count());
+
+        $team->users()->detach($user3);
+
+        $this->assertEquals(2, $team->users()->get()->count());
     }
 }
