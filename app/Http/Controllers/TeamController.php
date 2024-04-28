@@ -61,6 +61,7 @@ class TeamController extends Controller
      */
     public function destroy(Team $team)
     {
-        //
+        $team->users()->detach();
+        $team->delete();
     }
 }
