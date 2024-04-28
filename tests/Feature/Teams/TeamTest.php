@@ -61,7 +61,7 @@ class TeamTest extends TestCase
     }
 
     /**
-     * Test a team belongs to a user - One to Many Relationship
+     * Test a team belongs to a user, a user owns a team - One to Many Relationship
      */
     public function test_a_team_belongs_to_a_user(): void
     {
@@ -73,6 +73,8 @@ class TeamTest extends TestCase
         ])->create();
 
         $this->assertEquals(1, $team->user->count());
+
+        $this->assertEquals($user->id, $team->user->id);
 
         $this->assertInstanceOf(User::class, $team->user);
     }
@@ -92,7 +94,7 @@ class TeamTest extends TestCase
 
         $team->users()->attach($user2);
 
-        $this->assertEquals(1, $team->users()->get()->count());
+        $this->assertEquals(1, $team->loadCount('users')->users_count);
 
         $user3 = User::factory()->create();
         $user4 = User::factory()->create();
@@ -102,8 +104,7 @@ class TeamTest extends TestCase
             $user4->id,
         ]);
 
-        // $team_count = $team->loadCount('users')->users_count;
-        $this->assertEquals(3, $team->users()->get()->count());
+        $this->assertEquals(3, $team->loadCount('users')->users_count);
     }
 
     /**
@@ -128,10 +129,10 @@ class TeamTest extends TestCase
             $user4->id,
         ]);
 
-        $this->assertEquals(3, $team->users()->get()->count());
+        $this->assertEquals(3, $team->loadCount('users')->users_count);
 
         $team->users()->detach($user3);
 
-        $this->assertEquals(2, $team->users()->get()->count());
+        $this->assertEquals(2, $team->loadCount('users')->users_count);
     }
 }
