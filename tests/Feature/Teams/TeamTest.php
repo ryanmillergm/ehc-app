@@ -32,7 +32,7 @@ class TeamTest extends TestCase
     {
         $this->withoutExceptionHandling();
 
-        $user = User::factory()->create();
+        $user = $this->signIn();
 
         $attributes = [
             'user_id' => $user->id,

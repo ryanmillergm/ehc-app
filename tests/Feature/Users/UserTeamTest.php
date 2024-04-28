@@ -10,6 +10,24 @@ use Tests\TestCase;
 
 class UserTeamTest extends TestCase
 {
+    use WithFaker, RefreshDatabase;
+
+    /**
+     * A user must be authenticated to create a team test
+     */
+    public function test_an_unauthenticated_user_cannot_create_a_team(): void
+    {
+        // $this->withoutExceptionHandling();
+
+        $attributes = [
+            'user_id' => 2,
+            'name' => "Test Unauthenticated Team",
+        ];
+
+        $response = $this->post('/teams', $attributes)->assertRedirect('login');
+
+        $this->assertDatabaseMissing('teams', $attributes);
+    }
 
     /**
      * An authenticated user can create a team test
@@ -30,22 +48,6 @@ class UserTeamTest extends TestCase
         $this->assertDatabaseHas('teams', $attributes);
     }
 
-    /**
-     * A user must be authenticated to create a team test
-     */
-    public function test_an_unauthenticated_user_can_create_a_team(): void
-    {
-        $this->withoutExceptionHandling();
-
-        $attributes = [
-            'user_id' => 2,
-            'name' => "Test Team",
-        ];
-
-        $response = $this->post('/teams', $attributes);
-
-        $this->assertDatabaseMissing('teams', $attributes);
-    }
 
     /**
      * Test a user can have a team / be the owner of a team - One to Many Relationship
