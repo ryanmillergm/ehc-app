@@ -9,6 +9,8 @@ use Tests\TestCase;
 
 class AdminPanelTest extends TestCase
 {
+    use WithFaker, RefreshDatabase;
+
     /**
      * A basic feature test example.
      */
