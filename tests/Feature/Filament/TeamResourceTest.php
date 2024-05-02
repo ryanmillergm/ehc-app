@@ -6,6 +6,8 @@ use App\Filament\Resources\TeamResource;
 use App\Filament\Resources\TeamResource\Pages\CreateTeam;
 use App\Filament\Resources\TeamResource\Pages\EditTeam;
 use App\Filament\Resources\TeamResource\Pages\ListTeams;
+use App\Filament\Resources\TeamResource\RelationManagers\UsersRelationManager;
+use App\Filament\Resources\UserResource\Pages\EditUser;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Actions\DeleteAction;
@@ -236,5 +238,21 @@ class TeamResourceTest extends TestCase
         $this->get(teamResource::getUrl('view', [
             'record' => Team::factory()->create(),
         ]))->assertSuccessful();
+    }
+
+    /**
+     * Test user resource renders relation manager successfully
+     */
+    public function test_team_resource_renders_user_relation_manager_successfully(): void
+    {
+        $team = Team::factory()
+            ->has(User::factory()->count(1))
+            ->create();
+
+        livewire::test(UsersRelationManager::class, [
+            'ownerRecord' => $team,
+            'pageClass' => EditUser::class,
+        ])
+            ->assertSuccessful();
     }
 }
