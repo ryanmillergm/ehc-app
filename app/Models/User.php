@@ -10,6 +10,7 @@ use Illuminate\Notifications\Notifiable;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Filament\Models\Contracts\HasName;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Jetstream\HasProfilePhoto;
 use Laravel\Sanctum\HasApiTokens;
@@ -66,6 +67,16 @@ class User extends Authenticatable implements FilamentUser, HasName
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    /**
+     * Get the user's full name.
+     */
+    protected function fullName(): Attribute
+    {
+        return Attribute::make(
+            get: fn ($value, $attributes) => $attributes['first_name'] . ' ' . $attributes['last_name'],
+        );
     }
 
     /**
