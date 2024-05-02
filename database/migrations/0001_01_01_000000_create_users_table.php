@@ -21,6 +21,8 @@ return new class extends Migration
             $table->rememberToken();
             $table->foreignId('current_team_id')->nullable();
             $table->string('profile_photo_path', 2048)->nullable();
+            $table->string('full_name')->virtualAs('concat(first_name, \' \', last_name)');
+            $table->string('details')->virtualAs('concat(first_name, \' \', last_name, \' \', email)');
             $table->timestamps();
         });
 
