@@ -33,6 +33,8 @@ class UserResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-users';
 
+    protected static ?string $recordTitleAttribute = 'full_name';
+
     public static function form(Form $form): Form
     {
         return $form
@@ -106,8 +108,8 @@ class UserResource extends Resource
                 //
             ])
             ->actions([
-                EditAction::make(),
                 ViewAction::make(),
+                EditAction::make(),
             ])
             ->bulkActions([
                 BulkActionGroup::make([
