@@ -2,10 +2,13 @@
 
 namespace Tests\Feature\Filament;
 
+use App\Filament\Resources\TeamResource\Pages\EditTeam;
 use App\Filament\Resources\UserResource;
 use App\Filament\Resources\UserResource\Pages\CreateUser;
 use App\Filament\Resources\UserResource\Pages\EditUser;
 use App\Filament\Resources\UserResource\Pages\ListUsers;
+use App\Filament\Resources\UserResource\RelationManagers\TeamsRelationManager;
+use App\Models\Team;
 use App\Models\User;
 use Filament\Actions\DeleteAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -309,5 +312,21 @@ class UserResourceTest extends TestCase
         $this->get(UserResource::getUrl('view', [
             'record' => User::factory()->create(),
         ]))->assertSuccessful();
+    }
+
+    /**
+     * Test user resource renders relation manager successfully
+     */
+    public function test_user_resource_renders_relation_manager_successfully(): void
+    {
+        $user = User::factory()
+            ->has(Team::factory()->count(1))
+            ->create();
+
+        livewire::test(TeamsRelationManager::class, [
+            'ownerRecord' => $user,
+            'pageClass' => EditTeam::class,
+        ])
+            ->assertSuccessful();
     }
 }
