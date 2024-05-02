@@ -28,5 +28,10 @@ class UserSeeder extends Seeder
             'email'         => 'test11@test.com',
         ])
             ->create();
+
+        User::factory()
+            ->count(10)
+            ->hasAssignedTeams(1)
+            ->create();
     }
 }
