@@ -8,6 +8,8 @@ use App\Filament\Resources\UserResource\Pages\EditUser;
 use App\Filament\Resources\UserResource\Pages\ListUsers;
 use App\Filament\Resources\UserResource\Pages\ViewUser;
 use App\Filament\Resources\UserResource\RelationManagers;
+use App\Filament\Resources\UserResource\RelationManagers\AssignedTeamsRelationManager;
+use App\Filament\Resources\UserResource\RelationManagers\TeamsRelationManager;
 use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Components\DateTimePicker;
@@ -33,7 +35,7 @@ class UserResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-users';
 
-    protected static ?string $recordTitleAttribute = 'full_name';
+    // protected static ?string $recordTitleAttribute = 'full_name';
 
     public static function form(Form $form): Form
     {
@@ -121,7 +123,8 @@ class UserResource extends Resource
     public static function getRelations(): array
     {
         return [
-            RelationManagers\TeamsRelationManager::class,
+            TeamsRelationManager::class,
+            AssignedTeamsRelationManager::class,
         ];
     }
 
