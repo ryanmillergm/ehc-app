@@ -25,8 +25,10 @@ class AssignedTeamsRelationManager extends RelationManager
         return $table
             ->recordTitleAttribute('name')
             ->columns([
-                Tables\Columns\TextColumn::make('name'),
-                Tables\Columns\TextColumn::make('user_id'),
+                Tables\Columns\TextColumn::make('name')
+                    ->label('Team Name'),
+                Tables\Columns\TextColumn::make('user.id')
+                    ->label('Team Owner User Id'),
             ])
             ->filters([
                 //

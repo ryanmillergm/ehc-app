@@ -48,10 +48,12 @@ class TeamResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('user.id')
+                TextColumn::make('user.full_name')
+                    ->label('Team Owner')
                     ->numeric()
                     ->sortable(),
                 TextColumn::make('name')
+                    ->label('Team Name')
                     ->searchable(),
                 TextColumn::make('created_at')
                     ->dateTime()
