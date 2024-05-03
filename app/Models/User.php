@@ -103,7 +103,7 @@ class User extends Authenticatable implements FilamentUser, HasName
     /**
      * Get the teams a user owns or has created.
      */
-    public function teams(): HasMany
+    public function ownedTeams(): HasMany
     {
         return $this->hasMany(Team::class);
     }

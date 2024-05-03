@@ -21,7 +21,7 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class TeamsRelationManager extends RelationManager
 {
-    protected static string $relationship = 'teams';
+    protected static string $relationship = 'ownedTeams';
 
     public function form(Form $form): Form
     {

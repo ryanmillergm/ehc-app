@@ -320,7 +320,7 @@ class UserResourceTest extends TestCase
     public function test_user_resource_renders_relation_manager_successfully(): void
     {
         $user = User::factory()
-            ->has(Team::factory()->count(1))
+            ->has(Team::factory()->count(1), 'ownedTeams')
             ->create();
 
         livewire::test(TeamsRelationManager::class, [

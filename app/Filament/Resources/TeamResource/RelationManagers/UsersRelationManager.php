@@ -66,7 +66,7 @@ class UsersRelationManager extends RelationManager
                 CreateAction::make(),
                 AttachAction::make()
                     ->recordSelectOptionsQuery(function (Builder $query, $livewire) {
-                        $query->whereDoesntHave('teams', function($query) use($livewire) {
+                        $query->whereDoesntHave('ownedTeams', function($query) use($livewire) {
                             $query->where('user_id', $livewire->ownerRecord->user_id);
                           });
                     })

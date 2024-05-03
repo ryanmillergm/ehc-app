@@ -63,10 +63,10 @@ class UserTeamTest extends TestCase
 
         $team_query = Team::where('name', $team->name)->first();
 
-        $this->assertEquals(1, $user->loadCount('teams')->teams_count);
+        $this->assertEquals(1, $user->loadCount('ownedTeams')->owned_teams_count);
         $this->assertEquals($user->id, $team_query->user->id);
 
-        $user_team = $user->teams->where('name', $team->name)->first();
+        $user_team = $user->ownedTeams->where('name', $team->name)->first();
 
         $this->assertEquals($user_team->id, $team_query->id);
         $this->assertInstanceOf(Team::class, $user_team);
@@ -92,10 +92,10 @@ class UserTeamTest extends TestCase
 
         $team1_query = Team::where('name', $team1->name)->first();
 
-        $this->assertEquals(3, $user->loadCount('teams')->teams_count);
+        $this->assertEquals(3, $user->loadCount('ownedTeams')->owned_teams_count);
         $this->assertEquals($user->id, $team1_query->user->id);
 
-        $user_team = $user->teams->where('name', $team1->name)->first();
+        $user_team = $user->ownedTeams->where('name', $team1->name)->first();
 
         $this->assertEquals($user_team->id, $team1_query->id);
         $this->assertInstanceOf(Team::class, $user_team);
@@ -119,7 +119,7 @@ class UserTeamTest extends TestCase
 
         $this->delete('/teams/' . $team->id);
 
-        $this->assertEquals(0, $user->loadCount('teams')->teams_count);
+        $this->assertEquals(0, $user->loadCount('ownedTeams')->owned_teams_count);
         $this->assertDatabaseMissing('teams', $attributes);
     }
 
@@ -157,7 +157,7 @@ class UserTeamTest extends TestCase
 
         $this->delete('/teams/' . $team->id);
 
-        $this->assertEquals(0, $user->loadCount('teams')->teams_count);
+        $this->assertEquals(0, $user->loadCount('ownedteams')->ownedteams_count);
         $this->assertDatabaseMissing('teams', $attributes);
         $this->assertDatabaseMissing('team_user', $pivot_table_attributes);
     }

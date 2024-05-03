@@ -30,7 +30,7 @@ class TeamController extends Controller
      */
     public function store(StoreTeamRequest $request)
     {
-        $user = Auth::user()->teams()->create($request->validated());
+        $user = Auth::user()->ownedTeams()->create($request->validated());
     }
 
     /**
