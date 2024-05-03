@@ -9,7 +9,7 @@ use App\Filament\Resources\UserResource\Pages\ListUsers;
 use App\Filament\Resources\UserResource\Pages\ViewUser;
 use App\Filament\Resources\UserResource\RelationManagers;
 use App\Filament\Resources\UserResource\RelationManagers\AssignedTeamsRelationManager;
-use App\Filament\Resources\UserResource\RelationManagers\TeamsRelationManager;
+use App\Filament\Resources\UserResource\RelationManagers\OwnedTeamsRelationManager;
 use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Components\DateTimePicker;
@@ -123,7 +123,7 @@ class UserResource extends Resource
     public static function getRelations(): array
     {
         return [
-            TeamsRelationManager::class,
+            OwnedTeamsRelationManager::class,
             AssignedTeamsRelationManager::class,
         ];
     }

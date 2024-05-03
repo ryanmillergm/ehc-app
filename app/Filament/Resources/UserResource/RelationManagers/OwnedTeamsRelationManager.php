@@ -19,7 +19,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 
-class TeamsRelationManager extends RelationManager
+class OwnedTeamsRelationManager extends RelationManager
 {
     protected static string $relationship = 'ownedTeams';
 
@@ -38,7 +38,8 @@ class TeamsRelationManager extends RelationManager
         return $table
             ->recordTitleAttribute('name')
             ->columns([
-                TextColumn::make('name'),
+                TextColumn::make('name')
+                    ->label('Team Name'),
             ])
             ->filters([
                 //

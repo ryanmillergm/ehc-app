@@ -7,7 +7,7 @@ use App\Filament\Resources\UserResource;
 use App\Filament\Resources\UserResource\Pages\CreateUser;
 use App\Filament\Resources\UserResource\Pages\EditUser;
 use App\Filament\Resources\UserResource\Pages\ListUsers;
-use App\Filament\Resources\UserResource\RelationManagers\TeamsRelationManager;
+use App\Filament\Resources\UserResource\RelationManagers\OwnedTeamsRelationManager;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Actions\DeleteAction;
@@ -323,7 +323,7 @@ class UserResourceTest extends TestCase
             ->has(Team::factory()->count(1), 'ownedTeams')
             ->create();
 
-        livewire::test(TeamsRelationManager::class, [
+        livewire::test(OwnedTeamsRelationManager::class, [
             'ownerRecord' => $user,
             'pageClass' => EditTeam::class,
         ])
