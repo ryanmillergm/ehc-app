@@ -79,6 +79,10 @@ class User extends Authenticatable implements FilamentUser, HasName
         );
     }
 
+
+    // FILAMENT FUNCTIONS:
+
+    
     /**
      * getFilamentName
      *
@@ -99,6 +103,10 @@ class User extends Authenticatable implements FilamentUser, HasName
     {
         return $this->hasVerifiedEmail();
     }
+
+
+    // RELATIONS:
+
 
     /**
      * Get the teams a user owns or has created.
