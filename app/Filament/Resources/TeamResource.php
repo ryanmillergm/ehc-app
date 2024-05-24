@@ -35,12 +35,13 @@ class TeamResource extends Resource
     {
         return $form
             ->schema([
-                Select::make('user_id')
-                    ->relationship('user', 'details')
-                    ->required(),
                 TextInput::make('name')
                     ->required()
                     ->maxLength(255),
+                Select::make('user_id')
+                    ->label('Team Owner')
+                    ->relationship('user', 'details')
+                    ->required(),
             ]);
     }
 
@@ -48,13 +49,13 @@ class TeamResource extends Resource
     {
         return $table
             ->columns([
+                TextColumn::make('name')
+                    ->label('Team Name')
+                    ->searchable(),
                 TextColumn::make('user.full_name')
                     ->label('Team Owner')
                     ->numeric()
                     ->sortable(),
-                TextColumn::make('name')
-                    ->label('Team Name')
-                    ->searchable(),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
