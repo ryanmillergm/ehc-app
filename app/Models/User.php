@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Jetstream\HasProfilePhoto;
 use Laravel\Sanctum\HasApiTokens;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements FilamentUser, HasName
 {
@@ -22,6 +23,7 @@ class User extends Authenticatable implements FilamentUser, HasName
     use HasProfilePhoto;
     use Notifiable;
     use TwoFactorAuthenticatable;
+    use HasRoles;
 
     /**
      * The attributes that are mass assignable.
@@ -82,7 +84,7 @@ class User extends Authenticatable implements FilamentUser, HasName
 
     // FILAMENT FUNCTIONS:
 
-    
+
     /**
      * getFilamentName
      *
@@ -101,7 +103,7 @@ class User extends Authenticatable implements FilamentUser, HasName
      */
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->hasVerifiedEmail();
+        return $this->hasVerifiedEmail() && $this->hasRole('Super Admin');
     }
 
 
