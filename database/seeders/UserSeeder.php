@@ -30,8 +30,12 @@ class UserSeeder extends Seeder
             ->create();
 
         User::factory()
-            ->count(10)
+            ->count(2)
             ->hasAssignedTeams(1)
             ->create();
+
+        $role = Role::where('name', 'Super Admin')->get();
+        $user->assignRole($role);
+        // $team->assignRole($role);
     }
 }
