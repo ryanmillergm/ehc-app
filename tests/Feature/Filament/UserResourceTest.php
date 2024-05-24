@@ -329,4 +329,20 @@ class UserResourceTest extends TestCase
         ])
             ->assertSuccessful();
     }
+
+    /**
+     * Test user resource lists teams relation manager successfully
+     */
+    public function test_user_resource_lists_teams(): void
+    {
+        $user = User::factory()
+            ->has(Team::factory()->count(1), 'ownedTeams')
+            ->create();
+
+        livewire::test(OwnedTeamsRelationManager::class, [
+            'ownerRecord' => $user,
+            'pageClass' => EditTeam::class,
+        ])
+            ->assertCanSeeTableRecords($user->ownedTeams);
+    }
 }
