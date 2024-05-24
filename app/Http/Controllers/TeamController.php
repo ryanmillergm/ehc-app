@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Team;
 use App\Http\Requests\StoreTeamRequest;
 use App\Http\Requests\UpdateTeamRequest;
+use Illuminate\Support\Facades\Auth;
 
 class TeamController extends Controller
 {
@@ -29,7 +30,7 @@ class TeamController extends Controller
      */
     public function store(StoreTeamRequest $request)
     {
-        Team::create($request->validated());
+        $user = Auth::user()->ownedTeams()->create($request->validated());
     }
 
     /**
@@ -61,6 +62,7 @@ class TeamController extends Controller
      */
     public function destroy(Team $team)
     {
-        //
+        $team->users()->detach();
+        $team->delete();
     }
 }
