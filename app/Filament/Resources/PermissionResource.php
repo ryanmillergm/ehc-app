@@ -32,7 +32,7 @@ class PermissionResource extends Resource
             ->schema([
                 TextInput::make('name')
                     ->rules(['required', 'min:2', 'max:255'])
-                    ->unique(),
+                    ->unique(ignoreRecord: true),
             ]);
     }
 

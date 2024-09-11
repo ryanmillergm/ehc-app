@@ -53,7 +53,8 @@ class UserResource extends Resource
                 TextInput::make('email')
                     ->email()
                     ->required()
-                    ->maxLength(255),
+                    ->maxLength(255)
+                    ->unique(ignoreRecord: true),
                 DateTimePicker::make('email_verified_at')
                     ->visibleOn('view'),
                 TextInput::make('password')

@@ -54,7 +54,8 @@ class TeamResource extends Resource
             ->columns([
                 TextColumn::make('name')
                     ->label('Team Name')
-                    ->searchable(),
+                    ->searchable()
+                    ->unique(ignoreRecord: true),
                 TextColumn::make('user.full_name')
                     ->label('Team Owner')
                     ->numeric()
