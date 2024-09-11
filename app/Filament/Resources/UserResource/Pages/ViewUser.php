@@ -12,7 +12,6 @@ class ViewUser extends ViewRecord
 
     protected function getHeaderActions(): array
     {
-        // dd('here');
         return [
             Actions\EditAction::make(),
         ];
