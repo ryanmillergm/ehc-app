@@ -7,6 +7,7 @@ use App\Filament\Resources\RoleResource\RelationManagers;
 use Filament\Forms;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
+use Filament\Forms\Components\Select;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Actions\DeleteAction;
@@ -32,7 +33,11 @@ class RoleResource extends Resource
             ->schema([
                 TextInput::make('name')
                     ->rules(['required', 'min:2', 'max:255'])
-                    ->unique(),
+                    ->unique(ignoreRecord: true),
+
+                Select::make('permissions')
+                    ->multiple()
+                    ->relationship('permissions', 'name')->preload()
             ]);
     }
 
@@ -40,7 +45,12 @@ class RoleResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('name')
+                TextColumn::make('id')->sortable(),
+                TextColumn::make('name'),
+                TextColumn::make('created_at')
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
                 //
