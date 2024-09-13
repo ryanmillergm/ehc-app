@@ -20,6 +20,7 @@ class UserSeeder extends Seeder
             'last_name'     => 'Miller',
             'email'         => 'ryanmillergm@gmail.com'
         ])
+            ->hasAssignedTeams(1)
             ->create();
 
         $user2 = User::factory([
@@ -27,6 +28,7 @@ class UserSeeder extends Seeder
             'last_name'     => 'eleven',
             'email'         => 'test11@test.com',
         ])
+            ->hasAssignedTeams(1)
             ->create();
 
         User::factory()
