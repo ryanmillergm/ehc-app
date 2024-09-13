@@ -38,7 +38,7 @@ class ChildTest extends TestCase
             'country'       => $this->faker->country(),
             'city'          => $this->faker->city(),
             'description'   => $this->faker->paragraph(1),
-            'team_id'       => $this->faker->numberBetween(0, 4),
+            'team_id'       => $this->faker->numberBetween(1, 3),
         ];
 
         $response = $this->post('/children', $attributes);
