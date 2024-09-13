@@ -10,13 +10,17 @@ use Illuminate\Notifications\Notifiable;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Filament\Models\Contracts\HasName;
+use Filament\Models\Contracts\HasTenants;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Jetstream\HasProfilePhoto;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Support\Collection;
 
-class User extends Authenticatable implements FilamentUser, HasName
+class User extends Authenticatable implements FilamentUser, HasName, HasTenants
 {
     use HasApiTokens;
     use HasFactory;
@@ -84,6 +88,19 @@ class User extends Authenticatable implements FilamentUser, HasName
 
     // FILAMENT FUNCTIONS:
 
+    // Filament Multi-Tenancy
+    // assignedTeams
+
+    public function getTenants(Panel $panel): Collection
+    {
+        return $this->assignedTeams;
+    }
+
+    public function canAccessTenant(Model $tenant): bool
+    {
+        return $this->assignedTeams()->whereKey($tenant)->exists();
+    }
+    // End Multi-Tenancy
 
     /**
      * getFilamentName
@@ -103,7 +120,7 @@ class User extends Authenticatable implements FilamentUser, HasName
      */
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->hasVerifiedEmail() && $this->hasRole('Super Admin');
+        return $this->hasVerifiedEmail() && $this->hasRole(['Super Admin', 'Admin', 'Writer']);
     }
 
 

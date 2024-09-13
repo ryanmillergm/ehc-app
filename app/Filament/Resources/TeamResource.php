@@ -33,6 +33,7 @@ class TeamResource extends Resource
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
     protected static ?int $navigationSort = 4;
     protected static ?string $navigationGroup = 'User Settings';
+    protected static ?string $tenantOwnershipRelationshipName = 'assignedTeams';
 
     public static function form(Form $form): Form
     {
