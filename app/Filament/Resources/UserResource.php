@@ -12,6 +12,7 @@ use App\Filament\Resources\UserResource\RelationManagers\AssignedTeamsRelationMa
 use App\Filament\Resources\UserResource\RelationManagers\OwnedTeamsRelationManager;
 use App\Models\User;
 use Filament\Forms;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -77,6 +78,12 @@ class UserResource extends Resource
                     ->visibleOn('view'),
                 TextInput::make('profile_photo_path')
                     ->maxLength(2048),
+                Select::make('roles')
+                    ->multiple()
+                    ->relationship('roles', 'name')->preload(),
+                Select::make('permissions')
+                    ->multiple()
+                    ->relationship('permissions', 'name')->preload(),
             ]);
     }
 
