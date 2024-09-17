@@ -38,7 +38,11 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants
         'first_name',
         'last_name',
         'email',
+        'email_verified_at',
         'password',
+        'two_factor_confirmed_at',
+        'current_team_id',
+        'profile_photo_path'
     ];
 
     /**
@@ -120,7 +124,11 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants
      */
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->hasVerifiedEmail() && $this->hasRole(['Super Admin', 'Admin', 'Writer']);
+        if ($panel->getId() === 'admin') {
+            return $this->hasVerifiedEmail() && $this->hasRole(['Super Admin', 'Admin']);
+        } else {
+            return $this->hasVerifiedEmail() && $this->hasRole(['Super Admin', 'Admin', 'Director', 'Editor']);
+        }
     }
 
 
