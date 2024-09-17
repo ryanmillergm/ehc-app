@@ -41,7 +41,12 @@ class TeamResource extends Resource
             ->schema([
                 TextInput::make('name')
                     ->required()
-                    ->maxLength(255),
+                    ->maxLength(255)
+                    ->unique(ignoreRecord: true),
+                TextInput::make('slug')
+                    ->required()
+                    ->maxLength(255)
+                    ->unique(ignoreRecord: true),
                 Select::make('user_id')
                     ->label('Team Owner')
                     ->relationship('user', 'details')
@@ -53,10 +58,16 @@ class TeamResource extends Resource
     {
         return $table
             ->columns([
+                TextColumn::make('id')
+                    ->searchable()
+                    ->sortable(),
                 TextColumn::make('name')
                     ->label('Team Name')
                     ->searchable()
-                    ->unique(ignoreRecord: true),
+                    ->sortable(),
+                TextColumn::make('slug')
+                    ->searchable()
+                    ->sortable(),
                 TextColumn::make('user.full_name')
                     ->label('Team Owner')
                     ->numeric()
