@@ -13,7 +13,7 @@ class ChildPolicy
      */
     public function viewAny(User $user): bool
     {
-        return true;
+        return $user->hasRole(['Super Admin', 'Admin', 'Director', 'Editor']);
     }
 
     /**
@@ -21,7 +21,7 @@ class ChildPolicy
      */
     public function view(User $user, Child $child): bool
     {
-        return true;
+        return $user->hasRole(['Super Admin', 'Admin', 'Director', 'Editor']);
     }
 
     /**
@@ -29,7 +29,7 @@ class ChildPolicy
      */
     public function create(User $user): bool
     {
-        return true;
+        return $user->hasRole(['Super Admin', 'Admin', 'Director', 'Editor']);
     }
 
     /**
@@ -37,7 +37,7 @@ class ChildPolicy
      */
     public function update(User $user, Child $child): bool
     {
-        return true;
+        return $user->hasRole(['Super Admin', 'Admin', 'Director', 'Editor']);
     }
 
     /**
@@ -45,7 +45,7 @@ class ChildPolicy
      */
     public function delete(User $user, Child $child): bool
     {
-        return true;
+        return $user->hasRole(['Super Admin', 'Admin', 'Director']);
     }
 
     /**
