@@ -20,7 +20,7 @@ return new class extends Migration
             $table->string('country');
             $table->string('city');
             $table->text('description');
-            $table->foreignIdFor(Team::class)->nullable()->constrained()->cascadeOnDelete();
+            $table->foreignIdFor(Team::class)->nullable();
             $table->timestamps();
         });
     }
