@@ -11,7 +11,7 @@ class StoreChildRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return true;
+        return $this->user()->hasPermissionTo('children.write');
     }
 
     /**
@@ -28,6 +28,7 @@ class StoreChildRequest extends FormRequest
             'country'       => 'required',
             'city'          => 'required',
             'description'   => 'required',
+            'team_id'       => 'nullable',
         ];
     }
 }
