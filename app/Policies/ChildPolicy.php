@@ -13,7 +13,7 @@ class ChildPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->hasRole(['Super Admin', 'Admin', 'Director', 'Editor']);
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('children.read');
     }
 
     /**
@@ -21,7 +21,7 @@ class ChildPolicy
      */
     public function view(User $user, Child $child): bool
     {
-        return $user->hasRole(['Super Admin', 'Admin', 'Director', 'Editor']);
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('children.read');
     }
 
     /**
@@ -29,7 +29,7 @@ class ChildPolicy
      */
     public function create(User $user): bool
     {
-        return $user->hasRole(['Super Admin', 'Admin', 'Director', 'Editor']);
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('children.write');
     }
 
     /**
@@ -37,7 +37,7 @@ class ChildPolicy
      */
     public function update(User $user, Child $child): bool
     {
-        return $user->hasRole(['Super Admin', 'Admin', 'Director', 'Editor']);
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('children.write');
     }
 
     /**
@@ -45,7 +45,7 @@ class ChildPolicy
      */
     public function delete(User $user, Child $child): bool
     {
-        return $user->hasRole(['Super Admin', 'Admin', 'Director']);
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('children.delete');
     }
 
     /**
@@ -53,7 +53,7 @@ class ChildPolicy
      */
     public function restore(User $user, Child $child): bool
     {
-        return true;
+        return $user->hasRole(['Super Admin']);
     }
 
     /**
@@ -61,6 +61,6 @@ class ChildPolicy
      */
     public function forceDelete(User $user, Child $child): bool
     {
-        return true;
+        return $user->hasRole(['Super Admin']);
     }
 }
