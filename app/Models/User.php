@@ -125,9 +125,9 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants
     public function canAccessPanel(Panel $panel): bool
     {
         if ($panel->getId() === 'admin') {
-            return $this->hasVerifiedEmail() && $this->hasRole(['Super Admin', 'Admin']);
+            return $this->hasRole(['Super Admin']) || $this->hasPermissionTo('admin.panel');
         } else {
-            return $this->hasVerifiedEmail() && $this->hasRole(['Super Admin', 'Admin', 'Director', 'Editor']);
+            return $this->hasRole(['Super Admin']) || $this->hasPermissionTo('org.panel');
         }
     }
 
