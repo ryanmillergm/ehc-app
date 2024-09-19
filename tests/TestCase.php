@@ -21,7 +21,7 @@ abstract class TestCase extends BaseTestCase
     protected function signInAsSuperAdmin($user = null)
     {
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
-        $role = Role::create(['name' => 'Super Admin']);
+        $role = Role::where('name', 'Super Admin')->first() ?? Role::create(['name' => 'Super Admin']);
         $user = $this->signIn($user);
         $user->assignRole($role);
 
