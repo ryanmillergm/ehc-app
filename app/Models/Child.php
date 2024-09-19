@@ -29,6 +29,7 @@ class Child extends Model
         'country',
         'city',
         'description',
+        'team_id',
     ];
 
     public function team(): BelongsTo
