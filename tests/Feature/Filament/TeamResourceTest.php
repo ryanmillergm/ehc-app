@@ -24,33 +24,35 @@ class TeamResourceTest extends TestCase
     {
         parent::setUp();
 
-        $this->signIn();
+        $this->seed('PermissionSeeder');
+
+        // $this->signIn();
+        $this->signInWithPermissions(null, ['teams.read', 'teams.create', 'teams.update', 'teams.delete', 'admin.panel']);
     }
 
     /**
-     * Test an authenticated user can visit the user resource page in the filament admin panel.
+     * Test an authenticated user with permissions can visit the team resource page in the filament admin panel.
      */
-    public function test_an_authenticated_user_can_render_the_user_resource_page(): void
+    public function test_an_authenticated_user_with_permissions_can_render_the_user_resource_page(): void
     {
         $this->get(TeamResource::getUrl('index'))->assertSuccessful();
     }
 
     /**
-     * Test an authenticated team can visit the team resource table builder list page in the filament admin panel.
+     * Test an authenticated user with permissions can visit the team resource table builder list page in the filament admin panel.
      */
-    public function test_an_authenticated_team_can_render_the_team_resource_table_page(): void
+    public function test_an_authenticated_user_with_permissions_can_render_the_team_resource_table_page(): void
     {
         livewire::test(ListTeams::class)->assertSuccessful();
     }
 
     /**
-     * Test an authenticated team can visit the team resource table builder list page and see a list of teams.
+     * Test an authenticated user can visit the team resource table builder list page and see a list of teams.
      */
-    public function test_team_resource_page_can_list_teams(): void
+    public function test_auth_user_with_permissions_can_see_a_list_of_teams(): void
     {
         Team::factory()->count(10)->create();
         $teams = Team::all();
-
 
         livewire::test(ListTeams::class)
         ->assertCountTableRecords(10)
@@ -77,6 +79,7 @@ class TeamResourceTest extends TestCase
             ->fillForm([
                 'user_id' => $user->id,
                 'name' => $newData->name,
+                'slug' => 'team-slug',
             ])
             ->call('create')
             ->assertHasNoFormErrors();
