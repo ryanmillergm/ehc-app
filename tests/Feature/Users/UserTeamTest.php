@@ -2,8 +2,10 @@
 
 namespace Tests\Feature\Users;
 
+use App\Models\Permission;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Tests\TestCase;
@@ -32,15 +34,42 @@ class UserTeamTest extends TestCase
     /**
      * An authenticated user can create a team test
      */
-    public function test_an_authenticated_user_can_create_a_team(): void
+    public function test_an_authenticated_user_without_permissions_cannot_create_a_team(): void
+    {
+        $this->withoutExceptionHandling();
+
+        $user = $this->signIn();
+        Permission::create(['name' => 'teams.create']);
+
+        $attributes = [
+            'user_id' => $user->id,
+            'name' => $user->first_name . ' ' . $user->last_name . "'s Team",
+            'slug' => strtolower($user->first_name) . '-' . strtolower($user->last_name) . "s-team",
+        ];
+
+        $this->expectException(AuthorizationException::class);
+        $this->expectExceptionMessage('This action is unauthorized.');
+
+        $response = $this->post('/teams', $attributes);
+    }
+
+    /**
+     * An authenticated user can create a team test
+     */
+    public function test_an_authenticated_user_with_permissions_can_create_a_team(): void
     {
         $this->withoutExceptionHandling();
 
         $user = $this->signIn();
 
+        $this->seed();
+        $permission = Permission::where('name', 'teams.create')->first();
+        $user->givePermissionTo($permission->id);
+
         $attributes = [
             'user_id' => $user->id,
             'name' => $user->first_name . ' ' . $user->last_name . "'s Team",
+            'slug' => strtolower($user->first_name) . '-' . strtolower($user->last_name) . "s-team",
         ];
 
         $response = $this->post('/teams', $attributes);

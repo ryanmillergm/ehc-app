@@ -21,6 +21,7 @@ class TeamFactory extends Factory
         return [
             'name' => $this->faker->unique()->company(),
             'user_id' => User::factory(),
+            'slug' => strtolower($this->faker->firstName()) . '-' . strtolower($this->faker->lastName()) . "s-team",
         ];
     }
 }

@@ -11,7 +11,7 @@ class StoreTeamRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return true;
+        return $this->user()->hasPermissionTo('teams.create');
     }
 
     /**
@@ -24,6 +24,7 @@ class StoreTeamRequest extends FormRequest
         return [
             'user_id' => 'required',
             'name' => 'required',
+            'slug' => 'required',
         ];
     }
 }
