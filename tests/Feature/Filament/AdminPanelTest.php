@@ -11,6 +11,13 @@ class AdminPanelTest extends TestCase
 {
     use WithFaker, RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed('PermissionSeeder');
+    }
+
     /**
      * Unauthenticated users cannot visit admin page.
      */
@@ -36,9 +43,22 @@ class AdminPanelTest extends TestCase
     }
 
     /**
-     * A basic feature test example.
+     * An authenticated user with Super Admin role can visit admin page.
      */
     public function test_an_authenticated_user_with_permissions_can_visit_admin_page(): void
+    {
+        $user = User::factory()->create();
+        $this->signInWithPermissions($user, ['admin.panel']);
+
+        $response = $this->get('/admin');
+
+        $response->assertStatus(200);
+    }
+
+    /**
+     * An authenticated user with Super Admin role can visit admin page.
+     */
+    public function test_an_authenticated_user_with_super_admin_role_can_visit_admin_page(): void
     {
         $user = User::factory()->create();
         $this->signInAsSuperAdmin($user);
@@ -47,4 +67,6 @@ class AdminPanelTest extends TestCase
 
         $response->assertStatus(200);
     }
+
+
 }
