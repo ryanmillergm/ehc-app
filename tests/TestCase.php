@@ -2,6 +2,7 @@
 
 namespace Tests;
 
+use App\Models\Permission;
 use App\Models\User;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Spatie\Permission\Models\Role;
@@ -12,6 +13,19 @@ abstract class TestCase extends BaseTestCase
     protected function signIn($user = null)
     {
         $user = $user ?: User::factory()->create();
+
+        $this->actingAs($user);
+
+        return $user;
+    }
+
+    protected function signInWithPermissions($user = null, $permissions)
+    {
+        $user = $user ?: User::factory()->create();
+
+        foreach ($permissions as $permission) {
+            $user->givePermissionTo((Permission::firstOrCreate(['name' => $permission])->id));
+        }
 
         $this->actingAs($user);
 
