@@ -24,6 +24,7 @@ class StoreTeamRequest extends FormRequest
         return [
             'user_id' => 'required',
             'name' => 'required',
+            'slug' => 'required',
         ];
     }
 }

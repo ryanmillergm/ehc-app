@@ -41,6 +41,7 @@ class UserTeamTest extends TestCase
         $attributes = [
             'user_id' => $user->id,
             'name' => $user->first_name . ' ' . $user->last_name . "'s Team",
+            'slug' => strtolower($user->first_name) . '-' . strtolower($user->last_name) . "s-team",
         ];
 
         $response = $this->post('/teams', $attributes);
