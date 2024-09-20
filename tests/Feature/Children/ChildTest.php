@@ -90,7 +90,7 @@ class ChildTest extends TestCase
 
         $user = $this->signIn();
 
-        $permission = Permission::where('name', 'children.write')->first();
+        $permission = Permission::where('name', 'children.create')->first();
 
         $user->givePermissionTo($permission->id);
 

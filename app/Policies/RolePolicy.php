@@ -29,7 +29,7 @@ class RolePolicy
      */
     public function create(User $user): bool
     {
-        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('roles.write');
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('roles.create');
     }
 
     /**
@@ -37,7 +37,7 @@ class RolePolicy
      */
     public function update(User $user, Role $role): bool
     {
-        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('roles.write');
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('roles.update');
     }
 
     /**

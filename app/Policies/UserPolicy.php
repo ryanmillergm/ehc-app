@@ -28,7 +28,7 @@ class UserPolicy
      */
     public function create(User $user): bool
     {
-        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('users.write');
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('users.create');
     }
 
     /**
@@ -36,7 +36,7 @@ class UserPolicy
      */
     public function update(User $user): bool
     {
-        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('users.write');
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('users.update');
     }
 
     /**

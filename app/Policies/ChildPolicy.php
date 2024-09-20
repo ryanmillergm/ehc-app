@@ -29,7 +29,7 @@ class ChildPolicy
      */
     public function create(User $user): bool
     {
-        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('children.write');
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('children.create');
     }
 
     /**
@@ -37,7 +37,7 @@ class ChildPolicy
      */
     public function update(User $user, Child $child): bool
     {
-        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('children.write');
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('children.update');
     }
 
     /**

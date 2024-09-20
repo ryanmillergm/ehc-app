@@ -11,7 +11,7 @@ class StoreChildRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user()->hasPermissionTo('children.write');
+        return $this->user()->hasPermissionTo('children.create');
     }
 
     /**

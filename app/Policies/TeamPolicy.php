@@ -29,7 +29,7 @@ class TeamPolicy
      */
     public function create(User $user): bool
     {
-        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('teams.write');
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('teams.create');
     }
 
     /**
@@ -37,7 +37,7 @@ class TeamPolicy
      */
     public function update(User $user, Team $team): bool
     {
-        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('teams.write');
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('teams.update');
     }
 
     /**
