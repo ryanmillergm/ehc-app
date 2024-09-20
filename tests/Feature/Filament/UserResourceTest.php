@@ -8,9 +8,14 @@ use App\Filament\Resources\UserResource\Pages\CreateUser;
 use App\Filament\Resources\UserResource\Pages\EditUser;
 use App\Filament\Resources\UserResource\Pages\ListUsers;
 use App\Filament\Resources\UserResource\RelationManagers\OwnedTeamsRelationManager;
+use App\Models\Permission;
 use App\Models\Team;
 use App\Models\User;
-use Filament\Actions\DeleteAction;
+use Filament\Tables\Actions\CreateAction;
+use Filament\Tables\Actions\DeleteAction;
+use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
+use Filament\Tables\Actions\DeleteBulkAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Livewire\Livewire;
@@ -24,52 +29,75 @@ class UserResourceTest extends TestCase
     {
         parent::setUp();
 
+        $this->seed('PermissionSeeder');
+
         $this->signIn();
     }
 
     /**
      * Test an authenticated user can visit the user resource page in the filament admin panel.
      */
-    public function test_an_authenticated_user_can_render_the_user_resource_page(): void
+    public function test_an_authenticated_user_without_permissions_cannot_render_the_user_resource_page(): void
     {
+        $this->get(UserResource::getUrl('index'))->assertStatus(403);
+
+        $this->signInWithPermissions(null, ['teams.read', 'admin.panel']);
+
+        $this->get(UserResource::getUrl('index'))->assertStatus(403);
+    }
+
+    /**
+     * Test an authenticated user with permissions can visit the user resource page in the filament admin panel.
+     */
+    public function test_an_authenticated_user_with_permissions_can_render_the_user_resource_page(): void
+    {
+        $this->signInWithPermissions(null, ['users.read', 'admin.panel']);
+
         $this->get(UserResource::getUrl('index'))->assertSuccessful();
     }
 
     /**
-     * Test an authenticated user can visit the user resource table builder list page in the filament admin panel.
+     * Test an authenticated user with permissions can visit the user resource table builder list page in the filament admin panel.
      */
-    public function test_an_authenticated_user_can_render_the_user_resource_table_page(): void
+    public function test_an_authenticated_user_with_permissions_can_render_the_user_resource_table_page(): void
     {
+        $this->signInWithPermissions(null, ['users.read', 'users.create', 'users.update', 'users.delete', 'admin.panel']);
+
         livewire::test(ListUsers::class)->assertSuccessful();
     }
 
     /**
-     * Test an authenticated user can visit the user resource table builder list page and see a list of users.
+     * Test an authenticated userwith permissions can visit the user resource table builder list page and see a list of users.
      */
     public function test_user_resource_page_can_list_users(): void
     {
-        User::factory()->count(9)->create();
+        $this->signInWithPermissions(null, ['users.read', 'users.create', 'users.update', 'users.delete', 'admin.panel']);
+
+        User::factory()->count(7)->create();
         $users = User::all();
 
-
         livewire::test(ListUsers::class)
-        ->assertCountTableRecords(10)
+        ->assertCountTableRecords(9)
         ->assertCanSeeTableRecords($users);
     }
 
     /**
-     * Test an authenticated user visit the create a user resource page
+     * Test an authenticated user with permissions can visit the create a user resource page
      */
     public function test_auth_user_visit_create_user_resource_page(): void
     {
+        $this->signInWithPermissions(null, ['users.read', 'users.create', 'users.update', 'users.delete', 'admin.panel']);
+
         $this->get(UserResource::getUrl('create'))->assertSuccessful();
     }
 
     /**
-     * Test an authenticated user create a user resource
+     * Test an authenticated user with permissions can create a user resource
      */
     public function test_auth_user_can_create_user(): void
     {
+        $this->signInWithPermissions(null, ['users.read', 'users.create', 'users.update', 'users.delete', 'admin.panel']);
+
         $newData = User::factory()->make();
 
         livewire::test(CreateUser::class)
@@ -94,6 +122,8 @@ class UserResourceTest extends TestCase
      */
     public function test_create_user_requires_first_name(): void
     {
+        $this->signInWithPermissions(null, ['users.read', 'users.create', 'users.update', 'users.delete', 'admin.panel']);
+
         $newData = User::factory()->make();
 
         livewire::test(CreateUser::class)
@@ -118,6 +148,8 @@ class UserResourceTest extends TestCase
      */
     public function test_create_user_requires_last_name(): void
     {
+        $this->signInWithPermissions(null, ['users.read', 'users.create', 'users.update', 'users.delete', 'admin.panel']);
+
         $newData = User::factory()->make();
 
         livewire::test(CreateUser::class)
@@ -142,6 +174,8 @@ class UserResourceTest extends TestCase
      */
     public function test_create_user_requires_email(): void
     {
+        $this->signInWithPermissions(null, ['users.read', 'users.create', 'users.update', 'users.delete', 'admin.panel']);
+
         $newData = User::factory()->make();
 
         livewire::test(CreateUser::class)
@@ -166,6 +200,8 @@ class UserResourceTest extends TestCase
      */
     public function test_create_user_requires_password(): void
     {
+        $this->signInWithPermissions(null, ['users.read', 'users.create', 'users.update', 'users.delete', 'admin.panel']);
+
         $newData = User::factory()->make();
 
         livewire::test(CreateUser::class)
@@ -186,10 +222,12 @@ class UserResourceTest extends TestCase
     }
 
     /**
-     * Test an authenticated user can visit the user resource edit page
+     * Test an authenticated user with permissions can visit the user resource edit page
      */
     public function test_auth_user_can_visit_user_resource_edit_page(): void
     {
+        $this->signInWithPermissions(null, ['users.read', 'users.create', 'users.update', 'users.delete', 'admin.panel']);
+
         $this->get(UserResource::getUrl('edit', [
             'record' => User::factory()->create(),
         ]))->assertSuccessful();
@@ -200,6 +238,8 @@ class UserResourceTest extends TestCase
      */
     public function test_user_resource_edit_form_retrieves_correct_data(): void
     {
+        $this->signInWithPermissions(null, ['users.read', 'users.create', 'users.update', 'users.delete', 'admin.panel']);
+
         $user = User::factory()->create();
 
         livewire::test(EditUser::class, [
@@ -217,6 +257,8 @@ class UserResourceTest extends TestCase
      */
     public function test_user_resource_edit_form_saves_correct_data(): void
     {
+        $this->signInWithPermissions(null, ['users.read', 'users.create', 'users.update', 'users.delete', 'admin.panel']);
+
         $user = User::factory()->create();
         $newData = User::factory()->make();
 
@@ -243,6 +285,8 @@ class UserResourceTest extends TestCase
      */
     public function test_user_resource_edit_form_requires_first_name_data(): void
     {
+        $this->signInWithPermissions(null, ['users.read', 'users.create', 'users.update', 'users.delete', 'admin.panel']);
+
         $user = User::factory()->create();
 
         livewire::test(EditUser::class, [
@@ -260,6 +304,8 @@ class UserResourceTest extends TestCase
      */
     public function test_user_resource_edit_form_requires_last_name_data(): void
     {
+        $this->signInWithPermissions(null, ['users.read', 'users.create', 'users.update', 'users.delete', 'admin.panel']);
+
         $user = User::factory()->create();
 
         livewire::test(EditUser::class, [
@@ -277,6 +323,8 @@ class UserResourceTest extends TestCase
      */
     public function test_user_resource_edit_form_requires_email_data(): void
     {
+        $this->signInWithPermissions(null, ['users.read', 'users.create', 'users.update', 'users.delete', 'admin.panel']);
+
         $user = User::factory()->create();
 
         livewire::test(EditUser::class, [
@@ -290,10 +338,12 @@ class UserResourceTest extends TestCase
     }
 
     /**
-     * Test authenticated user can delete a user
+     * Test authenticated user with permissions can delete a user
      */
     public function test_auth_user_can_delete_a_user(): void
     {
+        $this->signInWithPermissions(null, ['users.read', 'users.create', 'users.update', 'users.delete', 'admin.panel']);
+
         $user = User::factory()->create();
 
         livewire::test(EditUser::class, [
@@ -305,10 +355,58 @@ class UserResourceTest extends TestCase
     }
 
     /**
-     * Test an authenticated user can visit the user resource view page
+     * Test authenticated user with permissions can delete a user
      */
-    public function test_an_authenticated_user_can_render_the_user_resource_view_page(): void
+    public function test_auth_user_can_delete_a_user2(): void
     {
+        $this->signInWithPermissions(null, ['users.read', 'users.create', 'users.update', 'users.delete', 'admin.panel']);
+
+        $user = User::factory()->create();
+
+        livewire::test(ListUsers::class)
+            ->callTableAction(DeleteAction::class, $user);
+
+        $this->assertModelMissing($user);
+    }
+
+    /**
+     * Test authenticated user without permissions can delete a user
+     */
+    public function test_auth_user_without_permissions_cannot_delete_a_user(): void
+    {
+        $this->signInWithPermissions(null, ['users.read', 'users.create', 'users.update', 'admin.panel']);
+        $user = User::factory()->create();
+
+        livewire::test(ListUsers::class)
+            ->assertTableActionExists(ViewAction::class)
+            ->assertTableActionExists(EditAction::class)
+            ->assertTableActionDoesNotExist(DeleteAction::class)
+            ->assertTableBulkActionDisabled('delete');
+    }
+
+    /**
+     * Test authenticated user without permissions can edit a user
+     */
+    public function test_auth_user_without_permissions_cannot_edit_a_user(): void
+    {
+        $this->signInWithPermissions(null, ['users.read', 'users.create', 'admin.panel']);
+        $user = User::factory()->create();
+
+        livewire::test(ListUsers::class)
+            ->assertTableActionExists(ViewAction::class)
+            ->assertTableActionDoesNotExist(EditAction::class)
+            ->assertTableActionDoesNotExist(DeleteAction::class)
+            ->assertTableActionDisabled('edit', $user)
+            ->assertTableActionDisabled('delete', $user);
+    }
+
+    /**
+     * Test an authenticated user with permissions can visit the user resource view page
+     */
+    public function test_an_authenticated_user_with_permissions_can_render_the_user_resource_view_page(): void
+    {
+        $this->signInWithPermissions(null, ['users.read', 'admin.panel']);
+
         $this->get(UserResource::getUrl('view', [
             'record' => User::factory()->create(),
         ]))->assertSuccessful();
