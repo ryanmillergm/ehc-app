@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Filament\Org\Resources\ChildResource\Pages;
+namespace App\Filament\Resources\ChildResource\Pages;
 
-use App\Filament\Org\Resources\ChildResource;
+use App\Filament\Resources\ChildResource;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
 

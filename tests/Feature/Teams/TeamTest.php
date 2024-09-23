@@ -32,11 +32,14 @@ class TeamTest extends TestCase
     {
         $this->withoutExceptionHandling();
 
-        $user = $this->signIn();
+        $this->seed('PermissionSeeder');
+
+        $user = $this->signInWithPermissions(null, ['teams.create']);
 
         $attributes = [
             'user_id' => $user->id,
             'name' => $user->first_name . ' ' . $user->last_name . "'s Team",
+            'slug' => 'team-slug',
         ];
 
         $response = $this->post('/teams', $attributes);
