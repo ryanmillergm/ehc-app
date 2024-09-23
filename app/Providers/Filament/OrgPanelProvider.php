@@ -19,6 +19,7 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use App\Filament\Org\Pages\Tenancy\EditTeamProfile;
 use App\Filament\Org\Pages\Tenancy\RegisterTeam;
+use App\Filament\Org\Resources\ChildResource;
 use App\Models\Team;
 use Filament\Support\Enums\MaxWidth;
 
@@ -37,6 +38,9 @@ class OrgPanelProvider extends PanelProvider
                 'success'   => Color::Emerald,
                 'warning'   => Color::Orange,
                 'primary'   => Color::Amber,
+            ])
+            ->resources([
+                ChildResource::class,
             ])
             ->discoverResources(in: app_path('Filament/Org/Resources'), for: 'App\\Filament\\Org\\Resources')
             ->discoverPages(in: app_path('Filament/Org/Pages'), for: 'App\\Filament\\Org\\Pages')
