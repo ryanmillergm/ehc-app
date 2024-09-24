@@ -10,7 +10,7 @@ Route::get('lang/{lang}', function($lang) {
    app()->setLocale($lang);
    session()->put('locale', $lang);
 
-    return back()->with('success', $lang);
+    return back()->with('success', __('flash-messages.language_updated'));
 })->name('lang');
 
 
