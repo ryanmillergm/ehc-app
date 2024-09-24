@@ -4,6 +4,8 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
+        @vite(['resources/css/app.css', 'resources/js/app.js'])
+
         <title>Laravel</title>
 
         <!-- Fonts -->
@@ -57,7 +59,7 @@
                     </header>
 
                     @include('shared.success-message')
-                    
+
                     <main class="mt-6">
                         <div class="grid gap-6 lg:grid-cols-2 lg:gap-8">
                             <a
