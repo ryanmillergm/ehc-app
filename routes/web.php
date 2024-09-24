@@ -10,7 +10,7 @@ Route::get('lang/{lang}', function($lang) {
    app()->setLocale($lang);
    session()->put('locale', $lang);
 
-    return back();
+    return back()->with('success', $lang);
 })->name('lang');
 
 
