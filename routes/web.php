@@ -2,11 +2,21 @@
 
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\ChildrenController;
+use App\Http\Middleware\Localization;
 use Illuminate\Support\Facades\Route;
+
+Route::get('lang/{lang}', function($lang) {
+
+   app()->setLocale($lang);
+   session()->put('locale', $lang);
+
+    return back();
+})->name('lang');
+
 
 Route::get('/', function () {
     return view('welcome');
-});
+})->name('welcome');
 
 
 Route::middleware([
