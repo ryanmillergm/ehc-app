@@ -36,14 +36,19 @@ class PermissionSeeder extends Seeder
         Permission::create(['name' => 'roles.update']);
         Permission::create(['name' => 'roles.delete']);
 
-        Permission::create(['name' => 'teams.read']);
-        Permission::create(['name' => 'teams.create']);
-        Permission::create(['name' => 'teams.update']);
-        Permission::create(['name' => 'teams.delete']);
-
         Permission::create(['name' => 'children.read']);
         Permission::create(['name' => 'children.create']);
         Permission::create(['name' => 'children.update']);
         Permission::create(['name' => 'children.delete']);
+
+        Permission::create(['name' => 'languages.read']);
+        Permission::create(['name' => 'languages.create']);
+        Permission::create(['name' => 'languages.update']);
+        Permission::create(['name' => 'languages.delete']);
+
+        Permission::create(['name' => 'teams.read']);
+        Permission::create(['name' => 'teams.create']);
+        Permission::create(['name' => 'teams.update']);
+        Permission::create(['name' => 'teams.delete']);
     }
 }
