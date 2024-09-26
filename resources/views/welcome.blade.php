@@ -4,6 +4,8 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
+        @vite(['resources/css/app.css', 'resources/js/app.js'])
+
         <title>Laravel</title>
 
         <!-- Fonts -->
@@ -38,7 +40,7 @@
                                         href="{{ route('login') }}"
                                         class="rounded-md px-3 py-2 text-black ring-1 ring-transparent transition hover:text-black/70 focus:outline-none focus-visible:ring-[#FF2D20]"
                                     >
-                                        Log in
+                                        {{ __('auth.log_in') }}
                                     </a>
 
                                     @if (Route::has('register'))
@@ -46,13 +48,17 @@
                                             href="{{ route('register') }}"
                                             class="rounded-md px-3 py-2 text-black ring-1 ring-transparent transition hover:text-black/70 focus:outline-none focus-visible:ring-[#FF2D20]"
                                         >
-                                            Register
+                                            {{ __('auth.register') }}
                                         </a>
                                     @endif
                                 @endauth
+
+                                @include('partials/_language_switcher')
                             </nav>
                         @endif
                     </header>
+
+                    @include('shared.success-message')
 
                     <main class="mt-6">
                         <div class="grid gap-6 lg:grid-cols-2 lg:gap-8">

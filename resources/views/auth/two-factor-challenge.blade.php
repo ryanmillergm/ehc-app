@@ -49,7 +49,7 @@
                     </button>
 
                     <x-button class="ms-4">
-                        {{ __('Log in') }}
+                        {{ __('auth.log_in') }}
                     </x-button>
                 </div>
             </form>
