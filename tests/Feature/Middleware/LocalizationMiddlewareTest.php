@@ -11,6 +11,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 class LocalizationMiddlewareTest extends TestCase
 {
+    use WithFaker, RefreshDatabase;
+    
     /**
      * Test that the Localization method sets the locale on any route.
      */

@@ -8,11 +8,15 @@ use Tests\TestCase;
 
 class SwitchLanguagesTest extends TestCase
 {
+    use WithFaker, RefreshDatabase;
+
     /**
      * Test the locale/language can be switched
      */
     public function test_the_locale_language_can_be_switched(): void
     {
+        $this->withoutExceptionHandling();
+        
          // Mocking a request that passes through middleware
          $response = $this->withSession([]) // starting with an empty session
          ->get('/');
