@@ -23,6 +23,12 @@ class Localization
         App::setlocale($locale);
         $request->session()->put('locale', $locale);
 
+        $language = getLanguage($locale) ?? getLanguage($default_locale);
+
+        if($language) {
+            session()->put('language_id', $language->id);
+        }
+
         // URL::defaults(['locale' => $request->segment(1)]);
 
         return $next($request);
