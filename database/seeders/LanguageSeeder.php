@@ -21,8 +21,8 @@ class LanguageSeeder extends Seeder
         ]);
         Language::create([
             'title'         => 'Spanish',
-            'iso_code'      => 'en',
-            'locale'        => 'en',
+            'iso_code'      => 'es',
+            'locale'        => 'es',
             'right_to_left' => false,
         ]);
     }
