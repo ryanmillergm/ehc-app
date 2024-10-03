@@ -14,6 +14,16 @@ class LanguageSwitch extends Controller
         app()->setLocale($language_code);
         session()->put('locale', $language_code);
 
-         return back()->with('success', __('flash-messages.language_updated'));
+        $language = getLanguage($language_code);
+
+        session()->put('language_id', $language->id);
+
+        $prev_path = parse_url($request->session()->previousUrl());
+
+        if (isset($prev_path["path"]) && $prev_path["path"] == '/lang/' . $language_code) {
+            return redirect('/')->with('success', __('flash-messages.language_updated'));
+        } else {
+            return back()->with('success', __('flash-messages.language_updated'));
+        }
     }
 }
