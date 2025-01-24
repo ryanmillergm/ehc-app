@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Language;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -16,11 +17,24 @@ class LanguageFactory extends Factory
      */
     public function definition(): array
     {
+        $code = $this->getLanguageCode();
+
         return [
-            'title'         => 'Spanish',
-            'iso_code'      => 'en',
-            'locale'        => 'en',
-            'right_to_left' => false,
+            'title'         => $this->faker->word(),
+            'iso_code'      => $code,
+            'locale'        => $code,
+            'right_to_left' => $this->faker->boolean(),
         ];
+    }
+
+    public function getLanguageCode()
+    {
+        $code = $this->faker->languageCode();
+        $language = Language::where('iso_code')->get()->first();
+        if ($language) {
+            return $this->getLanguageCode();
+        } else {
+            return $code;
+        }
     }
 }
