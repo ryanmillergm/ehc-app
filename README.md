@@ -1,3 +1,51 @@
+# The EHC App
+
+This app was developed to allow an organization to showcase their website with the ability for administrators to manage everything through an intuitive Content Management System (cms). Administrators are able to manage things such as Events, donors/sponsors, with the ability to  separate out manageable resource into departments using Filament's Multi-Tenancy. All resources are managed policies that only allow access by users with assigned roles with given permissions from the super admin.
+
+## Tech Stack
+ - Framework: Laravel v11.5.0
+ - Language: PHP v8.2.18
+ - Database: MySQL v8.0.23
+ - Livewire v3.4.11
+ - Jetstream v5.0.4 
+ - ORM: Eloquent
+ - Testing: PHPUnit v11.1.3
+ - Testing: Laravel Dusk v8.2.0 
+ - Node v16.20.2
+
+ ## Other Packages
+ - CMS: Filament v3.2.71
+ - Spatie laravel-permission v6.7.0
+ - `$ composer show` to view all installed packages and their current version
+
+## Local Setup
+ - `$ git clone https://github.com/ryanmillergm/ehc-app.git`
+ - `$ cd ehc-app`
+ - `$ composer install`
+ - `$ npm install && npm run dev`
+ - Create your local database
+ - Copy env.testing to .env and fill in your environment
+ - `$ php artisan migrate`
+ - `$ php artisan db:seed`
+ - `$ npx sequelize db:migrate`
+
+ ## Running the Server Locally
+ - `$ php artisan serve`
+ - Access local endpoints at `http://127.0.0.1:8000`
+ 
+## Running the Test Suite
+ - `php artisan test`
+
+ ## Core Contributors
+ - Ryan Miller, [@ryanmillergm](https://github.com/ryanmillergm)
+
+## Current Iterations
+
+## Future Iterations
+
+## Known Issues
+ - None
+
 <p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
 
 <p align="center">
