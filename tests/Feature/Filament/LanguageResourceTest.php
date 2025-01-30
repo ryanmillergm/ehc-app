@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Filament;
 
+use App\Filament\Resources\LanguageResource;
+use App\Filament\Resources\LanguageResource\Pages\ListLanguages;
 use App\Models\Language;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
@@ -10,14 +12,26 @@ use Livewire\Livewire;
 
 class LanguageResourceTest extends TestCase
 {
+    use WithFaker, RefreshDatabase;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->seed('PermissionSeeder');
         $this->seed('LanguageSeeder');
+    }
 
-        $this->signInWithPermissions(null, ['languages.read', 'languages.create', 'languages.update', 'languages.delete', 'admin.panel']);
+    /**
+     * Test an authenticated user cannot visit the language resource page in the filament admin panel.
+     */
+    public function test_an_authenticated_user_without_permissions_cannot_render_the_language_resource_page(): void
+    {
+        $this->get(LanguageResource::getUrl('index'))->assertRedirect('admin/login');
+
+        $this->signInWithPermissions(null, ['users.read', 'admin.panel']);
+
+        $this->get(LanguageResource::getUrl('index'))->assertStatus(403);
     }
 
     /**
@@ -35,7 +49,7 @@ class LanguageResourceTest extends TestCase
      */
     public function test_an_authenticated_user_with_permissions_can_render_the_language_resource_table_page(): void
     {
-        $this->signInWithPermissions(null, ['language.read', 'language.create', 'language.update', 'language.delete', 'admin.panel']);
+        $this->signInWithPermissions(null, ['languages.read', 'languages.create', 'languages.update', 'languages.delete', 'admin.panel']);
 
         livewire::test(ListLanguages::class)->assertSuccessful();
     }
@@ -46,8 +60,9 @@ class LanguageResourceTest extends TestCase
     public function test_language_resource_page_can_list_languages(): void
     {
         $this->signInWithPermissions(null, ['languages.read', 'languages.create', 'languages.update', 'languages.delete', 'admin.panel']);
-        $count = count(Language::all() + 7);
-        language::factory()->count(7)->create();
+        $num = 7;
+        $count = Language::all()->count() + $num;
+        language::factory()->count($num)->create();
         $languages = language::all();
 
         livewire::test(ListLanguages::class)
