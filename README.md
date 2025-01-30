@@ -2,6 +2,19 @@
 
 This app was developed to allow an organization to showcase their website with the ability for administrators to manage everything through an intuitive Content Management System (cms). Administrators are able to manage things such as Events, donors/sponsors, with the ability to  separate out manageable resource into departments using Filament's Multi-Tenancy. All resources are managed policies that only allow access by users with assigned roles with given permissions from the super admin.
 
+## Roles and permissions
+A role can have many permissions. A role or individual permissions can be assigned to a user. Permissions give users access to resources in the admin panels. A user can have many permissions through a role.
+The access to different models is controlled through each models policy. Ex/ `app\Policies\ChildPolicy.php`
+
+# Access Admin Panel
+The Admin Panel has access to all resources. A user must have the permission or a role with the permission `admin.panel` in order to have access. A user must also have permissions or a role with permissions for the resources they can access.
+`/admin`
+
+# Access Teams Admin Panel
+The Teams Admin Panel has access to limited resources only. A user must have the permission or a role with the permission `org.panel` in order to have access. A user must also have permissions or a role with permissions for the resources they can access.
+`/org/{team_name}` 
+
+
 ## Tech Stack
  - Framework: Laravel v11.5.0
  - Language: PHP v8.2.18
