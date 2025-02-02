@@ -18,7 +18,7 @@ class PageTest extends TestCase
     {
         $this->assertTrue(
           Schema::hasColumns('pages', [
-            'id', 'title', 'is_active'
+            'id', 'title', 'is_active',
         ]), 1);
     }
 }
