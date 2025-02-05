@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Page;
-use App\Http\Requests\StorePageRequest;
-use App\Http\Requests\UpdatePageRequest;
+use App\Http\Requests\Pages\StorePageRequest;
+use App\Http\Requests\Pages\UpdatePageRequest;
 
 class PageController extends Controller
 {
@@ -29,6 +29,7 @@ class PageController extends Controller
      */
     public function store(StorePageRequest $request)
     {
+        dd('page controller');
         //
     }
 
