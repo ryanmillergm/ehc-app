@@ -17,7 +17,8 @@ class PageFactory extends Factory
     public function definition(): array
     {
         return [
-            //
+            'title'         => $this->faker->text(30),
+            'is_active'     => $this->faker->boolean(),
         ];
     }
 }
