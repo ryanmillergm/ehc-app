@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             TeamSeeder::class,
             ChildSeeder::class,
             LanguageSeeder::class,
+            PageSeeder::class,
         ]);
     }
 }

@@ -14,6 +14,9 @@ The Admin Panel has access to all resources. A user must have the permission or 
 The Teams Admin Panel has access to limited resources only. A user must have the permission or a role with the permission `org.panel` in order to have access. A user must also have permissions or a role with permissions for the resources they can access.
 `/org/{team_name}` 
 
+# Pages with Translations
+This has pages by language translations. A page has many translations and a translation belongs to a page.
+
 
 ## Tech Stack
  - Framework: Laravel v11.5.0

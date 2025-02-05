@@ -50,5 +50,10 @@ class PermissionSeeder extends Seeder
         Permission::create(['name' => 'teams.create']);
         Permission::create(['name' => 'teams.update']);
         Permission::create(['name' => 'teams.delete']);
+
+        Permission::create(['name' => 'pages.read']);
+        Permission::create(['name' => 'pages.create']);
+        Permission::create(['name' => 'pages.update']);
+        Permission::create(['name' => 'pages.delete']);
     }
 }
