@@ -29,8 +29,7 @@ class PageController extends Controller
      */
     public function store(StorePageRequest $request)
     {
-        dd('page controller');
-        //
+        $page = Page::create($request->validated());
     }
 
     /**
