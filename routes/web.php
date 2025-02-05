@@ -4,6 +4,7 @@ use App\Http\Controllers\TeamController;
 use App\Http\Controllers\ChildrenController;
 use App\Http\Controllers\LanguagesController;
 use App\Http\Controllers\LanguageSwitch;
+use App\Http\Controllers\PageController;
 use App\Http\Middleware\Localization;
 use Illuminate\Support\Facades\Route;
 
@@ -26,5 +27,6 @@ Route::middleware([
         Route::resource('children', ChildrenController::class);
         Route::resource('languages', LanguagesController::class);
         Route::resource('teams', TeamController::class);
+        Route::resource('pages', PageController::class);
 
 });
