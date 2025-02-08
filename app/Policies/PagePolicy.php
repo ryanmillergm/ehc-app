@@ -13,7 +13,7 @@ class PagePolicy
      */
     public function viewAny(User $user): bool
     {
-        //
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('pages.read');
     }
 
     /**
@@ -21,7 +21,7 @@ class PagePolicy
      */
     public function view(User $user, Page $page): bool
     {
-        //
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('pages.read');
     }
 
     /**
@@ -29,7 +29,7 @@ class PagePolicy
      */
     public function create(User $user): bool
     {
-        //
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('pages.create');
     }
 
     /**
@@ -37,7 +37,7 @@ class PagePolicy
      */
     public function update(User $user, Page $page): bool
     {
-        //
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('pages.update');
     }
 
     /**
@@ -45,7 +45,7 @@ class PagePolicy
      */
     public function delete(User $user, Page $page): bool
     {
-        //
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('pages.delete');
     }
 
     /**
@@ -53,7 +53,7 @@ class PagePolicy
      */
     public function restore(User $user, Page $page): bool
     {
-        //
+        return $user->hasRole(['Super Admin']);
     }
 
     /**
@@ -61,6 +61,6 @@ class PagePolicy
      */
     public function forceDelete(User $user, Page $page): bool
     {
-        //
+        return $user->hasRole(['Super Admin']);
     }
 }
