@@ -370,7 +370,7 @@ class UserResourceTest extends TestCase
     }
 
     /**
-     * Test authenticated user without permissions can delete a user
+     * Test authenticated user without permissions cannot delete a user
      */
     public function test_auth_user_without_permissions_cannot_delete_a_user(): void
     {
