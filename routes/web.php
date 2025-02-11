@@ -5,6 +5,7 @@ use App\Http\Controllers\ChildrenController;
 use App\Http\Controllers\LanguagesController;
 use App\Http\Controllers\LanguageSwitch;
 use App\Http\Controllers\PageController;
+use App\Http\Controllers\PageTranslationController;
 use App\Http\Middleware\Localization;
 use Illuminate\Support\Facades\Route;
 
@@ -28,5 +29,9 @@ Route::middleware([
         Route::resource('languages', LanguagesController::class);
         Route::resource('teams', TeamController::class);
         Route::resource('pages', PageController::class);
+
+        Route::prefix('pages/{page}')->group(function () {
+            Route::resource('translations', PageTranslationController::class);
+        });
 
 });
