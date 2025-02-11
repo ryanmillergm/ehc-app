@@ -11,7 +11,7 @@ class DatabaseSeeder extends Seeder
     /**
      * Seed the application's database.
      */
-    public function run(): void 
+    public function run(): void
     {
         $this->call([
             PermissionSeeder::class,
@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
             ChildSeeder::class,
             LanguageSeeder::class,
             PageSeeder::class,
+            PageTranslationSeeder::class,
         ]);
     }
 }
