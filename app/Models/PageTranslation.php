@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PageTranslation extends Model
 {
@@ -24,4 +25,12 @@ class PageTranslation extends Model
         'content',
         'is_active'
     ];
+
+    /**
+     * Get the Page that owns the PageTranslation.
+     */
+    public function page(): BelongsTo
+    {
+        return $this->belongsTo(Page::class);
+    }
 }
