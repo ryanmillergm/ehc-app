@@ -13,7 +13,7 @@ class PageTranslationPolicy
      */
     public function viewAny(User $user): bool
     {
-        //
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('pages.read');
     }
 
     /**
@@ -21,7 +21,7 @@ class PageTranslationPolicy
      */
     public function view(User $user, PageTranslation $pageTranslation): bool
     {
-        //
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('pages.read');
     }
 
     /**
@@ -29,7 +29,7 @@ class PageTranslationPolicy
      */
     public function create(User $user): bool
     {
-        //
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('pages.create');
     }
 
     /**
@@ -37,7 +37,7 @@ class PageTranslationPolicy
      */
     public function update(User $user, PageTranslation $pageTranslation): bool
     {
-        //
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('pages.update');
     }
 
     /**
@@ -45,7 +45,7 @@ class PageTranslationPolicy
      */
     public function delete(User $user, PageTranslation $pageTranslation): bool
     {
-        //
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('pages.delete');
     }
 
     /**
@@ -53,7 +53,7 @@ class PageTranslationPolicy
      */
     public function restore(User $user, PageTranslation $pageTranslation): bool
     {
-        //
+        return $user->hasRole(['Super Admin']);
     }
 
     /**
@@ -61,6 +61,6 @@ class PageTranslationPolicy
      */
     public function forceDelete(User $user, PageTranslation $pageTranslation): bool
     {
-        //
+        return $user->hasRole(['Super Admin']);
     }
 }
