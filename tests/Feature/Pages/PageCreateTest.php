@@ -105,8 +105,6 @@ class PageCreateTest extends TestCase
     {
         $this->withoutExceptionHandling();
 
-        Page::truncate();
-
         $user = $this->signIn();
 
         $permission = Permission::where('name', 'pages.create')->first();
@@ -131,8 +129,6 @@ class PageCreateTest extends TestCase
     public function test_a_page_requires_is_active_attribute(): void
     {
         $this->withoutExceptionHandling();
-
-        Page::truncate();
 
         $user = $this->signIn();
 
