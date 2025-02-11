@@ -3,8 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\PageTranslation;
-use App\Http\Requests\StorePageTranslationRequest;
-use App\Http\Requests\UpdatePageTranslationRequest;
+use App\Http\Requests\Pages\StorePageTranslationRequest;
+use App\Http\Requests\Pages\UpdatePageTranslationRequest;
+use App\Models\Page;
 
 class PageTranslationController extends Controller
 {
@@ -27,9 +28,9 @@ class PageTranslationController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(StorePageTranslationRequest $request)
+    public function store(Page $page, StorePageTranslationRequest $request)
     {
-        //
+        $page->addTranslation($request->validated());
     }
 
     /**
