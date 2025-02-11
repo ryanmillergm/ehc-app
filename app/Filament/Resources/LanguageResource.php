@@ -6,9 +6,17 @@ use App\Filament\Resources\LanguageResource\Pages;
 use App\Filament\Resources\LanguageResource\RelationManagers;
 use App\Models\Language;
 use Filament\Forms;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Actions\BulkActionGroup;
+use Filament\Tables\Actions\DeleteBulkAction;
+use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -23,16 +31,16 @@ class LanguageResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\TextInput::make('title')
+                TextInput::make('title')
                     ->required()
                     ->maxLength(255),
-                Forms\Components\TextInput::make('iso_code')
+                TextInput::make('iso_code')
                     ->required()
                     ->maxLength(255),
-                Forms\Components\TextInput::make('locale')
+                TextInput::make('locale')
                     ->required()
                     ->maxLength(255),
-                Forms\Components\Toggle::make('right_to_left')
+                Toggle::make('right_to_left')
                     ->required(),
             ]);
     }
@@ -41,19 +49,20 @@ class LanguageResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('title')
+                TextColumn::make('id')->sortable(),
+                TextColumn::make('title')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('iso_code')
+                TextColumn::make('iso_code')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('locale')
+                TextColumn::make('locale')
                     ->searchable(),
-                Tables\Columns\IconColumn::make('right_to_left')
+                IconColumn::make('right_to_left')
                     ->boolean(),
-                Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('updated_at')
+                TextColumn::make('updated_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -62,12 +71,12 @@ class LanguageResource extends Resource
                 //
             ])
             ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
+                ViewAction::make(),
+                EditAction::make(),
             ])
             ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }

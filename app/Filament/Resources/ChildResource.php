@@ -6,9 +6,18 @@ use App\Filament\Resources\ChildResource\Pages;
 use App\Filament\Resources\ChildResource\RelationManagers;
 use App\Models\Child;
 use Filament\Forms;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Actions\BulkActionGroup;
+use Filament\Tables\Actions\DeleteBulkAction;
+use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -24,28 +33,28 @@ class ChildResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\TextInput::make('first_name')
+                TextInput::make('first_name')
                     ->required()
                     ->maxLength(255),
-                Forms\Components\TextInput::make('last_name')
+                TextInput::make('last_name')
                     ->required()
                     ->maxLength(255),
-                Forms\Components\DatePicker::make('date_of_birth')
+                DatePicker::make('date_of_birth')
                     ->live(onBlur: true)
                     ->native(false)
                     ->displayFormat('d/m/Y')
                     ->format('Y/m/d')
                     ->required(),
-                Forms\Components\TextInput::make('country')
+                TextInput::make('country')
                     ->required()
                     ->maxLength(255),
-                Forms\Components\TextInput::make('city')
+                TextInput::make('city')
                     ->required()
                     ->maxLength(255),
-                Forms\Components\Textarea::make('description')
+                Textarea::make('description')
                     ->required()
                     ->columnSpanFull(),
-                Forms\Components\Select::make('team_id')
+                Select::make('team_id')
                     ->relationship('team', 'name')
                     ->required(),
             ]);
@@ -55,25 +64,26 @@ class ChildResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('first_name')
+                TextColumn::make('id')->sortable(),
+                TextColumn::make('first_name')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('last_name')
+                TextColumn::make('last_name')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('date_of_birth')
+                TextColumn::make('date_of_birth')
                     ->date()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('country')
+                TextColumn::make('country')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('city')
+                TextColumn::make('city')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('team.name')
+                TextColumn::make('team.name')
                     ->numeric()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('updated_at')
+                TextColumn::make('updated_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -82,12 +92,12 @@ class ChildResource extends Resource
                 //
             ])
             ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
+                ViewAction::make(),
+                EditAction::make(),
             ])
             ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }
