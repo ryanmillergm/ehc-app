@@ -21,8 +21,8 @@ class PageTranslationSeeder extends Seeder
         ]);
 
         $lang_en = Language::where('title', 'English')->first();
-        if (empty($language)) {
-            $language = Language::create([
+        if (empty($lang_en)) {
+            $lang_en = Language::create([
                 'title'         => 'English',
                 'iso_code'      => 'en',
                 'locale'        => 'en',
@@ -31,8 +31,8 @@ class PageTranslationSeeder extends Seeder
         }
 
         $lang_es = Language::where('title', 'Spanish')->first();
-        if (empty($language)) {
-            $language = Language::create([
+        if (empty($lang_es)) {
+            $lang_es = Language::create([
                 'title'         => 'Spanish',
                 'iso_code'      => 'es',
                 'locale'        => 'es',
@@ -41,8 +41,8 @@ class PageTranslationSeeder extends Seeder
         }
 
         $lang_fr = Language::where('title', 'French')->first();
-        if (empty($language)) {
-            $language = Language::create([
+        if (empty($lang_fr)) {
+            $lang_fr = Language::create([
                 'title'         => 'French',
                 'iso_code'      => 'fr',
                 'locale'        => 'fr',
@@ -51,9 +51,9 @@ class PageTranslationSeeder extends Seeder
         }
 
         $lang_ar = Language::where('title', 'Arabic')->first();
-        if (empty($language)) {
-            $language = Language::create([
-                'title'         => 'French',
+        if (empty($lang_ar)) {
+            $lang_ar = Language::create([
+                'title'         => 'Arabic',
                 'iso_code'      => 'ar',
                 'locale'        => 'ar',
                 'right_to_left' => false,
@@ -100,9 +100,9 @@ class PageTranslationSeeder extends Seeder
             'is_active'     => true,
         ];
 
-        PageTranslation::create([$atts_en]);
-        PageTranslation::create([$atts_es]);
-        PageTranslation::create([$atts_fr]);
-        PageTranslation::create([$atts_ar]);
+        PageTranslation::create($atts_en);
+        PageTranslation::create($atts_es);
+        PageTranslation::create($atts_fr);
+        PageTranslation::create($atts_ar);
     }
 }
