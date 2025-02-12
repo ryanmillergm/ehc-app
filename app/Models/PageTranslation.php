@@ -33,4 +33,12 @@ class PageTranslation extends Model
     {
         return $this->belongsTo(Page::class);
     }
+
+    /**
+     * Get the Language that owns the PageTranslation.
+     */
+    public function language(): BelongsTo
+    {
+        return $this->belongsTo(Language::class);
+    }
 }
