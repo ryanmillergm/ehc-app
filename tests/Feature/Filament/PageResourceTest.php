@@ -143,7 +143,7 @@ class PageResourceTest extends TestCase
     public function test_page_resource_renders_relation_manager_successfully(): void
     {
         $page = Page::factory()
-            ->has(PageTranslation::factory()->count(1), 'translations')
+            ->has(PageTranslation::factory()->count(1), 'pageTranslations')
             ->create();
 
         livewire::test(TranslationsRelationManager::class, [
