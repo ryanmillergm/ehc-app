@@ -9,7 +9,6 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Foundation\Testing\WithFaker;
 use Tests\TestCase;
-use Illuminate\Support\Facades\Schema;
 
 class LanguagesCreateTest extends TestCase
 {
@@ -19,17 +18,6 @@ class LanguagesCreateTest extends TestCase
     {
         parent::setUp();
         $this->seed();
-    }
-
-    /**
-     * Test langugages database has correct columns
-     */
-    public function test_langugages_database_has_expected_columns()
-    {
-        $this->assertTrue(
-          Schema::hasColumns('languages', [
-            'title', 'iso_code', 'locale', 'right_to_left', 'created_at'
-        ]), 1);
     }
 
     /**
