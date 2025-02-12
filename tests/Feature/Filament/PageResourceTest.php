@@ -159,13 +159,13 @@ class PageResourceTest extends TestCase
     public function test_page_resource_lists_page_translations(): void
     {
         $page = Page::factory()
-            ->has(PageTranslation::factory()->count(3), 'translations')
+            ->has(PageTranslation::factory()->count(3), 'pageTranslations')
             ->create();
 
         livewire::test(TranslationsRelationManager::class, [
             'ownerRecord' => $page,
             'pageClass' => EditPageTranslation::class,
         ])
-            ->assertCanSeeTableRecords($page->translations);
+            ->assertCanSeeTableRecords($page->pageTranslations);
     }
 }

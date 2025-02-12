@@ -23,7 +23,7 @@ class Page extends Model
     /**
      * Get the translations for a page.
      */
-    public function translations(): HasMany
+    public function pageTranslations(): HasMany
     {
         return $this->hasMany(PageTranslation::class);
     }
@@ -31,7 +31,7 @@ class Page extends Model
 
     public function addTranslation($request)
     {
-        return $this->translations()->create($request);
+        return $this->pageTranslations()->create($request);
     }
 
 }

@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class TranslationsRelationManager extends RelationManager
 {
-    protected static string $relationship = 'translations';
+    protected static string $relationship = 'pageTranslations';
 
     public function form(Form $form): Form
     {
