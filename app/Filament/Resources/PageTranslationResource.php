@@ -6,6 +6,10 @@ use App\Filament\Resources\PageTranslationResource\Pages;
 use App\Filament\Resources\PageTranslationResource\RelationManagers;
 use App\Models\PageTranslation;
 use Filament\Forms;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -25,25 +29,27 @@ class PageTranslationResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\TextInput::make('page_id')
-                    ->required()
-                    ->numeric(),
-                Forms\Components\TextInput::make('language_id')
-                    ->required()
-                    ->numeric(),
-                Forms\Components\TextInput::make('title')
+                Select::make('page_id')
+                    ->label('Page')
+                    ->relationship('page', 'title')
+                    ->required(),
+                Select::make('language_id')
+                    ->label('Language')
+                    ->relationship('language', 'title')
+                    ->required(),
+                TextInput::make('title')
                     ->required()
                     ->maxLength(255),
-                Forms\Components\TextInput::make('slug')
+                TextInput::make('slug')
                     ->required()
                     ->maxLength(255),
-                Forms\Components\Textarea::make('description')
+                Textarea::make('description')
                     ->required()
                     ->columnSpanFull(),
-                Forms\Components\Textarea::make('content')
+                Textarea::make('content')
                     ->required()
                     ->columnSpanFull(),
-                Forms\Components\Toggle::make('is_active')
+                Toggle::make('is_active')
                     ->required(),
             ]);
     }
