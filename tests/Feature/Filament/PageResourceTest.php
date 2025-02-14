@@ -6,7 +6,7 @@ use App\Models\User;
 use App\Filament\Resources\PageResource;
 use App\Filament\Resources\PageResource\Pages\CreatePage;
 use App\Filament\Resources\PageResource\Pages\ListPages;
-use App\Filament\Resources\PageResource\RelationManagers\TranslationsRelationManager;
+use App\Filament\Resources\PageResource\RelationManagers\PageTranslationsRelationManager;
 use App\Filament\Resources\PageTranslationResource\Pages\EditPageTranslation;
 use App\Models\Page;
 use App\Models\PageTranslation;
@@ -146,7 +146,7 @@ class PageResourceTest extends TestCase
             ->has(PageTranslation::factory()->count(1), 'pageTranslations')
             ->create();
 
-        livewire::test(TranslationsRelationManager::class, [
+        livewire::test(PageTranslationsRelationManager::class, [
             'ownerRecord' => $page,
             'pageClass' => EditPageTranslation::class,
         ])
@@ -162,7 +162,7 @@ class PageResourceTest extends TestCase
             ->has(PageTranslation::factory()->count(3), 'pageTranslations')
             ->create();
 
-        livewire::test(TranslationsRelationManager::class, [
+        livewire::test(PageTranslationsRelationManager::class, [
             'ownerRecord' => $page,
             'pageClass' => EditPageTranslation::class,
         ])

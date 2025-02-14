@@ -4,7 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\PageResource\Pages;
 use App\Filament\Resources\PageResource\RelationManagers;
-use App\Filament\Resources\PageResource\RelationManagers\TranslationsRelationManager;
+use App\Filament\Resources\PageResource\RelationManagers\PageTranslationsRelationManager;
 use App\Filament\Resources\PageTranslationResource\Pages\ListPageTranslations;
 use App\Filament\Resources\PageTranslationResource\Pages\ViewPageTranslation;
 use Filament\Resources\Pages\Page as PageFilament;
@@ -80,7 +80,7 @@ class PageResource extends Resource
     public static function getRelations(): array
     {
         return [
-            TranslationsRelationManager::class,
+            PageTranslationsRelationManager::class,
         ];
     }
 
