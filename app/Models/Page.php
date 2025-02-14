@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Page extends Model
 {
@@ -18,4 +19,19 @@ class Page extends Model
         'title',
         'is_active',
     ];
+
+    /**
+     * Get the translations for a page.
+     */
+    public function pageTranslations(): HasMany
+    {
+        return $this->hasMany(PageTranslation::class);
+    }
+
+
+    public function addTranslation($request)
+    {
+        return $this->pageTranslations()->create($request);
+    }
+
 }

@@ -6,7 +6,10 @@ use App\Models\User;
 use App\Filament\Resources\PageResource;
 use App\Filament\Resources\PageResource\Pages\CreatePage;
 use App\Filament\Resources\PageResource\Pages\ListPages;
+use App\Filament\Resources\PageResource\RelationManagers\PageTranslationsRelationManager;
+use App\Filament\Resources\PageTranslationResource\Pages\EditPageTranslation;
 use App\Models\Page;
+use App\Models\PageTranslation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Tests\TestCase;
@@ -114,7 +117,7 @@ class PageResourceTest extends TestCase
     /**
      * Test validation - Page requires title
      */
-    public function test_create_user_requires_first_name(): void
+    public function test_create_page_requires_title(): void
     {
         $this->signInWithPermissions(null, ['pages.read', 'pages.create', 'pages.update', 'pages.delete', 'admin.panel']);
 
@@ -132,5 +135,37 @@ class PageResourceTest extends TestCase
             'title' => $newData->title,
             'is_active' => $newData->is_active,
         ]);
+    }
+
+    /**
+     * Test Page resource renders relation manager successfully
+     */
+    public function test_page_resource_renders_relation_manager_successfully(): void
+    {
+        $page = Page::factory()
+            ->has(PageTranslation::factory()->count(1), 'pageTranslations')
+            ->create();
+
+        livewire::test(PageTranslationsRelationManager::class, [
+            'ownerRecord' => $page,
+            'pageClass' => EditPageTranslation::class,
+        ])
+            ->assertSuccessful();
+    }
+
+    /**
+     * Test Page resource renders relation manager successfully
+     */
+    public function test_page_resource_lists_page_translations(): void
+    {
+        $page = Page::factory()
+            ->has(PageTranslation::factory()->count(3), 'pageTranslations')
+            ->create();
+
+        livewire::test(PageTranslationsRelationManager::class, [
+            'ownerRecord' => $page,
+            'pageClass' => EditPageTranslation::class,
+        ])
+            ->assertCanSeeTableRecords($page->pageTranslations);
     }
 }

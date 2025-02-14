@@ -4,6 +4,10 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\PageResource\Pages;
 use App\Filament\Resources\PageResource\RelationManagers;
+use App\Filament\Resources\PageResource\RelationManagers\PageTranslationsRelationManager;
+use App\Filament\Resources\PageTranslationResource\Pages\ListPageTranslations;
+use App\Filament\Resources\PageTranslationResource\Pages\ViewPageTranslation;
+use Filament\Resources\Pages\Page as PageFilament;
 use App\Models\Page;
 use Filament\Forms;
 use Filament\Forms\Components\TextInput;
@@ -16,12 +20,19 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Filament\Pages\SubNavigationPosition;
+use Filament\Tables\Actions\BulkActionGroup;
+use Filament\Tables\Actions\DeleteBulkAction;
+use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
 
 class PageResource extends Resource
 {
     protected static ?string $model = Page::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+
+    protected static SubNavigationPosition $subNavigationPosition = SubNavigationPosition::Top;
 
     public static function form(Form $form): Form
     {
@@ -38,6 +49,7 @@ class PageResource extends Resource
     {
         return $table
             ->columns([
+                TextColumn::make('id')->sortable(),
                 TextColumn::make('title')->sortable(),
                 CheckboxColumn::make('is_active')->sortable(),
             ])
@@ -45,20 +57,30 @@ class PageResource extends Resource
                 //
             ])
             ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
+                ViewAction::make(),
+                EditAction::make(),
             ])
             ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
+    }
+
+    public static function getRecordSubNavigation(PageFilament $page): array
+    {
+        return $page->generateNavigationItems([
+            Pages\Viewpage::class,
+            Pages\Editpage::class,
+            ViewPageTranslation::class,
+            ListPageTranslations::class,
+        ]);
     }
 
     public static function getRelations(): array
     {
         return [
-            //
+            PageTranslationsRelationManager::class,
         ];
     }
 

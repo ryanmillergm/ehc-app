@@ -25,5 +25,17 @@ class LanguageSeeder extends Seeder
             'locale'        => 'es',
             'right_to_left' => false,
         ]);
+        Language::create([
+            'title'         => 'French',
+            'iso_code'      => 'fr',
+            'locale'        => 'fr',
+            'right_to_left' => false,
+        ]);
+        Language::create([
+            'title'         => 'Arabic',
+            'iso_code'      => 'ar',
+            'locale'        => 'ar',
+            'right_to_left' => true,
+        ]);
     }
 }
