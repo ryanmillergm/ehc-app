@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\PageResource\RelationManagers;
 
 use App\Filament\Resources\PageTranslationResource;
+use App\Models\PageTranslation;
 use Filament\Forms;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
@@ -23,14 +24,15 @@ class TranslationsRelationManager extends RelationManager
 {
     protected static string $relationship = 'pageTranslations';
 
+    public function isReadOnly(): bool
+    {
+        return false;
+    }
+
     public function form(Form $form): Form
     {
         return $form
-            ->schema([
-                TextInput::make('title')
-                    ->required()
-                    ->maxLength(255),
-            ]);
+            ->schema(PageTranslation::getForm($this->getOwnerRecord()->id));
     }
 
     public function table(Table $table): Table

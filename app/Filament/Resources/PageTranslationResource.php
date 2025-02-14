@@ -28,30 +28,7 @@ class PageTranslationResource extends Resource
     public static function form(Form $form): Form
     {
         return $form
-            ->schema([
-                Select::make('page_id')
-                    ->label('Page')
-                    ->relationship('page', 'title')
-                    ->required(),
-                Select::make('language_id')
-                    ->label('Language')
-                    ->relationship('language', 'title')
-                    ->required(),
-                TextInput::make('title')
-                    ->required()
-                    ->maxLength(255),
-                TextInput::make('slug')
-                    ->required()
-                    ->maxLength(255),
-                Textarea::make('description')
-                    ->required()
-                    ->columnSpanFull(),
-                Textarea::make('content')
-                    ->required()
-                    ->columnSpanFull(),
-                Toggle::make('is_active')
-                    ->required(),
-            ]);
+            ->schema(PageTranslation::getForm());
     }
 
     public static function table(Table $table): Table
@@ -62,7 +39,7 @@ class PageTranslationResource extends Resource
                 TextColumn::make('page_id')
                     ->numeric()
                     ->sortable(),
-                TextColumn::make('language_id')
+                TextColumn::make('language.title')
                     ->numeric()
                     ->sortable(),
                 TextColumn::make('title')
