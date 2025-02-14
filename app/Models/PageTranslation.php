@@ -9,6 +9,9 @@ use Filament\Forms\Components\Toggle;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Filament\Forms\Get;
+use Filament\Forms\Set;
+use Illuminate\Support\Str;
 
 class PageTranslation extends Model
 {
@@ -45,6 +48,14 @@ class PageTranslation extends Model
                 ->relationship('language', 'title')
                 ->required(),
             TextInput::make('title')
+                ->live(onBlur: true)
+                ->afterStateUpdated(function (Get $get, Set $set, ?string $old, ?string $state) {
+                    if (($get('slug') ?? '') !== Str::slug($old)) {
+                        return;
+                    }
+
+                    $set('slug', Str::slug($state));
+                })
                 ->required()
                 ->maxLength(255),
             TextInput::make('slug')
