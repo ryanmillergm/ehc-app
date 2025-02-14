@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\PageResource\RelationManagers;
 
+use App\Filament\Resources\PageTranslationResource;
 use Filament\Forms;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
@@ -12,6 +13,7 @@ use Filament\Tables\Actions\CreateAction;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Columns\CheckboxColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -36,7 +38,12 @@ class TranslationsRelationManager extends RelationManager
         return $table
             ->recordTitleAttribute('title')
             ->columns([
+                TextColumn::make('id'),
                 TextColumn::make('title'),
+                TextColumn::make('slug'),
+                CheckboxColumn::make('is_active'),
+                TextColumn::make('page.title'),
+                TextColumn::make('language.title'),
             ])
             ->filters([
                 //
