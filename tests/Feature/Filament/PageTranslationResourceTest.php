@@ -3,12 +3,16 @@
 namespace Tests\Feature\Filament;
 
 use App\Filament\Resources\PageTranslationResource;
+use App\Filament\Resources\PageTranslationResource\Pages\CreatePageTranslation;
 use App\Filament\Resources\PageTranslationResource\Pages\ListPageTranslations;
+use App\Models\Language;
+use App\Models\Page;
 use App\Models\PageTranslation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Livewire\Livewire;
 use Tests\TestCase;
+use Illuminate\Support\Str;
 
 class PageTranslationResourceTest extends TestCase
 {
@@ -77,6 +81,77 @@ class PageTranslationResourceTest extends TestCase
         $this->signInWithPermissions(null, ['pages.read', 'pages.create', 'pages.update', 'pages.delete', 'admin.panel']);
 
         $this->get(PageTranslationResource::getUrl('create'))->assertSuccessful();
+    }
+
+    /**
+     * Test an authenticated user with permissions can create a page resource
+     */
+    public function test_auth_user_can_create_a_page_translation(): void
+    {
+        $this->signInWithPermissions(null, ['pages.read', 'pages.create', 'pages.update', 'pages.delete', 'admin.panel']);
+
+        $newData = PageTranslation::factory()->make();
+        $page = Page::factory()->create();
+        $language = Language::factory()->create();
+
+        livewire::test(CreatePageTranslation::class)
+            ->fillForm([
+                'page_id'       => $page->id,
+                'language_id'   => $language->id,
+                'title'         => $newData->title,
+                'slug'          => 'test-create-page-translation',
+                'description'   => $newData->description,
+                'content'       => $newData->content,
+                'is_active'     => $newData->is_active,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas(PageTranslation::class, [
+            'title'         => $newData->title,
+            'page_id'       => $page->id,
+            'language_id'   => $language->id,
+            'slug'          => 'test-create-page-translation',
+            'description'   => $newData->description,
+            'content'       => $newData->content,
+            'is_active'     => $newData->is_active,
+        ]);
+    }
+
+    /**
+     * Test a slug is automatically generated from title when creating a page translation
+     */
+    public function test_a_slug_is_automatically_generated_from_title_when_creating_a_page_translation(): void
+    {
+        $this->signInWithPermissions(null, ['pages.read', 'pages.create', 'pages.update', 'pages.delete', 'admin.panel']);
+
+        $newData = PageTranslation::factory()->make();
+        $page = Page::factory()->create();
+        $language = Language::factory()->create();
+
+        $slug = Str::slug($newData->title, '-');
+
+        livewire::test(CreatePageTranslation::class)
+            ->fillForm([
+                'page_id'       => $page->id,
+                'language_id'   => $language->id,
+                'title'         => $newData->title,
+                'description'   => $newData->description,
+                'content'       => $newData->content,
+                'is_active'     => $newData->is_active,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas(PageTranslation::class, [
+            'title'         => $newData->title,
+            'page_id'       => $page->id,
+            'language_id'   => $language->id,
+            'slug'          => $slug,
+            'description'   => $newData->description,
+            'content'       => $newData->content,
+            'is_active'     => $newData->is_active,
+        ]);
     }
 }
 
