@@ -7,6 +7,7 @@ use App\Http\Controllers\LanguageSwitch;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\PageTranslationController;
 use App\Http\Middleware\Localization;
+use App\Livewire\Pages\IndexPage;
 use Illuminate\Support\Facades\Route;
 
 Route::get('lang/{lang}', LanguageSwitch::class)->name('lang');
@@ -15,6 +16,7 @@ Route::get('/', function () {
     return view('welcome');
 })->name('welcome');
 
+Route::get('/pages/{slug}', IndexPage::class);
 
 Route::middleware([
     'auth:sanctum',
