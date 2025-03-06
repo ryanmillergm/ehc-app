@@ -36,10 +36,10 @@ class IndexPageTest extends TestCase
 
         $translation = PageTranslation::factory()->create(['language_id' => $language->id, 'page_id' => $page->id]);
 
-        $response = $this->get('/' . $translation->slug);
+        $response = $this->get('/pages/' . $translation->slug);
         $response->assertOk();
 
-        $this->get('/' . $translation->slug)
+        $this->get('/pages/' . $translation->slug)
             ->assertSeeLivewire(IndexPage::class);
     }
 }
