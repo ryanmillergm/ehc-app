@@ -24,22 +24,4 @@ class IndexPageTest extends TestCase
         Livewire::test(IndexPage::class)
             ->assertStatus(200);
     }
-
-    /** @test */
-    #[Test]
-    public function test_component_exists_on_the_page()
-    {
-        $this->withoutExceptionHandling();
-
-        $page = Page::factory()->create();
-        $language = Language::factory()->create();
-
-        $translation = PageTranslation::factory()->create(['language_id' => $language->id, 'page_id' => $page->id]);
-
-        $response = $this->get('/pages/' . $translation->slug);
-        $response->assertOk();
-
-        $this->get('/pages/' . $translation->slug)
-            ->assertSeeLivewire(IndexPage::class);
-    }
 }
