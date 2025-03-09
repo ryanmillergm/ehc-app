@@ -24,4 +24,30 @@ class IndexPageTest extends TestCase
         Livewire::test(IndexPage::class)
             ->assertStatus(200);
     }
+
+
+    /** @test */
+    #[Test]
+    public function displays_all_pages_for_default_language_english()
+    {
+        $this->seed();
+
+        $response = $this->get('/pages');
+        $response->assertOk();
+    
+        // Livewire::test(IndexPage::class)
+        //     ->assertViewHas('pageTranslations', function ($translations) {
+        //         return count($translations) == 1;
+        //     });
+
+        $this->get('/pages')
+            ->assertSeeLivewire(IndexPage::class);
+
+        Livewire::test(IndexPage::class)
+            ->assertSee('Blog Test Title Example')
+            ->assertDontSee('Blog Test Content Example');
+
+        // Need to test that it only displays pages with the language set in the session
+        
+    }
 }
