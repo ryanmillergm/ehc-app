@@ -20,6 +20,15 @@ class Page extends Model
         'is_active',
     ];
 
+    public function scopePageTranslationsByLanguage($query)
+    {
+        $pages = $query->withWhereHas('pageTranslations', function ($query) {
+            $query->where('is_active', true)->where( 'language_id', session('language_id'));
+        })->get();
+
+        return $pages;
+    }
+
     /**
      * Get the translations for a page.
      */
