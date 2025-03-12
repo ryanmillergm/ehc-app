@@ -15,7 +15,7 @@ The Teams Admin Panel has access to limited resources only. A user must have the
 `/org/{team_name}` 
 
 # Pages with Translations
-This has pages by language translations. A page has many translations and a translation belongs to a page.
+This has pages by language translations. A page has many translations and a translation belongs to a page. Defaults to english and finds translation by selected language.
 
 
 ## Tech Stack
