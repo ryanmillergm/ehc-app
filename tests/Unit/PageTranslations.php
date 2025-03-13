@@ -12,14 +12,7 @@ class PageTranslations extends TestCase
 {
     use RefreshDatabase;
     
-    /**
-     * A basic unit test example.
-     */
-    public function test_example(): void
-    {
-        $this->assertTrue(true);
-    }
-
+    
     public function test_a_page_translation_belongs_to_a_page()
     {
         $translation = PageTranslation::factory()->create();
