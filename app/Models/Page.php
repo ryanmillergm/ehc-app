@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -19,14 +20,18 @@ class Page extends Model
         'title',
         'is_active',
     ];
-
-    public function scopePageTranslationsByLanguage($query)
+    
+    /**
+     * scopeAllActivePagesWithTranslationsByLanguage
+     *
+     * @param  mixed $query
+     * @return void
+     */
+    public function scopeAllActivePagesWithTranslationsByLanguage(Builder $query)
     {
-        $pages = $query->withWhereHas('pageTranslations', function ($query) {
+        $query->withWhereHas('pageTranslations', function ($query) {
             $query->where('is_active', true)->where( 'language_id', session('language_id'));
-        })->get();
-
-        return $pages;
+        });
     }
 
     /**
