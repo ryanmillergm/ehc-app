@@ -14,15 +14,25 @@ use Tests\TestCase;
 
 class ShowPageTest extends TestCase
 {
-    use WithFaker, RefreshDatabase;
+    use RefreshDatabase, WithFaker;
+
+    public function setUp(): void
+    {
+        parent::setUp();
+        $this->seed();
+    }
     
     /** @test */
     #[Test]
     public function renders_successfully()
     {
-        Livewire::test(ShowPage::class)
+        $page = Page::with('pageTranslations')->find(4);
+        $translation_1 = $page->pageTranslations->first();
+
+        Livewire::test(ShowPage::class, ['slug' => $translation_1->slug])
             ->assertStatus(200);
     }
+    
 
     /** @test */
     #[Test]
@@ -48,10 +58,12 @@ class ShowPageTest extends TestCase
     #[Test]
     public function test_displays_page_translation()
     {
-        $this->seed();
+        $english_language = Language::where('locale', 'en')->first();
 
-        // dd(PageTranslation::all());
-        $page = Page::with('pageTranslations')->find(4);
+        session(['language_id' => $english_language->id]);
+        
+        $page = Page::allActivePagesWithTranslationsByLanguage()->first();
+        
         $translation_1 = $page->pageTranslations->first();
 
         $response = $this->get('/pages/' . $translation_1->slug);
@@ -60,7 +72,7 @@ class ShowPageTest extends TestCase
         $this->get('/pages/' . $translation_1->slug)
             ->assertSeeLivewire(ShowPage::class);
     
-        Livewire::test(ShowPage::class)
+        Livewire::test(ShowPage::class, ['slug' => $translation_1->slug])
             ->assertSee('Blog Test Title Example')
             ->assertSee('Blog Test Description Example')
             ->assertSee('Blog Test Content Example');
