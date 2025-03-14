@@ -11,7 +11,7 @@ class IndexPage extends Component
 
     #[Computed()]
     public function pages() {
-        $pages = Page::pageTranslationsByLanguage();
+        $pages = Page::allActivePagesWithTranslationsByLanguage()->get();
 
         return $pages;
     }
@@ -25,6 +25,7 @@ class IndexPage extends Component
             array_push($translations, $page->pageTranslations->first());
         }
 
+        // dd($translations);
         return $translations;
     }
 
