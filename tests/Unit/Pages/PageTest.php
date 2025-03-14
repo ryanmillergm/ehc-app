@@ -95,11 +95,11 @@ class PageTest extends TestCase
     }
     
     /**
-     * A page can be queried with Page Translations by language - scopePageTranslationsByLanguage
+     * A list of active pages can be queried with Page Translations by language - scopePageTranslationsByLanguage
      *
      * @return void
      */
-    public function test_a_page_can_scope_active_translations_by_language() 
+    public function test_active_pages_can_scope_active_translations_by_language() 
     {
         $this->seed();
               
@@ -109,17 +109,39 @@ class PageTest extends TestCase
 
         session(['language_id' => '1']);
 
-        $page = Page::factory()->create();
-        $page2 = Page::factory()->create();
-        $page3 = Page::factory()->create();
+        // Active Pages
+        $page = Page::factory()->create(['is_active' => true]);
+        $page2 = Page::factory()->create(['is_active' => true]);
+        $page3 = Page::factory()->create(['is_active' => true]);
 
+        // Not Active Pages
+        $page4 = Page::factory()->create(['is_active' => false]);
+
+        // Active Translations
         $translation = PageTranslation::factory()->create(['language_id' => $spanish_language->id, 'page_id' => $page->id, 'is_active' => true]);
         $translation2 = PageTranslation::factory()->create(['language_id' => $english_language->id, 'page_id' => $page->id, 'is_active' => true]);
         $translation3 = PageTranslation::factory()->create(['language_id' => $french_language->id, 'page_id' => $page->id, 'is_active' => true]);
-        $translation_en = PageTranslation::factory()->create(['language_id' => $english_language, 'page_id' => $page3->id, 'is_active' => false]);
+        $translation4 = PageTranslation::factory()->create(['language_id' => $english_language->id, 'page_id' => $page4->id, 'is_active' => true]);
+        $translation5 = PageTranslation::factory()->create(['language_id' => $spanish_language->id, 'page_id' => $page4->id, 'is_active' => true]);
+        
+        // Not Active Translations
+        $translation_en = PageTranslation::factory()->create(['language_id' => $english_language->id, 'page_id' => $page3->id, 'is_active' => false]);
 
         $pages_with_translations_by_english_language = Page::allActivePagesWithTranslationsByLanguage()->get();
-
         $this->assertEquals(2, count($pages_with_translations_by_english_language));
+
+        session(['language_id' => '2']);
+
+        $pages_with_translations_by_spanish_language = Page::allActivePagesWithTranslationsByLanguage()->get();
+        $this->assertEquals(2, count($pages_with_translations_by_spanish_language));
+        
+        // Active Spanish Translations
+        $translation_es = PageTranslation::factory()->create(['language_id' => $spanish_language->id, 'page_id' => $page3->id, 'is_active' => true]);
+
+        // Not Active Spanish Translations
+        $translation2_es = PageTranslation::factory()->create(['language_id' => $spanish_language->id, 'page_id' => $page2->id, 'is_active' => false]);
+
+        $pages_with_translations_by_spanish_language = Page::allActivePagesWithTranslationsByLanguage()->get();
+        $this->assertEquals(3, count($pages_with_translations_by_spanish_language));
     }
 }
