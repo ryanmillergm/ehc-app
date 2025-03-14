@@ -22,7 +22,7 @@ class Page extends Model
     ];
     
     /**
-     * scopeAllActivePagesWithTranslationsByLanguage
+     * Scope All Active Pages With Active PageTranslations By Language
      *
      * @param  mixed $query
      * @return void
@@ -31,7 +31,7 @@ class Page extends Model
     {
         $query->withWhereHas('pageTranslations', function ($query) {
             $query->where('is_active', true)->where( 'language_id', session('language_id'));
-        });
+        })->where('is_active', true);
     }
 
     /**
