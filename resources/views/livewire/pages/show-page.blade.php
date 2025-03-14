@@ -1,3 +1,7 @@
 <div>
-    {{-- The best athlete wants his opponent at his best. --}}
+    <h1>This is the show page</h1>
+    
+    <h1>{{ $this->translation->title }}</h1>
+    <p>{{ $this->translation->description }}</p>
+    <div>{!! $this->translation->content !!}</div>
 </div>
