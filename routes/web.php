@@ -17,9 +17,6 @@ Route::get('/', function () {
     return view('welcome');
 })->name('welcome');
 
-Route::get('/pages/{slug}', ShowPage::class);
-Route::get('/pages/', IndexPage::class);
-
 Route::middleware([
     'auth:sanctum',
     config('jetstream.auth_session'),
@@ -32,9 +29,16 @@ Route::middleware([
         Route::resource('children', ChildrenController::class);
         Route::resource('languages', LanguagesController::class);
         Route::resource('teams', TeamController::class);
-        // Route::resource('pages', PageController::class);
+        Route::resource('pages', PageController::class)->only([
+            'store'
+        ]);
 
-        // Route::prefix('pages/{page}')->group(function () {
-        //     Route::resource('translations', PageTranslationController::class);
-        // });
+        Route::prefix('pages/{page}')->group(function () {
+            Route::resource('translations', PageTranslationController::class)->only([
+                'store'
+            ]);
+        });
 });
+
+Route::get('/pages/{slug}', ShowPage::class);
+Route::get('/pages/', IndexPage::class);
