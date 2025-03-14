@@ -20,7 +20,6 @@ class PageTest extends TestCase
      */
     public function test_a_page_can_add_a_translation(): void
     {
-        // $this->assertTrue(true);
         $page = Page::factory()->create();
 
         $language = Language::factory()->create();
@@ -107,7 +106,7 @@ class PageTest extends TestCase
         $spanish_language = Language::where('locale', 'es')->first();
         $french_language = Language::where('locale', 'fr')->first();
 
-        session(['language_id' => '1']);
+        session(['language_id' => $english_language->id]);
 
         // Active Pages
         $page = Page::factory()->create(['is_active' => true]);
@@ -130,7 +129,7 @@ class PageTest extends TestCase
         $pages_with_translations_by_english_language = Page::allActivePagesWithTranslationsByLanguage()->get();
         $this->assertEquals(2, count($pages_with_translations_by_english_language));
 
-        session(['language_id' => '2']);
+        session(['language_id' => $spanish_language->id]);
 
         $pages_with_translations_by_spanish_language = Page::allActivePagesWithTranslationsByLanguage()->get();
         $this->assertEquals(2, count($pages_with_translations_by_spanish_language));
