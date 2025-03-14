@@ -9,6 +9,7 @@ use Tests\TestCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Illuminate\Support\Facades\DB;
+// use Illuminate\Support\Facades\Session;
 
 class PageTest extends TestCase
 {
@@ -91,5 +92,34 @@ class PageTest extends TestCase
 
         // Method 3: PageTranslations are related to Pages and is a collection instance.
         $this->assertInstanceOf('Illuminate\Database\Eloquent\Collection', $page->pageTranslations);
+    }
+    
+    /**
+     * A page can be queried with Page Translations by language - scopePageTranslationsByLanguage
+     *
+     * @return void
+     */
+    public function test_a_page_can_scope_active_translations_by_language() 
+    {
+        $this->seed();
+              
+        $english_language = Language::where('locale', 'en')->first();
+        $spanish_language = Language::where('locale', 'es')->first();
+        $french_language = Language::where('locale', 'fr')->first();
+
+        session(['language_id' => '1']);
+
+        $page = Page::factory()->create();
+        $page2 = Page::factory()->create();
+        $page3 = Page::factory()->create();
+
+        $translation = PageTranslation::factory()->create(['language_id' => $spanish_language->id, 'page_id' => $page->id, 'is_active' => true]);
+        $translation2 = PageTranslation::factory()->create(['language_id' => $english_language->id, 'page_id' => $page->id, 'is_active' => true]);
+        $translation3 = PageTranslation::factory()->create(['language_id' => $french_language->id, 'page_id' => $page->id, 'is_active' => true]);
+        $translation_en = PageTranslation::factory()->create(['language_id' => $english_language, 'page_id' => $page3->id, 'is_active' => false]);
+
+        $pages_with_translations_by_english_language = Page::allActivePagesWithTranslationsByLanguage()->get();
+
+        $this->assertEquals(2, count($pages_with_translations_by_english_language));
     }
 }
