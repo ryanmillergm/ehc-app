@@ -26,10 +26,10 @@ class ShowPageTest extends TestCase
     #[Test]
     public function renders_successfully()
     {
-        $page = Page::with('pageTranslations')->find(4);
-        $translation_1 = $page->pageTranslations->first();
+        $page = Page::with('pageTranslations')->where('title', 'Test translations Page')->first();
+        $translation = $page->pageTranslations->first();
 
-        Livewire::test(ShowPage::class, ['slug' => $translation_1->slug])
+        Livewire::test(ShowPage::class, ['slug' => $translation->slug])
             ->assertStatus(200);
     }
     
@@ -76,5 +76,43 @@ class ShowPageTest extends TestCase
             ->assertSee('Blog Test Title Example')
             ->assertSee('Blog Test Description Example')
             ->assertSee('Blog Test Content Example');
+    }
+
+
+    /** @test */
+    #[Test]
+    public function test_displays_default_page_translation_if_translation_for_language_does_not_exist()
+    {
+        $english_language = Language::where('locale', 'en')->first();
+        $spanish_language = Language::where('locale', 'es')->first();
+        $french_language = Language::where('locale', 'fr')->first();
+
+        // Sets session to Spanish
+        session(['language_id' => $spanish_language->id]);
+        session(['locale' => $spanish_language->locale]);
+
+        // dd(session('language_id'));
+
+        $page = Page::factory()->create([
+            'title' => 'This title should be in english',
+            'is_active' => true
+        ]);
+
+        $translation = PageTranslation::factory()->create(['language_id' => $english_language->id, 'page_id' => $page->id, 'is_active' => true]);
+        $translation_fr = PageTranslation::factory()->create(['language_id' => $french_language->id, 'page_id' => $page->id, 'is_active' => true]);
+ 
+        // Goes to a french translations slug
+        // $response = $this->get('/pages/' . 'lsakdjfklsdajflkasdjfkojf');
+        $response = $this->get('/pages/' . $translation_fr->slug);
+
+        // Should redirect to the english translation since there is no spanish translation
+        $response->assertRedirect('/pages/' . $translation->slug)->assertSeeLivewire(ShowPage::class, ['slug' => $translation->slug]);
+
+        dd('after redirect in test');
+    
+        Livewire::test(ShowPage::class, ['slug' => $translation->slug])
+            ->assertSee($translation->title)
+            ->assertSee($translation->description);
+            // ->assertSee($translation->content);
     }
 }
