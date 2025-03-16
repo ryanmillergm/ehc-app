@@ -37,8 +37,6 @@ class PageTranslationsTest extends TestCase
      */
     public function test_a_page_translation_belongs_to_a_language_and_a_page()
     {
-
-
         $page = Page::factory()->create();
         $page2 = Page::factory()->create();
         $page3 = Page::factory()->create();
