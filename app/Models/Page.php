@@ -35,6 +35,21 @@ class Page extends Model
     }
 
     /**
+     * Scope Get Translation by Language
+     *
+     * @param  mixed $query
+     * @return void
+     */
+    public function scopeTranslationByDefaultLanguage(Builder $query)
+    {
+        $language = Language::first();
+
+        $query->where(function ($query, $language) {
+            $query->where('language_id', $language)->where('is_active', true);
+        });
+    }
+
+    /**
      * Get the translations for a page.
      */
     public function pageTranslations(): HasMany
