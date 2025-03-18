@@ -91,7 +91,6 @@ class ShowPageTest extends TestCase
         session(['language_id' => $spanish_language->id]);
         session(['locale' => $spanish_language->locale]);
 
-        // dd(session('language_id'));
 
         $page = Page::factory()->create([
             'title' => 'This title should be in english',
