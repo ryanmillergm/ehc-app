@@ -113,4 +113,14 @@ class ShowPageTest extends TestCase
         //     ->assertSee($translation->description);
         //     // ->assertSee($translation->content);
     }
+
+
+    /** @test */
+    #[Test]
+    public function test_redirects_to_page_index_if_no_page_exists()
+    {
+        $response = $this->get('/pages/' . 'lsakdjfklsdajflkasdjfkojf');
+
+        $response->assertRedirect('/pages/');
+    }
 }
