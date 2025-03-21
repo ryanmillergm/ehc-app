@@ -97,6 +97,34 @@ class ShowPageTest extends TestCase
             'is_active' => true
         ]);
 
+        $translation_fr = PageTranslation::factory()->create(['language_id' => $french_language->id, 'page_id' => $page->id, 'is_active' => true]);
+ 
+        $response = $this->get('/pages/' . $translation_fr->slug);
+
+        $url = url()->current();
+
+        $this->assertEquals(parse_url($url, PHP_URL_PATH), '/pages/' . $translation_fr->slug);
+    }
+
+
+    /** @test */
+    #[Test]
+    public function test_displays_page_translation_of_slug_used_if_no_current_language_or_default_language_translation_exist()
+    {
+        $english_language = Language::where('locale', 'en')->first();
+        $spanish_language = Language::where('locale', 'es')->first();
+        $french_language = Language::where('locale', 'fr')->first();
+
+        // Sets session to Spanish
+        session(['language_id' => $spanish_language->id]);
+        session(['locale' => $spanish_language->locale]);
+
+
+        $page = Page::factory()->create([
+            'title' => 'This title should be in english',
+            'is_active' => true
+        ]);
+
         $translation = PageTranslation::factory()->create(['language_id' => $english_language->id, 'page_id' => $page->id, 'is_active' => true]);
         $translation_fr = PageTranslation::factory()->create(['language_id' => $french_language->id, 'page_id' => $page->id, 'is_active' => true]);
  
