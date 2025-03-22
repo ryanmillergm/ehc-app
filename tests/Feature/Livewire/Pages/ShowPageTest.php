@@ -43,6 +43,8 @@ class ShowPageTest extends TestCase
         $page = Page::factory()->create();
         $language = Language::factory()->create();
 
+        session(['language_id' => $language->id]);
+
         $translation = PageTranslation::factory()->create(['language_id' => $language->id, 'page_id' => $page->id]);
 
         $response = $this->get('/pages/' . $translation->slug);
