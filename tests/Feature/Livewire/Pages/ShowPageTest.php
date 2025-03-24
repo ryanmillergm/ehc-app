@@ -38,17 +38,20 @@ class ShowPageTest extends TestCase
     #[Test]
     public function test_component_exists_on_the_page()
     {
-        $this->withoutExceptionHandling();
+        $english_language = Language::where('locale', 'en')->first();
 
-        $page = Page::factory()->create();
-        $language = Language::factory()->create();
-
-        session(['language_id' => $language->id]);
-
-        $translation = PageTranslation::factory()->create(['language_id' => $language->id, 'page_id' => $page->id]);
+        session(['language_id' => $english_language->id]);
+        
+        $page = Page::allActivePagesWithTranslationsByLanguage()->first();
+        
+        $translation = $page->pageTranslations->first();
 
         $response = $this->get('/pages/' . $translation->slug);
         $response->assertOk();
+
+        $url = url()->current();
+        $this->assertEquals(parse_url($url, PHP_URL_PATH), '/pages/' . $translation->slug);
+        $response->assertStatus(200);
 
         $this->get('/pages/' . $translation->slug)
             ->assertSeeLivewire(ShowPage::class);
@@ -57,6 +60,7 @@ class ShowPageTest extends TestCase
 
     
     /** @test */
+    // If slug is for a translation matching the current sessions language, display translation
     #[Test]
     public function test_displays_page_translation()
     {
@@ -131,7 +135,6 @@ class ShowPageTest extends TestCase
         $translation_fr = PageTranslation::factory()->create(['language_id' => $french_language->id, 'page_id' => $page->id, 'is_active' => true]);
  
         // Goes to a french translations slug
-        // $response = $this->get('/pages/' . 'lsakdjfklsdajflkasdjfkojf');
         $response = $this->get('/pages/' . $translation_fr->slug);
 
         // Should redirect to the english translation since there is no spanish translation
