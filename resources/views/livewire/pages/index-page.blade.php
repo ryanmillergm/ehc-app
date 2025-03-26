@@ -1,4 +1,10 @@
 <div>
+    @if (session('status'))
+        <div class="text-center bg-green-700 text-gray-200">
+            {{ session('status') }}
+        </div>
+    @endif
+    
     <h1>Hello From Pages</h1>
     
             
