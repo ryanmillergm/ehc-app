@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 
 class PageTranslation extends Model
@@ -86,5 +87,41 @@ class PageTranslation extends Model
     public function language(): BelongsTo
     {
         return $this->belongsTo(Language::class);
+    }
+
+
+    /**
+     * Scope Get Translation with Page by Slug
+     *
+     * @param  mixed $query
+     * @return void
+     */
+    public function scopeTranslationBySlug(Builder $query, $slug)
+    {
+        $query->with('page')->where('slug', $slug);
+    }
+
+
+    /**
+     * Scope Get Active Translation and Page
+     *
+     * @param  mixed $query
+     * @return void
+     */
+    public function scopeActiveTranslation(Builder $query)
+    {
+        $query->where('is_active', true);
+    }
+
+
+    /**
+     * Scope Get Translation by Language
+     *
+     * @param  mixed $query
+     * @return void
+     */
+    public function scopeByLanguage(Builder $query, $language)
+    {
+        $query->where( 'language_id', $language);
     }
 }

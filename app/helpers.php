@@ -11,12 +11,14 @@ use Illuminate\Support\Facades\Session;
             }
 
             if ($id) {
-                return Language::find($id);
+                $language = Language::find($id);
             } else if ($locale) {
-                return Language::where('iso_code', $locale)->first();
+                $language =  Language::where('iso_code', $locale)->first();
             } else {
-                return Language::first();
+                $language =  Language::first();
             }
+
+            return $language ?? Language::first();
         }
     }
 
