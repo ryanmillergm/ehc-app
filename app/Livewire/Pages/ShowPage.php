@@ -36,11 +36,21 @@ class ShowPage extends Component
 
         $language = Language::find(session('language_id')) ?? getLanguage();
         
-        // Translation By Slug Doesn't Match Current Language
+        // If Translation By Slug Doesn't Match Current Language, find which translation it should dispaly.
         if ($translation->language_id !== $language->id) {
-            $page = $translation->page;
+            
+            $this->findTranslationToDisplay($slug, $translation, $language);
+        }
+
+        return $translation;
+    }
+
+    public function findTranslationToDisplay($slug, $translation, $language)
+    {
+        $page = $translation->page;
             $translation_for_current_language = $page->pageTranslations->where('language_id', $language->id)->first();
-            // If translation found for current Language redirect to translations slug
+
+            // If translation found for current Language redirect to that translation's slug
             if ($translation_for_current_language) {
                 session()->flash('status', "Found Page for {$language->title} language.");
                 // $this->translation = $translation_for_current_language;
@@ -54,7 +64,7 @@ class ShowPage extends Component
             
             $translation_for_default_language = $page->pageTranslations->where('language_id', $default_language->id)->first();
             
-            // If translation for default language redirect to translations slug
+            // If there is a translation for default language, redirect to translation's slug
             if ($translation_for_default_language) {
                 session()->flash('status', "Found {$default_language->title} page intead.");
                 // $this->translation = $translation_for_default_language;
@@ -62,7 +72,7 @@ class ShowPage extends Component
                 return $this->redirect('/pages/' . $translation_for_default_language->slug, navigate: true);
             }
 
-            // If current and default language translations are not available, return original transaltion for slug else redirect to pages index
+            // If current and default language translations are not available, return current slug's translation in different language or if no translation exists at all, redirect to pages index.
             if($translation) {
                 $translation_language = Language::find($translation->language_id);
 
@@ -72,7 +82,6 @@ class ShowPage extends Component
                 session()->flash('status', "Sorry. The page you were looking for does not exist");
                 return $this->redirectToPages($slug);
             }
-        }
 
         return $translation;
     }
@@ -84,8 +93,7 @@ class ShowPage extends Component
 
     public function redirectToPages($slug) 
     {
-        // session()->flash('status', `Sorry, the page "$slug" does not exist.`);
-
+        session()->flash('status', "Sorry, the page '{$slug}' does not exist.");
         $this->redirect(IndexPage::class, navigate: true);
     }
 
