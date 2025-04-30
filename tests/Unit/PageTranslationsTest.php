@@ -8,7 +8,7 @@ use App\Models\PageTranslation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-class PageTranslations extends TestCase
+class PageTranslationsTest extends TestCase
 {
     use RefreshDatabase;
     
