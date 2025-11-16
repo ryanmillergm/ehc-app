@@ -9,24 +9,38 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    let lastScrollY = window.pageYOffset || document.documentElement.scrollTop;
+    let lastScrollY = window.scrollY || window.pageYOffset;
     let ticking = false;
 
-    const SCROLL_DOWN_HIDE_OFFSET = 20; // how far down before we allow hiding
-    const SCROLL_DELTA = 5;             // minimum scroll delta to react
+    const HIDE_OFFSET = 10;  // start hiding after 10px
+    const SCROLL_DELTA = 5;  // minimum difference to count as up/down
+
+    const setNavbarHidden = (hidden) => {
+        navbar.style.transform = hidden ? 'translateY(-100%)' : 'translateY(0)';
+    };
 
     const updateNavbar = () => {
-        const currentScrollY = window.pageYOffset || document.documentElement.scrollTop;
+        const currentScrollY = window.scrollY || window.pageYOffset;
+        const diff = currentScrollY - lastScrollY;
 
-        const scrollingDown = currentScrollY > lastScrollY + SCROLL_DELTA;
-        const scrollingUp   = currentScrollY < lastScrollY - SCROLL_DELTA;
+        const scrollingDown = diff > SCROLL_DELTA;
+        const scrollingUp   = diff < -SCROLL_DELTA;
 
-        if (scrollingDown && currentScrollY > SCROLL_DOWN_HIDE_OFFSET) {
-            // Slide navbar up out of view
-            navbar.classList.add('-translate-y-full');
-        } else if (scrollingUp) {
-            // Slide navbar back in
-            navbar.classList.remove('-translate-y-full');
+        console.log({
+            lastScrollY,
+            currentScrollY,
+            diff,
+            scrollingDown,
+            scrollingUp,
+            transform: navbar.style.transform,
+        });
+
+        if (scrollingDown && currentScrollY > HIDE_OFFSET) {
+            // Hide navbar
+            setNavbarHidden(true);
+        } else if (scrollingUp || currentScrollY <= 0) {
+            // Show navbar again
+            setNavbarHidden(false);
         }
 
         lastScrollY = currentScrollY;

@@ -1,7 +1,8 @@
+{{-- resources/views/partials/navbar.blade.php --}}
 <nav
     id="main-navbar"
     class="fixed top-0 inset-x-0 z-50 bg-white/80 backdrop-blur border-b border-slate-200
-           transition-transform duration-300 transform-gpu translate-y-0"
+           transform transition-transform duration-300"
 >
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div class="grid grid-cols-[auto_1fr_auto] items-center h-16 gap-4">
@@ -45,7 +46,8 @@
                         <button
                             type="submit"
                             class="inline-flex items-center rounded-full bg-indigo-600 px-3 py-1.5
-                                   text-xs font-semibold text-white shadow-sm hover:bg-indigo-700">
+                                   text-xs font-semibold text-white shadow-sm hover:bg-indigo-700"
+                        >
                             Log out
                         </button>
                     </form>
