@@ -5,3 +5,41 @@
 [x-cloak] {
     display: none;
 }
+
+/* === Mobile navbar hamburger === */
+
+.navbar-hamburger-icon {
+    @apply relative w-6 h-6 transition-transform duration-500 ease-out;
+}
+
+.navbar-hamburger-line {
+    @apply absolute left-0 right-0 h-0.5 bg-slate-800 rounded-full transition-transform duration-300 ease-out;
+}
+
+/* line positions */
+.navbar-hamburger-line-top {
+    top: 0.25rem;
+}
+.navbar-hamburger-line-middle {
+    top: 0.75rem;
+}
+.navbar-hamburger-line-bottom {
+    top: 1.25rem;
+}
+
+/* open state: rotate + morph into "X" */
+.navbar-hamburger-open .navbar-hamburger-icon {
+    transform: rotate(180deg); /* change to 360deg if you want a full spin */
+}
+
+.navbar-hamburger-open .navbar-hamburger-line-top {
+    transform: translateY(0.5rem) rotate(45deg);
+}
+
+.navbar-hamburger-open .navbar-hamburger-line-middle {
+    transform: scaleX(0);
+}
+
+.navbar-hamburger-open .navbar-hamburger-line-bottom {
+    transform: translateY(-0.5rem) rotate(-45deg);
+}
