@@ -54,6 +54,7 @@ class StripeWebhookController extends Controller
                 break;
 
             case 'invoice.paid':
+            case 'invoice.payment_succeeded':
                 $this->handleInvoicePaid($event);
                 break;
 

@@ -1,24 +1,19 @@
 @php
-    $user = auth()->user();
-    $primaryAddress = $user?->primaryAddress; // or $user?->primaryAddressOrFirst
+    $user           = auth()->user();
+    $primaryAddress = $user?->primaryAddress; // or primaryAddressOrFirst, etc.
 @endphp
 
-@props([
-    'startUrl'    => route('donations.start'),
-    'completeUrl' => route('donations.complete'),
-    'stripeKey'   => config('services.stripe.key'),
-])
-
 <div
+    id="donation-widget-root"
     x-data="donationWidget(@js([
-        'startUrl'    => $startUrl,
-        'completeUrl' => $completeUrl,
-        'stripeKey'   => $stripeKey,
+        'startUrl'    => route('donations.start'),
+        'completeUrl' => route('donations.complete'),
+        'stripeKey'   => config('services.stripe.key'),
         'prefill'     => [
-            'first_name' => $user->first_name ?? '',
-            'last_name'  => $user->last_name ?? '',
-            'email'      => $user->email ?? '',
-            'phone'      => $primaryAddress->phone ?? '',
+            'first_name'      => $user->first_name ?? '',
+            'last_name'       => $user->last_name ?? '',
+            'email'           => $user->email ?? '',
+            'phone'           => $primaryAddress->phone ?? '',
             'address_line1'   => $primaryAddress->line1 ?? '',
             'address_line2'   => $primaryAddress->line2 ?? '',
             'address_city'    => $primaryAddress->city ?? '',
@@ -26,12 +21,14 @@
             'address_postal'  => $primaryAddress->postal_code ?? '',
             'address_country' => $primaryAddress->country ?? '',
         ],
+        'countries' => $countries,
+        'states'    => $states,
     ]))"
     x-init="init()"
     class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6"
 >
     {{-- Step 1: amount + frequency --}}
-    <div x-show="step === 1" x-cloak class="space-y-6">
+    <template x-if="step === 1">
         <div class="space-y-6">
             <div class="flex gap-2 text-sm font-medium bg-slate-100 rounded-full p-1">
                 <button
@@ -110,10 +107,10 @@
                 </button>
             </div>
         </div>
-    </div>
+    </template>
 
     {{-- Step 2: details + card --}}
-    <div x-show="step === 2" x-cloak>
+    <template x-if="step === 2">
         <form @submit.prevent="submitPayment" class="space-y-5">
             <div class="flex items-center justify-between">
                 <h2 class="text-sm font-semibold text-slate-900">
@@ -122,6 +119,7 @@
                 <p class="text-sm font-medium text-slate-700" x-text="summaryLabel()"></p>
             </div>
 
+            {{-- Donor basic info --}}
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                     <label class="block text-xs font-medium text-slate-600">First name</label>
@@ -167,7 +165,7 @@
                 </div>
             </div>
 
-            {{-- Basic address fields for saving to user profile --}}
+            {{-- Billing address --}}
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                     <label class="block text-xs font-medium text-slate-600">Address line 1</label>
@@ -189,6 +187,21 @@
                 </div>
             </div>
 
+            <div>
+                <label class="block text-xs font-medium text-slate-600">Country</label>
+                <select
+                    x-ref="countrySelect"
+                    x-model="donor.address_country"
+                    class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm
+                        focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                >
+                    <option value="">Select country</option>
+                    <template x-for="country in countries" :key="country.code">
+                        <option :value="country.code" x-text="country.name"></option>
+                    </template>
+                </select>
+            </div>
+
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                     <label class="block text-xs font-medium text-slate-600">City</label>
@@ -199,17 +212,36 @@
                                focus:border-indigo-500 focus:ring-indigo-500"
                     >
                 </div>
+
+                {{-- State / Province (dynamic: select for US/CA, text for others) --}}
                 <div>
-                    <label class="block text-xs font-medium text-slate-600">State</label>
-                    <input
-                        x-model="donor.address_state"
-                        type="text"
-                        class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm
-                               focus:border-indigo-500 focus:ring-indigo-500"
-                    >
+                    <label class="block text-xs font-medium text-slate-600">State / Province</label>
+
+                    <template x-if="statesForSelectedCountry()?.length">
+                        <select
+                            x-model="donor.address_state"
+                            class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm
+                                   focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                        >
+                            <option value="">Select state</option>
+                            <template x-for="state in statesForSelectedCountry()" :key="state.code">
+                                <option :value="state.code" x-text="state.name"></option>
+                            </template>
+                        </select>
+                    </template>
+
+                    <template x-if="!statesForSelectedCountry()?.length">
+                        <input
+                            x-model="donor.address_state"
+                            type="text"
+                            class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm
+                                   focus:border-indigo-500 focus:ring-indigo-500"
+                        >
+                    </template>
                 </div>
+
                 <div>
-                    <label class="block text-xs font-medium text-slate-600">Postal</label>
+                    <label class="block text-xs font-medium text-slate-600">Postal / ZIP</label>
                     <input
                         x-model="donor.address_postal"
                         type="text"
@@ -219,43 +251,40 @@
                 </div>
             </div>
 
-            <div>
-                <label class="block text-xs font-medium text-slate-600">Country</label>
-                <input
-                    x-model="donor.address_country"
-                    type="text"
-                    class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm
-                           focus:border-indigo-500 focus:ring-indigo-500"
-                >
-            </div>
+            {{-- Stripe card elements --}}
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-medium text-slate-600">Card number</label>
+                    <div
+                        id="card-number-element"
+                        class="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    ></div>
+                </div>
 
-            {{-- Stripe card element --}}
-            <div class="space-y-2">
-                <label class="block text-xs font-medium text-slate-600">Payment details</label>
-
-                <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                    <!-- Card number (big) -->
-                    <div class="sm:col-span-2">
-                        <div
-                            id="card-number-element"
-                            class="rounded-lg border border-slate-300 px-3 py-2"
-                        ></div>
-                    </div>
-
-                    <!-- Expiry -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
+                        <label class="block text-xs font-medium text-slate-600">Expiration</label>
                         <div
                             id="card-expiry-element"
-                            class="rounded-lg border border-slate-300 px-3 py-2"
+                            class="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
                         ></div>
                     </div>
-
-                    <!-- CVC -->
                     <div>
+                        <label class="block text-xs font-medium text-slate-600">CVC</label>
                         <div
                             id="card-cvc-element"
-                            class="rounded-lg border border-slate-300 px-3 py-2"
+                            class="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
                         ></div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600">Postal / ZIP</label>
+                        {{-- Mirrors billing postal code so it stays in sync --}}
+                        <input
+                            x-model="donor.address_postal"
+                            type="text"
+                            class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm
+                                   focus:border-indigo-500 focus:ring-indigo-500"
+                        >
                     </div>
                 </div>
 
@@ -292,229 +321,260 @@
     </template>
 </div>
 
-{{-- Stripe + Alpine controller (guard against multiple definition) --}}
-<script src="https://js.stripe.com/v3/"></script>
-<script>
-    if (typeof window.donationWidget === 'undefined') {
-        window.donationWidget = function (config) {
-            return {
-                step: 1,
-                presets: [10, 25, 50, 100, 250, 500],
-                frequency: 'one_time',
-                amount: 25,
-                customAmount: null,
-                loading: false,
+@once
+    <script src="https://js.stripe.com/v3/"></script>
 
-                // 'payment' for one-time, 'subscription' for monthly
-                mode: null,
-                transactionId: null,
-                pledgeId: null,
-                clientSecret: null,
+    <script>
+        if (typeof window.donationWidget === 'undefined') {
+            window.donationWidget = function (config) {
+                console.log('[donationWidget] raw prefill:', config.prefill);
 
-                stripe: null,
-                cardNumberElement: null,
-                cardExpiryElement: null,
-                cardCvcElement: null,
-                cardError: '',
+                // Normalize prefill country → 2-letter code, default US
+                let prefillCountry = (config.prefill.address_country || '').trim();
+                if (prefillCountry.length === 2) {
+                    prefillCountry = prefillCountry.toUpperCase();
+                } else {
+                    prefillCountry = 'US';
+                }
 
+                console.log('[donationWidget] normalized prefillCountry:', prefillCountry);
 
-                donor: {
-                    first_name: config.prefill.first_name || '',
-                    last_name: config.prefill.last_name || '',
-                    email: config.prefill.email || '',
-                    phone: config.prefill.phone || '',
-                    address_line1: config.prefill.address_line1 || '',
-                    address_line2: config.prefill.address_line2 || '',
-                    address_city: config.prefill.address_city || '',
-                    address_state: config.prefill.address_state || '',
-                    address_postal: config.prefill.address_postal || '',
-                    address_country: config.prefill.address_country || '',
-                },
+                return {
+                    step: 1,
+                    presets: [10, 25, 50, 100, 250, 500],
+                    frequency: 'one_time',
+                    amount: 25,
+                    customAmount: null,
+                    loading: false,
+                    mode: null,
+                    transactionId: null,
+                    pledgeId: null,
+                    clientSecret: null,
+                    stripe: null,
+                    elements: null,
+                    cardNumberElement: null,
+                    cardExpiryElement: null,
+                    cardCvcElement: null,
+                    cardError: '',
 
-                init() {
-                    this.amount = this.presets[1] ?? 25;
+                    countries: config.countries || [],
+                    states: config.states || {},
 
-                    this.stripe = Stripe(config.stripeKey);
-                    const elements = this.stripe.elements();
+                    donor: {
+                        first_name:      config.prefill.first_name || '',
+                        last_name:       config.prefill.last_name || '',
+                        email:           config.prefill.email || '',
+                        phone:           config.prefill.phone || '',
+                        address_line1:   config.prefill.address_line1 || '',
+                        address_line2:   config.prefill.address_line2 || '',
+                        address_city:    config.prefill.address_city || '',
+                        address_state:   config.prefill.address_state || '',
+                        address_postal:  config.prefill.address_postal || '',
+                        address_country: prefillCountry,
+                    },
 
-                    // Create individual Elements
-                    this.cardNumberElement = elements.create('cardNumber');
-                    this.cardExpiryElement = elements.create('cardExpiry');
-                    this.cardCvcElement    = elements.create('cardCvc');
+                    init() {
+                        console.log('[donationWidget] init donor.address_country =', this.donor.address_country);
+                        console.log('[donationWidget] first 3 countries =', this.countries.slice(0,3));
 
-                    // Mount them into the new containers
-                    this.cardNumberElement.mount('#card-number-element');
-                    this.cardExpiryElement.mount('#card-expiry-element');
-                    this.cardCvcElement.mount('#card-cvc-element');
+                        this.amount = this.presets[1] ?? 25;
 
-                    const updateError = (event) => {
-                        this.cardError = event.error ? event.error.message : '';
-                    };
+                        this.stripe   = Stripe(config.stripeKey);
+                        this.elements = this.stripe.elements();
 
-                    this.cardNumberElement.on('change', updateError);
-                    this.cardExpiryElement.on('change', updateError);
-                    this.cardCvcElement.on('change', updateError);
-                },
+                        this.$watch('step', (value) => {
+                            if (value === 2) {
+                                this.$nextTick(() => {
+                                    this.mountCardElements();
 
-                totalAmount() {
-                    return this.customAmount && this.customAmount > 0
-                        ? this.customAmount
-                        : this.amount;
-                },
+                                    const code = this.donor.address_country || 'US';
+                                    this.donor.address_country = code;
 
-                selectPreset(value) {
-                    this.amount = value;
-                    this.customAmount = null;
-                },
-
-                summaryLabel() {
-                    return `$${this.totalAmount()} ${this.frequency === 'monthly' ? 'per month' : 'one time'}`;
-                },
-
-                frequencyLabel() {
-                    return this.frequency === 'monthly' ? 'monthly' : 'one-time';
-                },
-
-                primaryButtonLabel() {
-                    return `Donate ${this.frequency === 'monthly' ? 'monthly' : 'one time'} $${this.totalAmount()}`;
-                },
-
-                async startDonation() {
-                    this.loading = true;
-                    this.cardError = '';
-
-                    try {
-                        const res = await fetch(config.startUrl, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                                'Accept': 'application/json',
-                            },
-                            body: JSON.stringify({
-                                amount: this.totalAmount(),
-                                frequency: this.frequency, // 'one_time' or 'monthly'
-                            }),
+                                    if (this.$refs.countrySelect) {
+                                        this.$refs.countrySelect.value = code;
+                                    }
+                                });
+                            }
                         });
+                    },
 
-                        if (!res.ok) throw new Error('Unable to start donation');
+                    mountCardElements() {
+                        if (this.cardNumberElement) return;
 
-                        const data = await res.json();
+                        this.cardNumberElement = this.elements.create('cardNumber');
+                        this.cardExpiryElement = this.elements.create('cardExpiry');
+                        this.cardCvcElement    = this.elements.create('cardCvc');
 
-                        // Now mode will be 'payment' (one-time) or 'subscription' (monthly)
-                        this.mode          = data.mode;
-                        this.clientSecret  = data.clientSecret;
-                        this.transactionId = data.transactionId || null;
-                        this.pledgeId      = data.pledgeId || null;
+                        this.cardNumberElement.mount('#card-number-element');
+                        this.cardExpiryElement.mount('#card-expiry-element');
+                        this.cardCvcElement.mount('#card-cvc-element');
 
-                        this.step = 2;
-                    } catch (e) {
-                        console.error(e);
-                        alert('Something went wrong starting your donation.');
-                    } finally {
-                        this.loading = false;
-                    }
-                },
-
-                async submitPayment() {
-                    this.loading = true;
-                    this.cardError = '';
-
-                    const billingDetails = {
-                        name: `${this.donor.first_name} ${this.donor.last_name}`.trim(),
-                        email: this.donor.email,
-                        phone: this.donor.phone,
-                        address: {
-                            line1: this.donor.address_line1 || undefined,
-                            line2: this.donor.address_line2 || undefined,
-                            city: this.donor.address_city || undefined,
-                            state: this.donor.address_state || undefined,
-                            postal_code: this.donor.address_postal || undefined,
-                            country: this.donor.address_country || undefined,
-                        },
-                    };
-
-                    try {
-                        let result;
-
-                        // Decide which Stripe API to call based on mode:
-                        if (this.mode === 'payment') {
-                            // One-time PaymentIntent
-                            result = await this.stripe.confirmCardPayment(this.clientSecret, {
-                                payment_method: {
-                                    card: this.cardNumberElement,
-                                    billing_details: billingDetails,
-                                },
-                            });
-                        } else if (this.mode === 'subscription') {
-                            // Monthly: SetupIntent to attach a payment method
-                            result = await this.stripe.confirmCardSetup(this.clientSecret, {
-                                payment_method: {
-                                    card: this.cardNumberElement,
-                                    billing_details: billingDetails,
-                                },
-                            });
-                        } else {
-                            throw new Error(`Unknown donation mode: ${this.mode}`);
-                        }
-
-                        if (result.error) {
-                            this.cardError = result.error.message;
-                            return;
-                        }
-
-                        const payload = {
-                            // Now we just send the mode through directly
-                            mode: this.mode, // 'payment' or 'subscription'
-
-                            donor_first_name: this.donor.first_name,
-                            donor_last_name: this.donor.last_name,
-                            donor_email: this.donor.email,
-                            donor_phone: this.donor.phone,
-                            address_line1: this.donor.address_line1,
-                            address_line2: this.donor.address_line2,
-                            address_city: this.donor.address_city,
-                            address_state: this.donor.address_state,
-                            address_postal: this.donor.address_postal,
-                            address_country: this.donor.address_country,
+                        const handleChange = (event) => {
+                            this.cardError = event.error ? event.error.message : '';
                         };
 
-                        if (this.mode === 'payment') {
-                            const pi = result.paymentIntent;
-                            payload.transaction_id    = this.transactionId;
-                            payload.payment_intent_id = pi.id;
-                            payload.payment_method_id = pi.payment_method;
-                            payload.charge_id         = pi.latest_charge || null;
-                            payload.receipt_url       = pi.charges?.data?.[0]?.receipt_url ?? null;
-                        } else if (this.mode === 'subscription') {
-                            const si = result.setupIntent;
-                            payload.pledge_id         = this.pledgeId;
-                            payload.payment_method_id = si.payment_method;
-                        }
+                        this.cardNumberElement.on('change', handleChange);
+                        this.cardExpiryElement.on('change', handleChange);
+                        this.cardCvcElement.on('change', handleChange);
+                    },
 
-                        const res = await fetch(config.completeUrl, {
-                            method: 'POST',
-                            headers: {
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                                'Accept': 'text/html,application/json',
-                                'Content-Type': 'application/x-www-form-urlencoded',
+                    totalAmount() {
+                        return this.customAmount && this.customAmount > 0
+                            ? this.customAmount
+                            : this.amount;
+                    },
+
+                    selectPreset(value) {
+                        this.amount = value;
+                        this.customAmount = null;
+                    },
+
+                    summaryLabel() {
+                        return `$${this.totalAmount()} ${this.frequency === 'monthly' ? 'per month' : 'one time'}`;
+                    },
+
+                    frequencyLabel() {
+                        return this.frequency === 'monthly' ? 'monthly' : 'one-time';
+                    },
+
+                    primaryButtonLabel() {
+                        return `Donate ${this.frequency === 'monthly' ? 'monthly' : 'one time'} $${this.totalAmount()}`;
+                    },
+
+                    statesForSelectedCountry() {
+                        const code = this.donor.address_country;
+                        if (!code) return null;
+                        return this.states[code] || null;
+                    },
+
+                    async startDonation() {
+                        this.loading = true;
+                        this.cardError = '';
+
+                        try {
+                            const res = await fetch(config.startUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                    'Accept': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                    amount: this.totalAmount(),
+                                    frequency: this.frequency,
+                                }),
+                            });
+
+                            if (!res.ok) throw new Error('Unable to start donation');
+
+                            const data = await res.json();
+                            this.mode          = data.mode;
+                            this.clientSecret  = data.clientSecret;
+                            this.transactionId = data.transactionId || null;
+                            this.pledgeId      = data.pledgeId || null;
+
+                            this.step = 2;
+                        } catch (e) {
+                            console.error(e);
+                            alert('Something went wrong starting your donation.');
+                        } finally {
+                            this.loading = false;
+                        }
+                    },
+
+                    async submitPayment() {
+                        this.loading = true;
+                        this.cardError = '';
+
+                        const billingDetails = {
+                            name: `${this.donor.first_name} ${this.donor.last_name}`.trim(),
+                            email: this.donor.email,
+                            phone: this.donor.phone,
+                            address: {
+                                line1:       this.donor.address_line1 || undefined,
+                                line2:       this.donor.address_line2 || undefined,
+                                city:        this.donor.address_city || undefined,
+                                state:       this.donor.address_state || undefined,
+                                postal_code: this.donor.address_postal || undefined,
+                                country:     this.donor.address_country || undefined,
                             },
-                            body: new URLSearchParams(payload),
-                        });
+                        };
 
-                        if (res.redirected) {
-                            window.location = res.url;
-                        } else {
-                            window.location.reload();
+                        try {
+                            let result;
+
+                            if (this.mode === 'payment') {
+                                result = await this.stripe.confirmCardPayment(this.clientSecret, {
+                                    payment_method: {
+                                        card: this.cardNumberElement,
+                                        billing_details: billingDetails,
+                                    },
+                                });
+                            } else {
+                                result = await this.stripe.confirmCardSetup(this.clientSecret, {
+                                    payment_method: {
+                                        card: this.cardNumberElement,
+                                        billing_details: billingDetails,
+                                    },
+                                });
+                            }
+
+                            if (result.error) {
+                                this.cardError = result.error.message;
+                                return;
+                            }
+
+                            const payload = {
+                                mode: this.mode === 'payment' ? 'payment' : 'subscription',
+                                donor_first_name: this.donor.first_name,
+                                donor_last_name:  this.donor.last_name,
+                                donor_email:      this.donor.email,
+                                donor_phone:      this.donor.phone,
+                                address_line1:    this.donor.address_line1,
+                                address_line2:    this.donor.address_line2,
+                                address_city:     this.donor.address_city,
+                                address_state:    this.donor.address_state,
+                                address_postal:   this.donor.address_postal,
+                                address_country:  this.donor.address_country,
+                            };
+
+                            if (this.mode === 'payment') {
+                                const pi = result.paymentIntent;
+                                payload.transaction_id    = this.transactionId;
+                                payload.payment_intent_id = pi.id;
+                                payload.payment_method_id = pi.payment_method;
+                                payload.charge_id         = pi.latest_charge || null;
+                                payload.receipt_url       = pi.charges?.data?.[0]?.receipt_url ?? null;
+                            } else {
+                                const si = result.setupIntent;
+                                payload.pledge_id         = this.pledgeId;
+                                payload.payment_method_id = si.payment_method;
+                            }
+
+                            const res = await fetch(config.completeUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                    'Accept': 'text/html,application/json',
+                                    'Content-Type': 'application/x-www-form-urlencoded',
+                                },
+                                body: new URLSearchParams(payload),
+                            });
+
+                            if (res.redirected) {
+                                window.location = res.url;
+                            } else {
+                                window.location.reload();
+                            }
+                        } catch (e) {
+                            console.error(e);
+                            this.cardError = 'Something went wrong confirming your payment.';
+                        } finally {
+                            this.loading = false;
                         }
-                    } catch (e) {
-                        console.error(e);
-                        this.cardError = 'Something went wrong confirming your payment.';
-                    } finally {
-                        this.loading = false;
-                    }
-                },
+                    },
+                };
             };
-        };
-    }
-</script>
+        }
+    </script>
+@endonce
