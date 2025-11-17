@@ -5,7 +5,7 @@
     class="fixed top-0 inset-x-0 z-50 bg-white/80 backdrop-blur border-b border-slate-200
            transform transition-transform duration-300"
 >
-    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <div class="mx-auto w-full max-w-7xl xl:max-w-screen-2xl px-4 sm:px-6 lg:px-10">
         <div class="flex h-16 items-center justify-between gap-4">
             {{-- Left: Logo --}}
             <div class="flex items-center">
