@@ -89,6 +89,13 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants
         );
     }
 
+    // Optional helper to always return something:
+    public function getPrimaryAddressOrFirstAttribute(): ?Address
+    {
+        return $this->primaryAddress()->first()
+            ?? $this->addresses()->first();
+    }
+    
 
     // FILAMENT FUNCTIONS:
 
@@ -134,6 +141,15 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants
 
     // RELATIONS:
 
+    public function addresses()
+    {
+        return $this->hasMany(Address::class);
+    }
+
+    public function primaryAddress()
+    {
+        return $this->hasOne(Address::class)->where('is_primary', true);
+    }
 
     /**
      * Get the teams a user owns or has created.
