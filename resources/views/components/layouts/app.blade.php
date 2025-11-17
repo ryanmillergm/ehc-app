@@ -1,3 +1,4 @@
+{{-- Layout For General Auth User App --}}
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
@@ -20,7 +21,13 @@
             @vite(['resources/css/app.css', 'resources/js/app.js'])
         @endif
     </head>
-    <body>
-        {{ $slot }}
+    <body class="font-sans antialiased bg-gray-100">
+        @include('partials.navbar')
+
+        <main class="pt-16" style="margin-bottom: 1000px;">
+            {{ $slot }}
+
+            <p>Layout for Auth Users in General App</p>
+        </main>
     </body>
 </html>

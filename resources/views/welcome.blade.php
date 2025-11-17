@@ -1,3 +1,4 @@
+{{-- General Landing Page --}}
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
@@ -18,6 +19,8 @@
         </style>
     </head>
     <body class="font-sans antialiased">
+        <p>resources\views\welcome.blade.php</p>
+        {{-- <livewire:navbar> --}}
         <div class="bg-gray-50 text-black/50">
             <img id="background" class="absolute -left-20 top-0 max-w-[877px]" src="https://laravel.com/assets/img/welcome/background.svg" />
             <div class="relative min-h-screen flex flex-col items-center justify-center selection:bg-[#FF2D20] selection:text-white">
@@ -167,6 +170,12 @@
                             </div>
                         </div>
                     </main>
+
+                    <p>Hello</p>
+                    <div x-data="{ open: false }">
+                        <button @click="open = !open">Toggle</button>
+                        <div x-show="open" class="bg-blue-200 p-4 mt-2">Hello world</div>
+                    </div>
 
                     <footer class="py-16 text-center text-sm text-black">
                         Laravel v{{ Illuminate\Foundation\Application::VERSION }} (PHP v{{ PHP_VERSION }})

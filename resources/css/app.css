@@ -5,3 +5,51 @@
 [x-cloak] {
     display: none;
 }
+
+/* === Mobile navbar hamburger === */
+
+.navbar-hamburger-icon {
+    position: relative;
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+.navbar-hamburger-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    border-radius: 9999px;
+    background-color: #020617;
+    transition: transform 0.3s ease, opacity 0.2s ease;
+}
+
+.navbar-hamburger-line-top {
+    top: 0.3rem;
+}
+
+.navbar-hamburger-line-middle {
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.navbar-hamburger-line-bottom {
+    bottom: 0.3rem;
+}
+
+/* open state: rotate + morph into "X" */
+#mobile-menu-toggle[data-state='open'] .navbar-hamburger-icon {
+    transform: rotate(180deg);
+}
+
+#mobile-menu-toggle[data-state='open'] .navbar-hamburger-line-top {
+    transform: translateY(0.375rem) rotate(45deg);
+}
+
+#mobile-menu-toggle[data-state='open'] .navbar-hamburger-line-middle {
+    opacity: 0;
+}
+
+#mobile-menu-toggle[data-state='open'] .navbar-hamburger-line-bottom {
+    transform: translateY(-0.375rem) rotate(-45deg);
+}

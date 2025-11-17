@@ -17,8 +17,12 @@
         <!-- Styles -->
         @livewireStyles
     </head>
-    <body>
-        <div class="font-sans text-gray-900 antialiased">
+    <body class="font-sans text-gray-900 antialiased bg-gray-100">
+        @include('partials.navbar')
+
+        <div class="pt-16">
+            <p>Layout for Auth Users in General App</p>
+            <p>resources\views\layouts\guest.blade.php</p>
             {{ $slot }}
         </div>
 
