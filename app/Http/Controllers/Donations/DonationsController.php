@@ -167,7 +167,6 @@ class DonationsController extends Controller
             /** @var \App\Models\Transaction $transaction */
             $transaction = Transaction::findOrFail($data['transaction_id']);
 
-            // Build a full name from the donor data
             $fullName = trim(
                 ($data['donor_first_name'] ?? '') . ' ' . ($data['donor_last_name'] ?? '')
             );
@@ -199,7 +198,6 @@ class DonationsController extends Controller
             ($data['donor_first_name'] ?? '') . ' ' . ($data['donor_last_name'] ?? '')
         );
 
-        // Keep donor info on the pledge up to date
         if (! empty($data['donor_email'])) {
             $pledge->donor_email = $data['donor_email'];
         }
@@ -215,10 +213,13 @@ class DonationsController extends Controller
             $data['payment_method_id']
         );
 
+        // Store pledge ID in session for a single-use thank-you view
+        $request->session()->put('pledge_thankyou_id', $pledge->id);
+
         // All actual recurring charges (including the first) will be reflected
         // via invoice.paid → handleInvoicePaid() + Transaction rows.
         return redirect()
-            ->route('donations.thankyou-subscription', $pledge)
+            ->route('donations.thankyou-subscription')
             ->with('success', 'Thank you for your monthly pledge!');
     }
 
@@ -227,9 +228,26 @@ class DonationsController extends Controller
         return view('donations.thankyou', compact('transaction'));
     }
 
-    public function thankYouSubscription(Pledge $pledge)
+    /**
+     * Single-use subscription thank-you.
+     *
+     * Only works immediately after redirect from complete();
+     * once the page is left/refreshed, the session key is gone.
+     */
+    public function thankYouSubscription(Request $request)
     {
+        // Pull removes it from the session so it can't be reused
+        $pledgeId = $request->session()->pull('pledge_thankyou_id');
+
+        if (! $pledgeId) {
+            abort(404); // or redirect()->route('welcome');
+        }
+
+        /** @var \App\Models\Pledge $pledge */
+        $pledge = Pledge::findOrFail($pledgeId);
+
         $subscriptionTransaction = Transaction::where('pledge_id', $pledge->id)
+            ->where('type', 'subscription_recurring')
             ->latest('paid_at')
             ->first();
 

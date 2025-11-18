@@ -32,7 +32,7 @@ Route::prefix('donations')->name('donations.')->group(function () {
     Route::get('thank-you/{transaction}', [DonationsController::class, 'thankYou'])
         ->name('thankyou');
 
-    Route::get('thank-you-subscription/{pledge}', [DonationsController::class, 'thankYouSubscription'])
+    Route::get('thank-you-subscription', [DonationsController::class, 'thankYouSubscription'])
         ->name('thankyou-subscription');
 });
 

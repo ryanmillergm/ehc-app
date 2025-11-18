@@ -95,8 +95,9 @@ class CompleteDonationTest extends TestCase
 
         // Controller should still send us to the subscription thank-you page
         $response->assertRedirect(
-            route('donations.thankyou-subscription', $pledge)
+            route('donations.thankyou-subscription')
         );
+
 
         // Pledge donor info updated from the payload;
         // subscription id / invoice / transactions are handled in StripeService + webhooks
@@ -249,11 +250,36 @@ class CompleteDonationTest extends TestCase
 
         $response = $this
             ->actingAs($user)
-            ->get(route('donations.thankyou-subscription', $pledge));
+            ->withSession(['pledge_thankyou_id' => $pledge->id]) // 👈 important
+            ->get(route('donations.thankyou-subscription'));
 
         $response->assertOk();
         $response->assertSee('Thank you for your monthly gift');
         $response->assertSee('View Stripe receipt');
         $response->assertSee($latest->receipt_url);
+    }
+
+    public function test_thank_you_subscription_returns_404_without_session_key(): void
+    {
+        $response = $this->get(route('donations.thankyou-subscription'));
+
+        $response->assertNotFound();
+    }
+
+    public function test_thank_you_subscription_works_once_when_session_key_present(): void
+    {
+        $pledge = Pledge::factory()->create();
+
+        // First hit: session key present
+        $response1 = $this
+            ->withSession(['pledge_thankyou_id' => $pledge->id])
+            ->get(route('donations.thankyou-subscription'));
+
+        $response1->assertOk();
+        $response1->assertSee('Thank you for your monthly gift');
+
+        // Second hit: key has been pulled/forgotten → 404
+        $response2 = $this->get(route('donations.thankyou-subscription'));
+        $response2->assertNotFound();
     }
 }
