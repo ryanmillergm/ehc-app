@@ -15,6 +15,18 @@
                     <x-nav-link href="{{ route('dashboard') }}" :active="request()->routeIs('dashboard')">
                         {{ __('Dashboard') }}
                     </x-nav-link>
+
+                    <x-nav-link href="{{ route('giving.index') }}" :active="request()->routeIs('giving.*')">
+                        {{ __('My Giving') }}
+                    </x-nav-link>
+
+                    <x-nav-link href="{{ route('profile.show') }}" :active="request()->routeIs('profile.show')">
+                        {{ __('Profile') }}
+                    </x-nav-link>
+
+                    <x-nav-link href="{{ route('addresses.index') }}" :active="request()->routeIs('addresses.*')">
+                        {{ __('Addresses') }}
+                    </x-nav-link>
                 </div>
             </div>
 
@@ -102,6 +114,10 @@
                                 {{ __('Profile') }}
                             </x-dropdown-link>
 
+                            <x-dropdown-link href="{{ route('giving.index') }}">
+                                {{ __('My Giving') }}
+                            </x-dropdown-link>
+
                             @if (Laravel\Jetstream\Jetstream::hasApiFeatures())
                                 <x-dropdown-link href="{{ route('api-tokens.index') }}">
                                     {{ __('API Tokens') }}
@@ -142,6 +158,18 @@
             <x-responsive-nav-link href="{{ route('dashboard') }}" :active="request()->routeIs('dashboard')">
                 {{ __('Dashboard') }}
             </x-responsive-nav-link>
+
+            <x-responsive-nav-link href="{{ route('giving.index') }}" :active="request()->routeIs('giving.*')">
+                {{ __('My Giving') }}
+            </x-responsive-nav-link>
+
+            <x-responsive-nav-link href="{{ route('profile.show') }}" :active="request()->routeIs('profile.show')">
+                {{ __('Profile') }}
+            </x-responsive-nav-link>
+
+            <x-responsive-nav-link href="{{ route('addresses.index') }}" :active="request()->routeIs('addresses.*')">
+                {{ __('Addresses') }}
+            </x-responsive-nav-link>
         </div>
 
         <!-- Responsive Settings Options -->
@@ -163,6 +191,10 @@
                 <!-- Account Management -->
                 <x-responsive-nav-link href="{{ route('profile.show') }}" :active="request()->routeIs('profile.show')">
                     {{ __('Profile') }}
+                </x-responsive-nav-link>
+
+                <x-responsive-nav-link href="{{ route('giving.index') }}" :active="request()->routeIs('giving.*')">
+                    {{ __('My Giving') }}
                 </x-responsive-nav-link>
 
                 @if (Laravel\Jetstream\Jetstream::hasApiFeatures())

@@ -1,5 +1,6 @@
 <?php
 
+// Jetstream Template
 namespace App\View\Components;
 
 use Illuminate\View\Component;
