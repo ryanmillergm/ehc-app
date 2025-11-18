@@ -255,4 +255,91 @@ class StripeService
             'metadata'         => $stripeRefund->metadata ? $stripeRefund->metadata->toArray() : [],
         ]);
     }
+
+    /**
+     * Cancel a subscription at period end and sync pledge fields.
+     */
+    public function cancelSubscriptionAtPeriodEnd(Pledge $pledge): void
+    {
+        if (! $pledge->stripe_subscription_id) {
+            return;
+        }
+
+        $subscription = $this->stripe->subscriptions->update(
+            $pledge->stripe_subscription_id,
+            [
+                'cancel_at_period_end' => true,
+            ]
+        );
+
+        $pledge->update([
+            'status'               => $subscription->status,
+            'cancel_at_period_end' => (bool) $subscription->cancel_at_period_end,
+            'current_period_start' => $subscription->current_period_start
+                ? now()->setTimestamp($subscription->current_period_start)
+                : null,
+            'current_period_end'   => $subscription->current_period_end
+                ? now()->setTimestamp($subscription->current_period_end)
+                : null,
+        ]);
+    }
+
+    /**
+     * Change the recurring amount for a pledge's subscription.
+     * Creates a new Price if needed, updates the Stripe subscription,
+     * and syncs the pledge.
+     */
+    public function updateSubscriptionAmount(Pledge $pledge, int $amountCents): void
+    {
+        if (! $pledge->stripe_subscription_id) {
+            return;
+        }
+
+        $subscription = $this->stripe->subscriptions->retrieve(
+            $pledge->stripe_subscription_id,
+            ['expand' => ['items.data.price']]
+        );
+
+        // Reuse existing price when amount matches; otherwise create a new one.
+        $priceId = $pledge->stripe_price_id;
+
+        if (! $priceId || $pledge->amount_cents !== $amountCents) {
+            $price = $this->stripe->prices->create([
+                'unit_amount' => $amountCents,
+                'currency'    => $pledge->currency,
+                'recurring'   => ['interval' => $pledge->interval],
+                'product'     => $subscription->items->data[0]->price->product ?? null,
+            ]);
+
+            $priceId = $price->id;
+        }
+
+        $subscription = $this->stripe->subscriptions->update(
+            $subscription->id,
+            [
+                'cancel_at_period_end' => false,
+                'proration_behavior'   => 'create_prorations',
+                'items' => [
+                    [
+                        'id'    => $subscription->items->data[0]->id,
+                        'price' => $priceId,
+                    ],
+                ],
+            ]
+        );
+
+        $pledge->update([
+            'amount_cents'         => $amountCents,
+            'stripe_price_id'      => $priceId,
+            'status'               => $subscription->status,
+            'cancel_at_period_end' => (bool) $subscription->cancel_at_period_end,
+            'current_period_start' => $subscription->current_period_start
+                ? now()->setTimestamp($subscription->current_period_start)
+                : null,
+            'current_period_end'   => $subscription->current_period_end
+                ? now()->setTimestamp($subscription->current_period_end)
+                : null,
+        ]);
+    }
+
 }

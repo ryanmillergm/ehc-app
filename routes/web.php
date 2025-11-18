@@ -1,17 +1,19 @@
 <?php
 
-use App\Http\Controllers\ChildrenController;
-use App\Http\Controllers\Donations\DonationsController;
-use App\Http\Controllers\LanguagesController;
+use App\Livewire\Pages\ShowPage;
+use App\Livewire\Pages\IndexPage;
+use App\Http\Middleware\Localization;
+use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\LanguageSwitch;
 use App\Http\Controllers\PageController;
-use App\Http\Controllers\PageTranslationController;
-use App\Http\Controllers\StripeWebhookController;
 use App\Http\Controllers\TeamController;
-use App\Http\Middleware\Localization;
-use App\Livewire\Pages\IndexPage;
-use App\Livewire\Pages\ShowPage;
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\GivingController;
+use App\Http\Controllers\AddressController;
+use App\Http\Controllers\ChildrenController;
+use App\Http\Controllers\LanguagesController;
+use App\Http\Controllers\StripeWebhookController;
+use App\Http\Controllers\PageTranslationController;
+use App\Http\Controllers\Donations\DonationsController;
 
 Route::get('lang/{lang}', LanguageSwitch::class)->name('lang');
 
@@ -49,6 +51,37 @@ Route::middleware([
         Route::get('/dashboard', function () {
             return view('dashboard');
         })->name('dashboard');
+
+        // Addresses
+        Route::get('/addresses', [AddressController::class, 'index'])
+            ->name('addresses.index');
+
+        Route::post('/addresses', [AddressController::class, 'store'])
+            ->name('addresses.store');
+
+        Route::get('/addresses/{address}/edit', [AddressController::class, 'edit'])
+            ->name('addresses.edit');
+
+        Route::put('/addresses/{address}', [AddressController::class, 'update'])
+            ->name('addresses.update');
+
+        Route::delete('/addresses/{address}', [AddressController::class, 'destroy'])
+            ->name('addresses.destroy');
+
+        Route::post('/addresses/{address}/primary', [AddressController::class, 'makePrimary'])
+            ->name('addresses.make-primary');
+
+        // My Giving (user-facing giving dashboard)
+        Route::prefix('giving')->name('giving.')->group(function () {
+            Route::get('/', [GivingController::class, 'index'])->name('index');
+
+            // Manage subscriptions
+            Route::post('/subscriptions/{pledge}/cancel', [GivingController::class, 'cancelSubscription'])
+                ->name('subscriptions.cancel');
+
+            Route::post('/subscriptions/{pledge}/amount', [GivingController::class, 'updateSubscriptionAmount'])
+                ->name('subscriptions.amount');
+        });
 
         Route::resource('children', ChildrenController::class);
         Route::resource('languages', LanguagesController::class);
