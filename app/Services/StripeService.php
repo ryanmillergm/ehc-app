@@ -23,17 +23,61 @@ class StripeService
      */
     public function getOrCreateCustomer(User|array $donor): string
     {
+        $existingCustomerId = null;
+        $email              = null;
+        $name               = null;
+
         if ($donor instanceof User) {
-            $email = $donor->email;
-            $name  = trim("{$donor->first_name} {$donor->last_name}");
+            $user  = $donor;
+            $email = $user->email;
+            $name  = trim("{$user->first_name} {$user->last_name}");
+
+            // 1) Try pledges for this user
+            $existingCustomerId = Pledge::where('user_id', $user->id)
+                ->whereNotNull('stripe_customer_id')
+                ->orderByDesc('created_at')
+                ->value('stripe_customer_id');
+
+            // 2) Fallback to transactions for this user
+            if (! $existingCustomerId) {
+                $existingCustomerId = Transaction::where('user_id', $user->id)
+                    ->whereNotNull('customer_id')
+                    ->orderByDesc('created_at')
+                    ->value('customer_id');
+            }
         } else {
             $email = $donor['email'] ?? null;
-            $name  = $donor['name'] ?? null;
+            $name  = $donor['name']  ?? null;
+
+            if ($email) {
+                // 1) Try transactions by payer_email
+                $existingCustomerId = Transaction::whereNotNull('customer_id')
+                    ->where('payer_email', $email)
+                    ->orderByDesc('created_at')
+                    ->value('customer_id');
+
+                // 2) Fallback to pledges by donor_email
+                if (! $existingCustomerId) {
+                    $existingCustomerId = Pledge::whereNotNull('stripe_customer_id')
+                        ->where('donor_email', $email)
+                        ->orderByDesc('created_at')
+                        ->value('stripe_customer_id');
+                }
+            }
         }
 
+        // If we already have a Stripe customer for this donor, reuse it
+        if ($existingCustomerId) {
+            return $existingCustomerId;
+        }
+
+        // Otherwise create a new one in Stripe
         $customer = $this->stripe->customers->create([
-            'email' => $email,
-            'name'  => $name,
+            'email'    => $email ?: null,
+            'name'     => $name  ?: null,
+            'metadata' => [
+                'source' => 'donation_widget',
+            ],
         ]);
 
         return $customer->id;

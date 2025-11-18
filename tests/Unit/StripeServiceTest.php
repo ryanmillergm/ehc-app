@@ -261,4 +261,31 @@ class StripeServiceTest extends TestCase
             'status'           => 'succeeded',
         ]);
     }
+    
+    public function test_get_or_create_customer_reuses_existing_customer_from_transactions(): void
+    {
+        // Existing transaction with a customer_id + email
+        Transaction::factory()->create([
+            'user_id'      => null,
+            'customer_id'  => 'cus_existing_123',
+            'payer_email'  => 'donor@example.test',
+            'amount_cents' => 1000,
+            'currency'     => 'usd',
+        ]);
+
+        // Inject a mocked Stripe client so StripeService doesn't create a real one
+        $stripe = Mockery::mock(StripeClient::class);
+
+        // StripeService must be:
+        // public function __construct(?StripeClient $stripe = null)
+        $service = new StripeService($stripe);
+
+        $customerId = $service->getOrCreateCustomer([
+            'email' => 'donor@example.test',
+            'name'  => 'Test Donor',
+        ]);
+
+        // Because we already had a matching Transaction, it should reuse that customer
+        $this->assertSame('cus_existing_123', $customerId);
+    }
 }
