@@ -97,7 +97,8 @@ class DonationsController extends Controller
      * Called from the front-end after Stripe confirms the payment
      * (for one-time payments) or setup (monthly).
      *
-     * Webhooks also run for robustness, but this gives immediate redirect behavior.
+     * Webhooks also run for robustness, but this gives immediate redirect behavior
+     * and sets the ephemeral session key for the thank-you pages.
      */
     public function complete(Request $request)
     {
@@ -185,7 +186,14 @@ class DonationsController extends Controller
                 'paid_at'           => now(),
             ])->save();
 
+            // single-use key for the thank-you page
             $request->session()->put('transaction_thankyou_id', $transaction->id);
+
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'redirect' => route('donations.thankyou'),
+                ]);
+            }
 
             return redirect()
                 ->route('donations.thankyou')
@@ -208,6 +216,7 @@ class DonationsController extends Controller
         }
         $pledge->save();
 
+        // This creates/updates the Stripe subscription & sets stripe_* IDs
         $this->stripe->createSubscriptionForPledge(
             $pledge,
             $data['payment_method_id']
@@ -215,6 +224,12 @@ class DonationsController extends Controller
 
         // Store pledge ID in session for a single-use thank-you view
         $request->session()->put('pledge_thankyou_id', $pledge->id);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'redirect' => route('donations.thankyou-subscription'),
+            ]);
+        }
 
         return redirect()
             ->route('donations.thankyou-subscription')

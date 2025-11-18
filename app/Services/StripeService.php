@@ -12,9 +12,9 @@ class StripeService
 {
     protected StripeClient $stripe;
 
-    public function __construct()
+    public function __construct(?StripeClient $stripe = null)
     {
-        $this->stripe = new StripeClient(config('services.stripe.secret'));
+        $this->stripe = $stripe ?: new StripeClient(config('services.stripe.secret'));
     }
 
     /**
@@ -152,12 +152,12 @@ class StripeService
         }
 
         $subscription = $this->stripe->subscriptions->create([
-            'customer'              => $customerId,
-            'items'                 => [['price' => $priceId]],
-            'default_payment_method'=> $paymentMethodId,
-            'collection_method'     => 'charge_automatically',
-            'expand'                => ['latest_invoice.payment_intent'],
-            'metadata'              => [
+            'customer'               => $customerId,
+            'items'                  => [['price' => $priceId]],
+            'default_payment_method' => $paymentMethodId,
+            'collection_method'      => 'charge_automatically',
+            'expand'                 => ['latest_invoice.payment_intent'],
+            'metadata'               => [
                 'pledge_id' => (string) $pledge->id,
                 'user_id'   => (string) $pledge->user_id,
             ],
@@ -171,8 +171,20 @@ class StripeService
             ? $latestInvoice->payment_intent
             : null;
 
-        $pledge->stripe_subscription_id   = $subscription->id;
-        $pledge->status                   = $subscription->status;
+        // ---- Sync pledge with subscription + period dates ----
+        $pledge->stripe_subscription_id = $subscription->id;
+        $pledge->status                 = $subscription->status;
+
+        if ($subscription->current_period_start) {
+            $pledge->current_period_start = now()->setTimestamp($subscription->current_period_start);
+        }
+
+        if ($subscription->current_period_end) {
+            $periodEnd = now()->setTimestamp($subscription->current_period_end);
+            $pledge->current_period_end = $periodEnd;
+            $pledge->next_pledge_at     = $periodEnd;
+        }
+
         $pledge->latest_invoice_id        = $latestInvoice?->id;
         $pledge->latest_payment_intent_id = $latestPi?->id;
         $pledge->save();
@@ -258,6 +270,10 @@ class StripeService
 
     /**
      * Cancel a subscription at period end and sync pledge fields.
+     *
+     * We intentionally DO NOT touch current_period_start / current_period_end here,
+     * to avoid wiping them out when Stripe doesn't send them.
+     * Webhooks (invoice + subscription.updated) keep those in sync.
      */
     public function cancelSubscriptionAtPeriodEnd(Pledge $pledge): void
     {
@@ -272,15 +288,10 @@ class StripeService
             ]
         );
 
+        // Only update status + cancel flag; keep period dates as-is.
         $pledge->update([
             'status'               => $subscription->status,
             'cancel_at_period_end' => (bool) $subscription->cancel_at_period_end,
-            'current_period_start' => $subscription->current_period_start
-                ? now()->setTimestamp($subscription->current_period_start)
-                : null,
-            'current_period_end'   => $subscription->current_period_end
-                ? now()->setTimestamp($subscription->current_period_end)
-                : null,
         ]);
     }
 
@@ -328,18 +339,24 @@ class StripeService
             ]
         );
 
-        $pledge->update([
+        // Only update period fields if Stripe actually sends them.
+        $updates = [
             'amount_cents'         => $amountCents,
             'stripe_price_id'      => $priceId,
             'status'               => $subscription->status,
             'cancel_at_period_end' => (bool) $subscription->cancel_at_period_end,
-            'current_period_start' => $subscription->current_period_start
-                ? now()->setTimestamp($subscription->current_period_start)
-                : null,
-            'current_period_end'   => $subscription->current_period_end
-                ? now()->setTimestamp($subscription->current_period_end)
-                : null,
-        ]);
-    }
+        ];
 
+        if ($subscription->current_period_start) {
+            $updates['current_period_start'] = now()->setTimestamp($subscription->current_period_start);
+        }
+
+        if ($subscription->current_period_end) {
+            $end = now()->setTimestamp($subscription->current_period_end);
+            $updates['current_period_end'] = $end;
+            $updates['next_pledge_at']     = $end;
+        }
+
+        $pledge->update($updates);
+    }
 }

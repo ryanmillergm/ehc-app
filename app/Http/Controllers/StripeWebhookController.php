@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Pledge;
 use App\Models\Refund;
 use App\Models\Transaction;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Stripe\Webhook;
@@ -67,6 +68,7 @@ class StripeWebhookController extends Controller
                 $this->handleInvoicePaymentFailed($event);
                 break;
 
+            case 'customer.subscription.created':
             case 'customer.subscription.updated':
             case 'customer.subscription.deleted':
                 $this->handleSubscriptionUpdated($event);
@@ -126,7 +128,6 @@ class StripeWebhookController extends Controller
     // ------------------------------------------------------------------
     // INVOICES / SUBSCRIPTIONS (monthly)
     // ------------------------------------------------------------------
-
     public function handleInvoicePaid(object $event): void
     {
         $invoice = $event->data->object;
@@ -139,52 +140,107 @@ class StripeWebhookController extends Controller
         $subscriptionId = $subscriptionIdTop ?: $subscriptionIdLine;
 
         Log::info('handleInvoicePaid entry', [
-            'event_type'     => $event->type ?? null,
-            'invoice_id'     => $invoice->id ?? null,
-            'sub_top'        => $subscriptionIdTop,
-            'sub_line'       => $subscriptionIdLine,
-            'sub_final'      => $subscriptionId,
-            'customer'       => $invoice->customer ?? null,
-            'amount_paid'    => $invoice->amount_paid ?? null,
-            'status'         => $invoice->status ?? null,
+            'event_type'  => $event->type ?? null,
+            'invoice_id'  => $invoice->id ?? null,
+            'sub_top'     => $subscriptionIdTop,
+            'sub_line'    => $subscriptionIdLine,
+            'sub_final'   => $subscriptionId,
+            'customer'    => $invoice->customer ?? null,
+            'amount_paid' => $invoice->amount_paid ?? null,
+            'status'      => $invoice->status ?? null,
         ]);
 
-        if (! $subscriptionId) {
-            Log::info('handleInvoicePaid: missing subscription id; skipping', [
-                'invoice_id' => $invoice->id ?? null,
-            ]);
-            return;
-        }
-
+        // ---------------------------------------------------------
+        // 1) Resolve the pledge: prefer subscription_id, then fallback to customer
+        // ---------------------------------------------------------
         /** @var \App\Models\Pledge|null $pledge */
-        $pledge = Pledge::where('stripe_subscription_id', $subscriptionId)->first();
+        $pledge = null;
+
+        if ($subscriptionId) {
+            $pledge = Pledge::where('stripe_subscription_id', $subscriptionId)->first();
+        }
 
         if (! $pledge) {
-            Log::warning('handleInvoicePaid: pledge not found for subscription', [
-                'subscription_id' => $subscriptionId,
+            $customerId = $invoice->customer ?? null;
+
+            Log::info('handleInvoicePaid: attempting customer fallback', [
                 'invoice_id'      => $invoice->id ?? null,
+                'subscription_id' => $subscriptionId,
+                'customer_id'     => $customerId,
             ]);
-            return;
+
+            if ($customerId) {
+                // Take the most recent pledge for this customer
+                $pledge = Pledge::where('stripe_customer_id', $customerId)
+                    ->orderByDesc('id')
+                    ->first();
+
+                if ($pledge) {
+                    // If we still don't have a subscription id, borrow it from the pledge
+                    if (! $subscriptionId && $pledge->stripe_subscription_id) {
+                        $subscriptionId = $pledge->stripe_subscription_id;
+                    }
+
+                    Log::info('handleInvoicePaid: pledge resolved via customer', [
+                        'pledge_id'       => $pledge->id,
+                        'customer_id'     => $customerId,
+                        'subscription_id' => $subscriptionId,
+                    ]);
+                } else {
+                    Log::warning('handleInvoicePaid: no pledge found for customer', [
+                        'invoice_id'  => $invoice->id ?? null,
+                        'customer_id' => $customerId,
+                    ]);
+                    return;
+                }
+            } else {
+                Log::warning('handleInvoicePaid: missing subscription & customer; skipping', [
+                    'invoice_id' => $invoice->id ?? null,
+                ]);
+                return;
+            }
         }
 
-        // Work out next_pledge_at from the line period if possible
-        $period          = $line0?->period ?? null;
-        $intervalSeconds = 0;
-
-        if ($period?->start && $period?->end) {
-            $intervalSeconds = $period->end - $period->start;
+        // At this point we MUST have a pledge; ensure subscriptionId is set if possible
+        if (! $subscriptionId && $pledge->stripe_subscription_id) {
+            $subscriptionId = $pledge->stripe_subscription_id;
         }
+
+        // ---------------------------------------------------------
+        // 2) Work out period dates from the invoice line if possible
+        // ---------------------------------------------------------
+        $period = $line0?->period ?? null;
+
+        $periodStart = $period?->start
+            ? Carbon::createFromTimestamp($period->start)
+            : null;
+
+        $periodEnd = $period?->end
+            ? Carbon::createFromTimestamp($period->end)
+            : null;
+
+        Log::info('handleInvoicePaid: updating pledge periods', [
+            'pledge_id'            => $pledge->id,
+            'subscription_id'      => $subscriptionId,
+            'period_start_ts'      => $period?->start ?? null,
+            'period_end_ts'        => $period?->end ?? null,
+            'period_start_carbon'  => $periodStart?->toDateTimeString(),
+            'period_end_carbon'    => $periodEnd?->toDateTimeString(),
+        ]);
 
         $pledge->update([
             'status'                   => 'active',
-            'last_pledge_at'           => now(),
-            'next_pledge_at'           => $intervalSeconds > 0 ? now()->addSeconds($intervalSeconds) : null,
+            'current_period_start'     => $periodStart ?? $pledge->current_period_start,
+            'current_period_end'       => $periodEnd   ?? $pledge->current_period_end,
+            'last_pledge_at'           => $periodEnd   ?? $pledge->last_pledge_at ?? now(),
+            'next_pledge_at'           => $periodEnd   ?? $pledge->next_pledge_at,
             'latest_invoice_id'        => $invoice->id,
             'latest_payment_intent_id' => $invoice->payment_intent ?? $pledge->latest_payment_intent_id,
         ]);
 
-        // ---------- Transaction row for this invoice ----------
-
+        // ---------------------------------------------------------
+        // 3) Upsert Transaction row for this invoice
+        // ---------------------------------------------------------
         $paymentIntentId = $invoice->payment_intent ?? null;
         $chargeId        = $invoice->charge ?: ($invoice->charges->data[0]->id ?? null);
         $amountCents     = $invoice->amount_paid ?? $invoice->amount_due ?? 0;
@@ -256,15 +312,60 @@ class StripeWebhookController extends Controller
     {
         $sub = $event->data->object;
 
-        $pledge = Pledge::where('stripe_subscription_id', $sub->id)->first();
-        if (! $pledge) return;
+        $subscriptionId = $sub->id ?? null;
 
-        $pledge->update([
-            'status'               => $sub->status,
-            'cancel_at_period_end' => (bool) $sub->cancel_at_period_end,
-            'current_period_start' => $sub->current_period_start ? now()->setTimestamp($sub->current_period_start) : null,
-            'current_period_end'   => $sub->current_period_end ? now()->setTimestamp($sub->current_period_end) : null,
+        Log::info('handleSubscriptionUpdated entry', [
+            'event_type'          => $event->type ?? null,
+            'subscription_id'     => $subscriptionId,
+            'status'              => $sub->status ?? null,
+            'cancel_at_period_end'=> $sub->cancel_at_period_end ?? null,
+            'current_period_start'=> $sub->current_period_start ?? null,
+            'current_period_end'  => $sub->current_period_end ?? null,
         ]);
+
+        if (! $subscriptionId) {
+            return;
+        }
+
+        $pledge = Pledge::where('stripe_subscription_id', $subscriptionId)->first();
+        if (! $pledge) {
+            return;
+        }
+
+        // Always update status + cancel_at_period_end
+        $updates = [
+            'status'               => $sub->status,
+            'cancel_at_period_end' => (bool) ($sub->cancel_at_period_end ?? false),
+        ];
+
+        // Only update period fields if Stripe actually sends them
+        $start = $sub->current_period_start
+            ? Carbon::createFromTimestamp($sub->current_period_start)
+            : null;
+
+        $end = $sub->current_period_end
+            ? Carbon::createFromTimestamp($sub->current_period_end)
+            : null;
+
+        if ($start) {
+            $updates['current_period_start'] = $start;
+        }
+
+        if ($end) {
+            $updates['current_period_end'] = $end;
+            $updates['next_pledge_at']     = $end;
+        }
+
+        Log::info('handleSubscriptionUpdated: updating pledge', [
+            'pledge_id'            => $pledge->id,
+            'subscription_id'      => $subscriptionId,
+            'status'               => $updates['status'],
+            'cancel_at_period_end' => $updates['cancel_at_period_end'],
+            'current_period_start' => $updates['current_period_start'] ?? $pledge->current_period_start,
+            'current_period_end'   => $updates['current_period_end']   ?? $pledge->current_period_end,
+        ]);
+
+        $pledge->update($updates);
     }
 
     // ------------------------------------------------------------------
