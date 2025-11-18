@@ -31,8 +31,6 @@ class StripeService
             $name  = $donor['name'] ?? null;
         }
 
-        // In a real app you might store stripe_customer_id on User.
-        // For now we just create a new one every time for simplicity.
         $customer = $this->stripe->customers->create([
             'email' => $email,
             'name'  => $name,
@@ -59,7 +57,7 @@ class StripeService
             'currency' => $transaction->currency,
             'customer' => $customerId,
             'metadata' => [
-                'transaction_id' => $transaction->id,
+                'transaction_id' => (string) $transaction->id,
                 'type'           => $transaction->type,
                 'source'         => $transaction->source,
             ],
@@ -69,7 +67,7 @@ class StripeService
         ]);
 
         $transaction->payment_intent_id = $pi->id;
-        $transaction->status            = $pi->status; // e.g. 'requires_payment_method'
+        $transaction->status            = $pi->status;
         $transaction->save();
 
         return $pi;
@@ -88,54 +86,145 @@ class StripeService
             $pledge->save();
         }
 
-        $setupIntent = $this->stripe->setupIntents->create([
+        return $this->stripe->setupIntents->create([
             'customer' => $customerId,
             'automatic_payment_methods' => ['enabled' => true],
             'metadata' => [
-                'pledge_id' => $pledge->id,
+                'pledge_id' => (string) $pledge->id,
             ],
         ]);
-
-        return $setupIntent;
     }
 
     /**
      * After a SetupIntent succeeds, create the Subscription for the pledge.
+     *
+     * Uses an inline price based on pledge amount/interval.
+     * Also updates the pledge with subscription + latest invoice/payment intent info,
+     * and creates the *first* subscription Transaction row.
      */
     public function createSubscriptionForPledge(Pledge $pledge, string $paymentMethodId): \Stripe\Subscription
     {
         $customerId = $pledge->stripe_customer_id;
 
-        // Create an inline price (amount + interval) if you don't have a catalog product.
-        $price = $this->stripe->prices->create([
-            'unit_amount' => $pledge->amount_cents,
-            'currency'    => $pledge->currency,
-            'recurring'   => ['interval' => $pledge->interval],
-            'product_data' => [
-                'name' => 'Monthly donation',
-            ],
-        ]);
+        // Safety: if we somehow don't have a customer id yet, create one now.
+        if (! $customerId) {
+            $email = $pledge->donor_email;
+            $name  = $pledge->donor_name;
 
-        $pledge->stripe_price_id = $price->id;
-        $pledge->save();
+            if (! $email || ! $name) {
+                $user = $pledge->user ?? null;
+                if ($user instanceof User) {
+                    $email = $email ?: $user->email;
+                    $name  = $name ?: trim("{$user->first_name} {$user->last_name}");
+                }
+            }
+
+            $customer = $this->stripe->customers->create([
+                'email'    => $email ?: null,
+                'name'     => $name ?: null,
+                'metadata' => [
+                    'pledge_id' => (string) $pledge->id,
+                    'user_id'   => (string) $pledge->user_id,
+                ],
+            ]);
+
+            $customerId = $customer->id;
+            $pledge->stripe_customer_id = $customerId;
+            $pledge->save();
+        }
+
+        // Reuse existing price if present; otherwise create a new inline price.
+        $priceId = $pledge->stripe_price_id;
+
+        if (! $priceId) {
+            $price = $this->stripe->prices->create([
+                'unit_amount' => $pledge->amount_cents,
+                'currency'    => $pledge->currency,
+                'recurring'   => ['interval' => $pledge->interval],
+                'product_data' => [
+                    'name' => 'Monthly donation',
+                ],
+            ]);
+
+            $priceId = $price->id;
+            $pledge->stripe_price_id = $priceId;
+            $pledge->save();
+        }
 
         $subscription = $this->stripe->subscriptions->create([
-            'customer' => $customerId,
-            'items'    => [
-                ['price' => $price->id],
-            ],
-            'default_payment_method' => $paymentMethodId,
-            'expand' => ['latest_invoice.payment_intent'],
-            'metadata' => [
-                'pledge_id' => $pledge->id,
+            'customer'              => $customerId,
+            'items'                 => [['price' => $priceId]],
+            'default_payment_method'=> $paymentMethodId,
+            'collection_method'     => 'charge_automatically',
+            'expand'                => ['latest_invoice.payment_intent'],
+            'metadata'              => [
+                'pledge_id' => (string) $pledge->id,
+                'user_id'   => (string) $pledge->user_id,
             ],
         ]);
 
-        $pledge->stripe_subscription_id = $subscription->id;
-        $pledge->status                 = $subscription->status;
-        $pledge->latest_invoice_id      = $subscription->latest_invoice?->id;
-        $pledge->latest_payment_intent_id = $subscription->latest_invoice?->payment_intent?->id;
+        $latestInvoice = is_object($subscription->latest_invoice ?? null)
+            ? $subscription->latest_invoice
+            : null;
+
+        $latestPi = is_object($latestInvoice?->payment_intent ?? null)
+            ? $latestInvoice->payment_intent
+            : null;
+
+        $pledge->stripe_subscription_id   = $subscription->id;
+        $pledge->status                   = $subscription->status;
+        $pledge->latest_invoice_id        = $latestInvoice?->id;
+        $pledge->latest_payment_intent_id = $latestPi?->id;
         $pledge->save();
+
+        // ---- Initial subscription Transaction (first charge) ----
+        if ($latestInvoice && $latestInvoice->amount_paid > 0) {
+            $paymentIntentId = $latestPi?->id ?? ($latestInvoice->payment_intent ?? null);
+
+            $chargeId = $latestInvoice->charge ?? null;
+            if (! $chargeId && $latestPi && isset($latestPi->latest_charge)) {
+                $chargeId = $latestPi->latest_charge;
+            }
+
+            $lookup = [];
+            if ($paymentIntentId) {
+                $lookup['payment_intent_id'] = $paymentIntentId;
+            } else {
+                $lookup['subscription_id'] = $subscription->id;
+                if ($chargeId) {
+                    $lookup['charge_id'] = $chargeId;
+                }
+            }
+
+            $tx = Transaction::firstOrNew($lookup);
+
+            $existingMeta = $tx->metadata ?? [];
+            if (! is_array($existingMeta)) {
+                $existingMeta = (array) json_decode($existingMeta, true) ?: [];
+            }
+
+            $extraMeta = [
+                'stripe_invoice_id'      => $latestInvoice->id,
+                'stripe_subscription_id' => $subscription->id,
+            ];
+
+            $tx->fill([
+                'user_id'         => $pledge->user_id,
+                'pledge_id'       => $pledge->id,
+                'subscription_id' => $subscription->id,
+                'charge_id'       => $chargeId ?: $tx->charge_id,
+                'amount_cents'    => $latestInvoice->amount_paid,
+                'currency'        => $pledge->currency,
+                'type'            => 'subscription_recurring',
+                'status'          => 'succeeded',
+                'payer_email'     => $pledge->donor_email,
+                'payer_name'      => $pledge->donor_name,
+                'receipt_url'     => $latestInvoice->hosted_invoice_url ?? $tx->receipt_url,
+                'source'          => 'donation_widget',
+                'paid_at'         => $tx->paid_at ?? now(),
+                'metadata'        => array_merge($existingMeta, $extraMeta),
+            ])->save();
+        }
 
         return $subscription;
     }
@@ -148,10 +237,10 @@ class StripeService
         $amount = $amountCents ?? $transaction->amount_cents;
 
         $stripeRefund = $this->stripe->refunds->create([
-            'charge' => $transaction->charge_id,
-            'amount' => $amount,
-            'metadata' => [
-                'transaction_id' => $transaction->id,
+            'charge'  => $transaction->charge_id,
+            'amount'  => $amount,
+            'metadata'=> [
+                'transaction_id' => (string) $transaction->id,
             ],
         ]);
 

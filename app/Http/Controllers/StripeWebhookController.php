@@ -58,12 +58,8 @@ class StripeWebhookController extends Controller
                 $this->handlePaymentIntentFailed($event);
                 break;
 
-            case 'charge.succeeded':
-                $this->handleChargeSucceeded($event);
-                break;
-
-            case 'invoice.paid':
             case 'invoice.payment_succeeded':
+            case 'invoice.paid':
                 $this->handleInvoicePaid($event);
                 break;
 
@@ -80,16 +76,20 @@ class StripeWebhookController extends Controller
                 $this->handleChargeRefunded($event);
                 break;
 
+            case 'charge.succeeded':
+                $this->handleChargeSucceeded($event);
+                break;
+
             default:
-                // ignore other events
+                // ignore everything else
                 break;
         }
     }
 
-    /**
-     * PaymentIntent succeeded: ensure status / paid_at are set.
-     * We do NOT rely on this to get card/receipt details anymore.
-     */
+    // ------------------------------------------------------------------
+    // PAYMENT INTENT (one-time) HELPERS
+    // ------------------------------------------------------------------
+
     public function handlePaymentIntentSucceeded(object $event): void
     {
         $pi = $event->data->object;
@@ -104,70 +104,10 @@ class StripeWebhookController extends Controller
             return;
         }
 
-        $tx->update([
+        $tx->fill([
             'status'  => 'succeeded',
             'paid_at' => $tx->paid_at ?? now(),
-        ]);
-    }
-
-    /**
-     * Charge succeeded: enrich transaction with charge + card details.
-     */
-    public function handleChargeSucceeded(object $event): void
-    {
-        $charge = $event->data->object;
-
-        $paymentIntentId = $charge->payment_intent ?? null;
-        if (! $paymentIntentId) {
-            Log::info('Charge succeeded without payment_intent', [
-                'charge_id' => $charge->id ?? null,
-            ]);
-            return;
-        }
-
-        /** @var \App\Models\Transaction|null $tx */
-        $tx = Transaction::where('payment_intent_id', $paymentIntentId)->first();
-
-        if (! $tx) {
-            Log::info('Charge succeeded but no transaction found', [
-                'payment_intent_id' => $paymentIntentId,
-                'charge_id'         => $charge->id ?? null,
-            ]);
-            return;
-        }
-
-        $billing = $charge->billing_details ?? null;
-        $card    = $charge->payment_method_details->card ?? null;
-
-        // Ensure metadata is an array
-        $existingMeta = $tx->metadata ?? [];
-        if (! is_array($existingMeta)) {
-            $existingMeta = (array) json_decode($existingMeta, true) ?: [];
-        }
-
-        $extraMeta = array_filter([
-            'card_brand'   => $card->brand   ?? null,
-            'card_last4'   => $card->last4   ?? null,
-            'card_country' => $card->country ?? null,
-            'card_funding' => $card->funding ?? null,
-            'charge_id'    => $charge->id    ?? null,
-        ]);
-
-        $tx->fill([
-            'status'      => 'succeeded',
-            'charge_id'   => $charge->id          ?? $tx->charge_id,
-            'receipt_url' => $charge->receipt_url ?? $tx->receipt_url,
-            'payer_email' => $billing->email      ?? $tx->payer_email,
-            'payer_name'  => $billing->name       ?? $tx->payer_name,
-            'paid_at'     => $tx->paid_at        ?? now(),
-            'metadata'    => array_merge($existingMeta, $extraMeta),
         ])->save();
-
-        Log::info('Transaction enriched from charge.succeeded', [
-            'transaction_id'    => $tx->id,
-            'payment_intent_id' => $paymentIntentId,
-            'charge_id'         => $charge->id ?? null,
-        ]);
     }
 
     public function handlePaymentIntentFailed(object $event): void
@@ -183,53 +123,125 @@ class StripeWebhookController extends Controller
         $tx->update(['status' => 'failed']);
     }
 
+    // ------------------------------------------------------------------
+    // INVOICES / SUBSCRIPTIONS (monthly)
+    // ------------------------------------------------------------------
+
     public function handleInvoicePaid(object $event): void
     {
         $invoice = $event->data->object;
 
-        $subscriptionId = $invoice->subscription;
-        if (! $subscriptionId) return;
+        // Try multiple places for the subscription id (defensive)
+        $subscriptionIdTop  = $invoice->subscription ?? null;
+        $line0              = $invoice->lines->data[0] ?? null;
+        $subscriptionIdLine = $line0->subscription ?? null;
 
-        $pledge = Pledge::where('stripe_subscription_id', $subscriptionId)->first();
-        if (! $pledge) return;
+        $subscriptionId = $subscriptionIdTop ?: $subscriptionIdLine;
 
-        $pledge->update([
-            'status'            => 'active',
-            'last_pledge_at'    => now(),
-            'next_pledge_at'    => now()->addSeconds($invoice->lines->data[0]?->period?->end - $invoice->lines->data[0]?->period?->start ?? 0),
-            'latest_invoice_id' => $invoice->id,
+        Log::info('handleInvoicePaid entry', [
+            'event_type'     => $event->type ?? null,
+            'invoice_id'     => $invoice->id ?? null,
+            'sub_top'        => $subscriptionIdTop,
+            'sub_line'       => $subscriptionIdLine,
+            'sub_final'      => $subscriptionId,
+            'customer'       => $invoice->customer ?? null,
+            'amount_paid'    => $invoice->amount_paid ?? null,
+            'status'         => $invoice->status ?? null,
         ]);
 
-        $charge      = $invoice->charge ? $invoice->charge : ($invoice->charges->data[0]->id ?? null);
-        $amountCents = $invoice->amount_paid;
+        if (! $subscriptionId) {
+            Log::info('handleInvoicePaid: missing subscription id; skipping', [
+                'invoice_id' => $invoice->id ?? null,
+            ]);
+            return;
+        }
 
-        Transaction::firstOrCreate(
-            [
+        /** @var \App\Models\Pledge|null $pledge */
+        $pledge = Pledge::where('stripe_subscription_id', $subscriptionId)->first();
+
+        if (! $pledge) {
+            Log::warning('handleInvoicePaid: pledge not found for subscription', [
                 'subscription_id' => $subscriptionId,
-                'charge_id'       => $charge,
-                'amount_cents'    => $amountCents,
-            ],
-            [
-                'user_id'           => $pledge->user_id,
-                'pledge_id'         => $pledge->id,
-                'payment_intent_id' => $invoice->payment_intent ?? null,
-                'currency'          => $invoice->currency,
-                'type'              => 'subscription_recurring',
-                'status'            => 'succeeded',
-                'payer_email'       => $invoice->customer_email ?? $pledge->donor_email,
-                'payer_name'        => $pledge->donor_name,
-                'receipt_url'       => $invoice->hosted_invoice_url ?? null,
-                'source'            => 'stripe_webhook',
-                'paid_at'           => now(),
-            ]
-        );
+                'invoice_id'      => $invoice->id ?? null,
+            ]);
+            return;
+        }
+
+        // Work out next_pledge_at from the line period if possible
+        $period          = $line0?->period ?? null;
+        $intervalSeconds = 0;
+
+        if ($period?->start && $period?->end) {
+            $intervalSeconds = $period->end - $period->start;
+        }
+
+        $pledge->update([
+            'status'                   => 'active',
+            'last_pledge_at'           => now(),
+            'next_pledge_at'           => $intervalSeconds > 0 ? now()->addSeconds($intervalSeconds) : null,
+            'latest_invoice_id'        => $invoice->id,
+            'latest_payment_intent_id' => $invoice->payment_intent ?? $pledge->latest_payment_intent_id,
+        ]);
+
+        // ---------- Transaction row for this invoice ----------
+
+        $paymentIntentId = $invoice->payment_intent ?? null;
+        $chargeId        = $invoice->charge ?: ($invoice->charges->data[0]->id ?? null);
+        $amountCents     = $invoice->amount_paid ?? $invoice->amount_due ?? 0;
+
+        if ($paymentIntentId) {
+            $tx = Transaction::firstOrNew([
+                'payment_intent_id' => $paymentIntentId,
+            ]);
+        } else {
+            $tx = Transaction::firstOrNew([
+                'subscription_id' => $subscriptionId,
+                'charge_id'       => $chargeId,
+            ]);
+        }
+
+        $existingMeta = $tx->metadata ?? [];
+        if (! is_array($existingMeta)) {
+            $existingMeta = (array) json_decode($existingMeta, true) ?: [];
+        }
+
+        $extraMeta = array_filter([
+            'stripe_invoice_id'      => $invoice->id,
+            'stripe_subscription_id' => $subscriptionId,
+        ]);
+
+        $tx->fill([
+            'user_id'         => $pledge->user_id,
+            'pledge_id'       => $pledge->id,
+            'subscription_id' => $subscriptionId,
+            'charge_id'       => $chargeId,
+            'amount_cents'    => $amountCents,
+            'currency'        => $invoice->currency,
+            'type'            => 'subscription_recurring',
+            'status'          => 'succeeded',
+            'payer_email'     => $invoice->customer_email ?? $pledge->donor_email,
+            'payer_name'      => $pledge->donor_name,
+            'receipt_url'     => $invoice->hosted_invoice_url ?? $tx->receipt_url,
+            'source'          => 'stripe_webhook',
+            'paid_at'         => $tx->paid_at ?? now(),
+            'metadata'        => array_merge($existingMeta, $extraMeta),
+        ])->save();
+
+        Log::info('Invoice paid transaction upserted', [
+            'transaction_id'    => $tx->id,
+            'pledge_id'         => $pledge->id,
+            'subscription_id'   => $subscriptionId,
+            'payment_intent_id' => $paymentIntentId,
+            'charge_id'         => $chargeId,
+            'amount_cents'      => $amountCents,
+        ]);
     }
 
     public function handleInvoicePaymentFailed(object $event): void
     {
         $invoice = $event->data->object;
 
-        $subscriptionId = $invoice->subscription;
+        $subscriptionId = $invoice->subscription ?? null;
         if (! $subscriptionId) return;
 
         $pledge = Pledge::where('stripe_subscription_id', $subscriptionId)->first();
@@ -255,6 +267,10 @@ class StripeWebhookController extends Controller
         ]);
     }
 
+    // ------------------------------------------------------------------
+    // REFUNDS
+    // ------------------------------------------------------------------
+
     public function handleChargeRefunded(object $event): void
     {
         $charge = $event->data->object;
@@ -262,9 +278,7 @@ class StripeWebhookController extends Controller
         $tx = Transaction::where('charge_id', $charge->id)->first();
         if (! $tx) return;
 
-        $tx->update([
-            'status' => 'refunded',
-        ]);
+        $tx->update(['status' => 'refunded']);
 
         foreach ($charge->refunds->data as $stripeRefund) {
             Refund::updateOrCreate(
@@ -280,5 +294,60 @@ class StripeWebhookController extends Controller
                 ]
             );
         }
+    }
+
+    // ------------------------------------------------------------------
+    // CHARGE SUCCEEDED ENRICHMENT (mostly for one-time)
+    // ------------------------------------------------------------------
+
+    public function handleChargeSucceeded(object $event): void
+    {
+        $charge = $event->data->object;
+
+        $paymentIntentId = $charge->payment_intent ?? null;
+        if (! $paymentIntentId) {
+            return;
+        }
+
+        /** @var \App\Models\Transaction|null $tx */
+        $tx = Transaction::where('payment_intent_id', $paymentIntentId)->first();
+
+        if (! $tx) {
+            Log::info('Charge succeeded but no transaction found', [
+                'payment_intent_id' => $paymentIntentId,
+                'charge_id'         => $charge->id ?? null,
+            ]);
+            return;
+        }
+
+        $billing = $charge->billing_details ?? null;
+        $card    = $charge->payment_method_details->card ?? null;
+
+        $existingMeta = $tx->metadata ?? [];
+        if (! is_array($existingMeta)) {
+            $existingMeta = (array) json_decode($existingMeta, true) ?: [];
+        }
+
+        $extraMeta = array_filter([
+            'card_brand'   => $card->brand   ?? null,
+            'card_last4'   => $card->last4   ?? null,
+            'card_country' => $card->country ?? null,
+            'card_funding' => $card->funding ?? null,
+            'charge_id'    => $charge->id    ?? null,
+        ]);
+
+        $tx->fill([
+            'charge_id'   => $charge->id          ?? $tx->charge_id,
+            'receipt_url' => $charge->receipt_url ?? $tx->receipt_url,
+            'payer_email' => $billing->email      ?? $tx->payer_email,
+            'payer_name'  => $billing->name       ?? $tx->payer_name,
+            'metadata'    => array_merge($existingMeta, $extraMeta),
+        ])->save();
+
+        Log::info('Transaction enriched from charge.succeeded', [
+            'transaction_id'    => $tx->id,
+            'payment_intent_id' => $tx->payment_intent_id,
+            'charge_id'         => $tx->charge_id,
+        ]);
     }
 }

@@ -35,6 +35,7 @@ return [
         'secret' => env('STRIPE_SECRET'),
         'key'    => env('STRIPE_KEY'),
         'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+        'recurring_product_id' => env('STRIPE_RECURRING_PRODUCT_ID'),
     ],
 
 ];

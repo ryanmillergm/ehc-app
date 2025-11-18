@@ -95,10 +95,9 @@ class DonationsController extends Controller
 
     /**
      * Called from the front-end after Stripe confirms the payment
-     * (for one-time payments) or subscription (monthly).
+     * (for one-time payments) or setup (monthly).
      *
-     * In a fully robust setup, you also handle this via webhooks,
-     * but this gives you immediate redirect behavior.
+     * Webhooks also run for robustness, but this gives immediate redirect behavior.
      */
     public function complete(Request $request)
     {
@@ -106,10 +105,11 @@ class DonationsController extends Controller
             'mode'           => ['required', 'in:payment,subscription'],
             'transaction_id' => ['nullable', 'integer', 'required_if:mode,payment'],
             'pledge_id'      => ['nullable', 'integer', 'required_if:mode,subscription'],
-            'payment_intent_id'   => ['nullable', 'string'],
-            'subscription_id'     => ['nullable', 'string'],
+
+            'payment_intent_id'   => ['nullable', 'string'], // one-time only
+            'subscription_id'     => ['nullable', 'string'], // not used for now
             'charge_id'           => ['nullable', 'string'],
-            'payment_method_id'   => ['nullable', 'string'],
+            'payment_method_id'   => ['nullable', 'string', 'required_if:mode,subscription'],
             'receipt_url'         => ['nullable', 'url'],
 
             'donor_first_name' => ['nullable', 'string', 'max:100'],
@@ -138,7 +138,6 @@ class DonationsController extends Controller
                 || ! empty($data['address_postal']);
 
             if ($hasAddressInput) {
-                // Avoid calling $user->addresses(); just work with Address directly
                 $primary = Address::firstOrNew([
                     'user_id'    => $user->id,
                     'is_primary' => true,
@@ -179,7 +178,7 @@ class DonationsController extends Controller
                 'payment_method_id' => $data['payment_method_id'] ?? $transaction->payment_method_id,
                 'receipt_url'       => $data['receipt_url']       ?? $transaction->receipt_url,
 
-                // NEW: store who actually paid
+                // store who actually paid
                 'payer_email'       => $data['donor_email']       ?? $transaction->payer_email,
                 'payer_name'        => $fullName                  ?: $transaction->payer_name,
 
@@ -196,31 +195,28 @@ class DonationsController extends Controller
         /** @var \App\Models\Pledge $pledge */
         $pledge = Pledge::findOrFail($data['pledge_id']);
 
-        $pledge->stripe_subscription_id   = $data['subscription_id'] ?? $pledge->stripe_subscription_id;
-        $pledge->latest_payment_intent_id = $data['payment_intent_id'] ?? $pledge->latest_payment_intent_id;
-        $pledge->status                   = 'active';
+        $fullName = trim(
+            ($data['donor_first_name'] ?? '') . ' ' . ($data['donor_last_name'] ?? '')
+        );
+
+        // Keep donor info on the pledge up to date
+        if (! empty($data['donor_email'])) {
+            $pledge->donor_email = $data['donor_email'];
+        }
+        if ($fullName !== '') {
+            $pledge->donor_name = $fullName;
+        }
         $pledge->save();
 
-        // Initial transaction row for reporting
-        if (! empty($data['payment_intent_id'])) {
-            Transaction::create([
-                'user_id'            => $pledge->user_id,
-                'pledge_id'          => $pledge->id,
-                'payment_intent_id'  => $data['payment_intent_id'],
-                'subscription_id'    => $pledge->stripe_subscription_id,
-                'charge_id'          => $data['charge_id'] ?? null,
-                'amount_cents'       => $pledge->amount_cents,
-                'currency'           => $pledge->currency,
-                'type'               => 'subscription_initial',
-                'status'             => 'succeeded',
-                'payer_email'        => $pledge->donor_email,
-                'payer_name'         => $pledge->donor_name,
-                'receipt_url'        => $data['receipt_url'] ?? null,
-                'source'             => 'donation_widget',
-                'paid_at'            => now(),
-            ]);
-        }
+        // Create the actual Stripe subscription using the saved payment method.
+        // This will also update $pledge with subscription + latest invoice info.
+        $this->stripe->createSubscriptionForPledge(
+            $pledge,
+            $data['payment_method_id']
+        );
 
+        // All actual recurring charges (including the first) will be reflected
+        // via invoice.paid → handleInvoicePaid() + Transaction rows.
         return redirect()
             ->route('donations.thankyou-subscription', $pledge)
             ->with('success', 'Thank you for your monthly pledge!');
@@ -233,6 +229,13 @@ class DonationsController extends Controller
 
     public function thankYouSubscription(Pledge $pledge)
     {
-        return view('donations.thankyou-subscription', compact('pledge'));
+        $subscriptionTransaction = Transaction::where('pledge_id', $pledge->id)
+            ->latest('paid_at')
+            ->first();
+
+        return view('donations.thankyou-subscription', [
+            'pledge'                  => $pledge,
+            'subscriptionTransaction' => $subscriptionTransaction,
+        ]);
     }
 }

@@ -20,6 +20,17 @@
                 </p>
             @endif
 
+            @if (! empty($subscriptionTransaction?->receipt_url))
+                <p class="text-xs text-slate-500">
+                    <a href="{{ $subscriptionTransaction->receipt_url }}"
+                       target="_blank"
+                       rel="noopener"
+                       class="underline">
+                        View Stripe receipt
+                    </a>
+                </p>
+            @endif
+
             <a
                 href="{{ route('welcome') }}"
                 class="inline-flex items-center justify-center rounded-full bg-indigo-600 px-4 py-2
