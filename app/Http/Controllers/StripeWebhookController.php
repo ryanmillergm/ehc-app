@@ -281,6 +281,21 @@ class StripeWebhookController extends Controller
         $tx->update(['status' => 'refunded']);
 
         foreach ($charge->refunds->data as $stripeRefund) {
+            // Make metadata robust to different shapes (StripeObject, stdClass, array, null)
+            $rawMeta = $stripeRefund->metadata ?? [];
+
+            if (is_object($rawMeta) && method_exists($rawMeta, 'toArray')) {
+                // Real Stripe metadata (StripeObject)
+                $metaArray = $rawMeta->toArray();
+            } elseif (is_object($rawMeta)) {
+                // stdClass or other object
+                $metaArray = (array) $rawMeta;
+            } elseif (is_array($rawMeta)) {
+                $metaArray = $rawMeta;
+            } else {
+                $metaArray = [];
+            }
+
             Refund::updateOrCreate(
                 ['stripe_refund_id' => $stripeRefund->id],
                 [
@@ -290,7 +305,7 @@ class StripeWebhookController extends Controller
                     'currency'         => $stripeRefund->currency,
                     'status'           => $stripeRefund->status,
                     'reason'           => $stripeRefund->reason,
-                    'metadata'         => $stripeRefund->metadata ? $stripeRefund->metadata->toArray() : [],
+                    'metadata'         => $metaArray,
                 ]
             );
         }
