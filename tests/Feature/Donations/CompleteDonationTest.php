@@ -43,7 +43,7 @@ class CompleteDonationTest extends TestCase
             'receipt_url'       => 'https://example.test/receipt',
         ]);
 
-        $response->assertRedirect(route('donations.thankyou', $tx));
+        $response->assertRedirect(route('donations.thankyou'));
 
         $this->assertDatabaseHas('transactions', [
             'id'                => $tx->id,
@@ -150,7 +150,7 @@ class CompleteDonationTest extends TestCase
             ->actingAs($user)
             ->post(route('donations.complete'), $payload);
 
-        $response->assertRedirect(route('donations.thankyou', $tx));
+        $response->assertRedirect(route('donations.thankyou'));
 
         // Transaction has all the Stripe IDs + receipt URL and payer info now
         $this->assertDatabaseHas('transactions', [
@@ -199,7 +199,8 @@ class CompleteDonationTest extends TestCase
 
         $response = $this
             ->actingAs($user)
-            ->get(route('donations.thankyou', $tx));
+            ->withSession(['transaction_thankyou_id' => $tx->id])
+            ->get(route('donations.thankyou'));
 
         $response->assertOk();
         $response->assertSee('$25.00');
@@ -280,6 +281,35 @@ class CompleteDonationTest extends TestCase
 
         // Second hit: key has been pulled/forgotten → 404
         $response2 = $this->get(route('donations.thankyou-subscription'));
+        $response2->assertNotFound();
+    }
+
+    public function test_thank_you_returns_404_without_session_key(): void
+    {
+        $response = $this->get(route('donations.thankyou'));
+
+        $response->assertNotFound();
+    }
+
+    public function test_thank_you_works_once_when_session_key_present(): void
+    {
+        $tx = Transaction::factory()->create([
+            'amount_cents' => 1000,
+            'currency'     => 'usd',
+            'type'         => 'one_time',
+            'status'       => 'succeeded',
+        ]);
+
+        // First hit: session key present
+        $response1 = $this
+            ->withSession(['transaction_thankyou_id' => $tx->id])
+            ->get(route('donations.thankyou'));
+
+        $response1->assertOk();
+        $response1->assertSee('Thank you for your gift');
+
+        // Second hit: key has been pulled → 404
+        $response2 = $this->get(route('donations.thankyou'));
         $response2->assertNotFound();
     }
 }

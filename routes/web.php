@@ -29,7 +29,7 @@ Route::prefix('donations')->name('donations.')->group(function () {
     Route::post('complete', [DonationsController::class, 'complete'])
         ->name('complete');
 
-    Route::get('thank-you/{transaction}', [DonationsController::class, 'thankYou'])
+    Route::get('thank-you', [DonationsController::class, 'thankYou'])
         ->name('thankyou');
 
     Route::get('thank-you-subscription', [DonationsController::class, 'thankYouSubscription'])

@@ -107,7 +107,7 @@ class DonationsController extends Controller
             'pledge_id'      => ['nullable', 'integer', 'required_if:mode,subscription'],
 
             'payment_intent_id'   => ['nullable', 'string'], // one-time only
-            'subscription_id'     => ['nullable', 'string'], // not used for now
+            'subscription_id'     => ['nullable', 'string'], // not used here
             'charge_id'           => ['nullable', 'string'],
             'payment_method_id'   => ['nullable', 'string', 'required_if:mode,subscription'],
             'receipt_url'         => ['nullable', 'url'],
@@ -185,8 +185,10 @@ class DonationsController extends Controller
                 'paid_at'           => now(),
             ])->save();
 
+            $request->session()->put('transaction_thankyou_id', $transaction->id);
+
             return redirect()
-                ->route('donations.thankyou', $transaction)
+                ->route('donations.thankyou')
                 ->with('success', 'Thank you for your donation!');
         }
 
@@ -206,8 +208,6 @@ class DonationsController extends Controller
         }
         $pledge->save();
 
-        // Create the actual Stripe subscription using the saved payment method.
-        // This will also update $pledge with subscription + latest invoice info.
         $this->stripe->createSubscriptionForPledge(
             $pledge,
             $data['payment_method_id']
@@ -216,23 +216,29 @@ class DonationsController extends Controller
         // Store pledge ID in session for a single-use thank-you view
         $request->session()->put('pledge_thankyou_id', $pledge->id);
 
-        // All actual recurring charges (including the first) will be reflected
-        // via invoice.paid → handleInvoicePaid() + Transaction rows.
         return redirect()
             ->route('donations.thankyou-subscription')
             ->with('success', 'Thank you for your monthly pledge!');
     }
 
-    public function thankYou(Transaction $transaction)
+    /**
+     * One-time thank-you page: requires a session key and works once.
+     */
+    public function thankYou(Request $request)
     {
+        $transactionId = $request->session()->pull('transaction_thankyou_id');
+
+        if (! $transactionId) {
+            abort(404);
+        }
+
+        $transaction = Transaction::findOrFail($transactionId);
+
         return view('donations.thankyou', compact('transaction'));
     }
 
     /**
-     * Single-use subscription thank-you.
-     *
-     * Only works immediately after redirect from complete();
-     * once the page is left/refreshed, the session key is gone.
+     * Subscription thank-you page: also requires a session key and works once.
      */
     public function thankYouSubscription(Request $request)
     {
@@ -240,7 +246,7 @@ class DonationsController extends Controller
         $pledgeId = $request->session()->pull('pledge_thankyou_id');
 
         if (! $pledgeId) {
-            abort(404); // or redirect()->route('welcome');
+            abort(404);
         }
 
         /** @var \App\Models\Pledge $pledge */
