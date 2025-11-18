@@ -133,22 +133,19 @@ class DonationsController extends Controller
             ])->save();
 
             // 2) Upsert their primary address if any address fields given
-            $hasAddressInput = !empty($data['address_line1'])
-                || !empty($data['address_city'])
-                || !empty($data['address_postal']);
+            $hasAddressInput = ! empty($data['address_line1'])
+                || ! empty($data['address_city'])
+                || ! empty($data['address_postal']);
 
             if ($hasAddressInput) {
-                $primary = $user->addresses()->where('is_primary', true)->first();
+                // Avoid calling $user->addresses(); just work with Address directly
+                $primary = Address::firstOrNew([
+                    'user_id'    => $user->id,
+                    'is_primary' => true,
+                ]);
 
-                if (! $primary) {
-                    // Optionally clear existing primary flags, just in case
-                    $user->addresses()->update(['is_primary' => false]);
-
-                    $primary = new Address([
-                        'user_id'    => $user->id,
-                        'is_primary' => true,
-                        'label'      => 'Primary',
-                    ]);
+                if (! $primary->exists) {
+                    $primary->label = 'Primary';
                 }
 
                 $primary->fill([
@@ -166,13 +163,26 @@ class DonationsController extends Controller
             }
         }
 
+        // ----- One-time payment completion -----
         if ($data['mode'] === 'payment') {
+            /** @var \App\Models\Transaction $transaction */
             $transaction = Transaction::findOrFail($data['transaction_id']);
+
+            // Build a full name from the donor data
+            $fullName = trim(
+                ($data['donor_first_name'] ?? '') . ' ' . ($data['donor_last_name'] ?? '')
+            );
+
             $transaction->fill([
                 'payment_intent_id' => $data['payment_intent_id'] ?? $transaction->payment_intent_id,
-                'charge_id'         => $data['charge_id'] ?? $transaction->charge_id,
+                'charge_id'         => $data['charge_id']         ?? $transaction->charge_id,
                 'payment_method_id' => $data['payment_method_id'] ?? $transaction->payment_method_id,
-                'receipt_url'       => $data['receipt_url'] ?? $transaction->receipt_url,
+                'receipt_url'       => $data['receipt_url']       ?? $transaction->receipt_url,
+
+                // NEW: store who actually paid
+                'payer_email'       => $data['donor_email']       ?? $transaction->payer_email,
+                'payer_name'        => $fullName                  ?: $transaction->payer_name,
+
                 'status'            => 'succeeded',
                 'paid_at'           => now(),
             ])->save();
@@ -182,14 +192,16 @@ class DonationsController extends Controller
                 ->with('success', 'Thank you for your donation!');
         }
 
-        // Subscription completion: link subscription + first transaction to pledge
+        // ----- Subscription completion -----
+        /** @var \App\Models\Pledge $pledge */
         $pledge = Pledge::findOrFail($data['pledge_id']);
+
         $pledge->stripe_subscription_id   = $data['subscription_id'] ?? $pledge->stripe_subscription_id;
         $pledge->latest_payment_intent_id = $data['payment_intent_id'] ?? $pledge->latest_payment_intent_id;
         $pledge->status                   = 'active';
         $pledge->save();
 
-        // Optional: create an initial transaction row for reporting
+        // Initial transaction row for reporting
         if (! empty($data['payment_intent_id'])) {
             Transaction::create([
                 'user_id'            => $pledge->user_id,

@@ -20,6 +20,11 @@ class StripeWebhookController extends Controller
 
         try {
             $event = Webhook::constructEvent($payload, $sigHeader, $secret);
+
+            Log::info('Stripe webhook received', [
+                'id'   => $event->id ?? null,
+                'type' => $event->type ?? null,
+            ]);
         } catch (\Throwable $e) {
             Log::warning('Stripe webhook signature verification failed', [
                 'error' => $e->getMessage(),
@@ -53,6 +58,10 @@ class StripeWebhookController extends Controller
                 $this->handlePaymentIntentFailed($event);
                 break;
 
+            case 'charge.succeeded':
+                $this->handleChargeSucceeded($event);
+                break;
+
             case 'invoice.paid':
             case 'invoice.payment_succeeded':
                 $this->handleInvoicePaid($event);
@@ -72,29 +81,93 @@ class StripeWebhookController extends Controller
                 break;
 
             default:
+                // ignore other events
                 break;
         }
     }
 
+    /**
+     * PaymentIntent succeeded: ensure status / paid_at are set.
+     * We do NOT rely on this to get card/receipt details anymore.
+     */
     public function handlePaymentIntentSucceeded(object $event): void
     {
         $pi = $event->data->object;
 
-        /** @var Transaction|null $tx */
+        /** @var \App\Models\Transaction|null $tx */
         $tx = Transaction::where('payment_intent_id', $pi->id)->first();
 
         if (! $tx) {
+            Log::info('PI succeeded but no transaction found', [
+                'payment_intent_id' => $pi->id,
+            ]);
             return;
         }
 
-        $charge = $pi->charges->data[0] ?? null;
+        $tx->update([
+            'status'  => 'succeeded',
+            'paid_at' => $tx->paid_at ?? now(),
+        ]);
+    }
+
+    /**
+     * Charge succeeded: enrich transaction with charge + card details.
+     */
+    public function handleChargeSucceeded(object $event): void
+    {
+        $charge = $event->data->object;
+
+        $paymentIntentId = $charge->payment_intent ?? null;
+        if (! $paymentIntentId) {
+            Log::info('Charge succeeded without payment_intent', [
+                'charge_id' => $charge->id ?? null,
+            ]);
+            return;
+        }
+
+        /** @var \App\Models\Transaction|null $tx */
+        $tx = Transaction::where('payment_intent_id', $paymentIntentId)->first();
+
+        if (! $tx) {
+            Log::info('Charge succeeded but no transaction found', [
+                'payment_intent_id' => $paymentIntentId,
+                'charge_id'         => $charge->id ?? null,
+            ]);
+            return;
+        }
+
+        $billing = $charge->billing_details ?? null;
+        $card    = $charge->payment_method_details->card ?? null;
+
+        // Ensure metadata is an array
+        $existingMeta = $tx->metadata ?? [];
+        if (! is_array($existingMeta)) {
+            $existingMeta = (array) json_decode($existingMeta, true) ?: [];
+        }
+
+        $extraMeta = array_filter([
+            'card_brand'   => $card->brand   ?? null,
+            'card_last4'   => $card->last4   ?? null,
+            'card_country' => $card->country ?? null,
+            'card_funding' => $card->funding ?? null,
+            'charge_id'    => $charge->id    ?? null,
+        ]);
 
         $tx->fill([
             'status'      => 'succeeded',
-            'charge_id'   => $charge?->id ?? $tx->charge_id,
-            'receipt_url' => $charge?->receipt_url ?? $tx->receipt_url,
-            'paid_at'     => now(),
+            'charge_id'   => $charge->id          ?? $tx->charge_id,
+            'receipt_url' => $charge->receipt_url ?? $tx->receipt_url,
+            'payer_email' => $billing->email      ?? $tx->payer_email,
+            'payer_name'  => $billing->name       ?? $tx->payer_name,
+            'paid_at'     => $tx->paid_at        ?? now(),
+            'metadata'    => array_merge($existingMeta, $extraMeta),
         ])->save();
+
+        Log::info('Transaction enriched from charge.succeeded', [
+            'transaction_id'    => $tx->id,
+            'payment_intent_id' => $paymentIntentId,
+            'charge_id'         => $charge->id ?? null,
+        ]);
     }
 
     public function handlePaymentIntentFailed(object $event): void
@@ -127,8 +200,7 @@ class StripeWebhookController extends Controller
             'latest_invoice_id' => $invoice->id,
         ]);
 
-        // Create a transaction row representing this recurring charge
-        $charge = $invoice->charge ? $invoice->charge : ($invoice->charges->data[0]->id ?? null);
+        $charge      = $invoice->charge ? $invoice->charge : ($invoice->charges->data[0]->id ?? null);
         $amountCents = $invoice->amount_paid;
 
         Transaction::firstOrCreate(
@@ -138,17 +210,17 @@ class StripeWebhookController extends Controller
                 'amount_cents'    => $amountCents,
             ],
             [
-                'user_id'     => $pledge->user_id,
-                'pledge_id'   => $pledge->id,
+                'user_id'           => $pledge->user_id,
+                'pledge_id'         => $pledge->id,
                 'payment_intent_id' => $invoice->payment_intent ?? null,
-                'currency'    => $invoice->currency,
-                'type'        => 'subscription_recurring',
-                'status'      => 'succeeded',
-                'payer_email' => $invoice->customer_email ?? $pledge->donor_email,
-                'payer_name'  => $pledge->donor_name,
-                'receipt_url' => $invoice->hosted_invoice_url ?? null,
-                'source'      => 'stripe_webhook',
-                'paid_at'     => now(),
+                'currency'          => $invoice->currency,
+                'type'              => 'subscription_recurring',
+                'status'            => 'succeeded',
+                'payer_email'       => $invoice->customer_email ?? $pledge->donor_email,
+                'payer_name'        => $pledge->donor_name,
+                'receipt_url'       => $invoice->hosted_invoice_url ?? null,
+                'source'            => 'stripe_webhook',
+                'paid_at'           => now(),
             ]
         );
     }
@@ -190,7 +262,6 @@ class StripeWebhookController extends Controller
         $tx = Transaction::where('charge_id', $charge->id)->first();
         if (! $tx) return;
 
-        // Mark transaction as refunded
         $tx->update([
             'status' => 'refunded',
         ]);

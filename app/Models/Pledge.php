@@ -41,6 +41,11 @@ class Pledge extends Model
         'metadata'             => 'array',
     ];
 
+    public function getAmountDollarsAttribute(): float
+    {
+        return $this->amount_cents / 100;
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

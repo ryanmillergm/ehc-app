@@ -1,6 +1,9 @@
 @php
     $user           = auth()->user();
-    $primaryAddress = $user?->primaryAddress; // or primaryAddressOrFirst, etc.
+    $primaryAddress = $user?->primaryAddress;
+
+    // Prefer the user's primary address country; otherwise default to US
+    $prefillCountry = $primaryAddress?->country ?? 'US';
 @endphp
 
 <div
@@ -10,16 +13,16 @@
         'completeUrl' => route('donations.complete'),
         'stripeKey'   => config('services.stripe.key'),
         'prefill'     => [
-            'first_name'      => $user->first_name ?? '',
-            'last_name'       => $user->last_name ?? '',
-            'email'           => $user->email ?? '',
-            'phone'           => $primaryAddress->phone ?? '',
-            'address_line1'   => $primaryAddress->line1 ?? '',
-            'address_line2'   => $primaryAddress->line2 ?? '',
-            'address_city'    => $primaryAddress->city ?? '',
-            'address_state'   => $primaryAddress->state ?? '',
-            'address_postal'  => $primaryAddress->postal_code ?? '',
-            'address_country' => $primaryAddress->country ?? '',
+            'first_name'      => $user?->first_name ?? '',
+            'last_name'       => $user?->last_name ?? '',
+            'email'           => $user?->email ?? '',
+            'phone'           => $primaryAddress?->phone ?? '',
+            'address_line1'   => $primaryAddress?->line1 ?? '',
+            'address_line2'   => $primaryAddress?->line2 ?? '',
+            'address_city'    => $primaryAddress?->city ?? '',
+            'address_state'   => $primaryAddress?->state ?? '',
+            'address_postal'  => $primaryAddress?->postal_code ?? '',
+            'address_country' => $prefillCountry,
         ],
         'countries' => $countries,
         'states'    => $states,
@@ -219,9 +222,10 @@
 
                     <template x-if="statesForSelectedCountry()?.length">
                         <select
+                            x-ref="stateSelect"
                             x-model="donor.address_state"
                             class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm
-                                   focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                                focus:border-indigo-500 focus:ring-indigo-500 bg-white"
                         >
                             <option value="">Select state</option>
                             <template x-for="state in statesForSelectedCountry()" :key="state.code">
@@ -235,10 +239,11 @@
                             x-model="donor.address_state"
                             type="text"
                             class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm
-                                   focus:border-indigo-500 focus:ring-indigo-500"
+                                focus:border-indigo-500 focus:ring-indigo-500"
                         >
                     </template>
                 </div>
+
 
                 <div>
                     <label class="block text-xs font-medium text-slate-600">Postal / ZIP</label>
@@ -322,6 +327,7 @@
 </div>
 
 @once
+    {{-- Stripe.js --}}
     <script src="https://js.stripe.com/v3/"></script>
 
     <script>
@@ -329,12 +335,27 @@
             window.donationWidget = function (config) {
                 console.log('[donationWidget] raw prefill:', config.prefill);
 
+                console.log(
+                    '[donationWidget] prefill country/state from PHP:',
+                    config.prefill.address_country,
+                    config.prefill.address_state
+                );
+
+
                 // Normalize prefill country → 2-letter code, default US
-                let prefillCountry = (config.prefill.address_country || '').trim();
-                if (prefillCountry.length === 2) {
-                    prefillCountry = prefillCountry.toUpperCase();
-                } else {
+                let prefillCountry = (config.prefill.address_country || 'US').toString().trim();
+                if (prefillCountry.length !== 2) {
                     prefillCountry = 'US';
+                } else {
+                    prefillCountry = prefillCountry.toUpperCase();
+                }
+
+                // Ensure US exists in countries list so the select can bind correctly
+                if (!Array.isArray(config.countries)) {
+                    config.countries = [];
+                }
+                if (!config.countries.find(c => c.code === 'US')) {
+                    config.countries.unshift({ code: 'US', name: 'United States' });
                 }
 
                 console.log('[donationWidget] normalized prefillCountry:', prefillCountry);
@@ -373,30 +394,100 @@
                         address_country: prefillCountry,
                     },
 
-                    init() {
-                        console.log('[donationWidget] init donor.address_country =', this.donor.address_country);
-                        console.log('[donationWidget] first 3 countries =', this.countries.slice(0,3));
+                    // --- helpers -------------------------------------------------
 
+                    normalizeStateForCountry(countryCode, rawState) {
+                        if (!rawState) return '';
+
+                        const list = this.states[countryCode] || [];
+                        if (!Array.isArray(list) || !list.length) {
+                            return rawState;
+                        }
+
+                        const value = rawState.toString().trim();
+
+                        // 1) exact code match (CO vs co)
+                        const byCode = list.find(
+                            s => s.code.toString().toUpperCase() === value.toUpperCase()
+                        );
+                        if (byCode) return byCode.code;
+
+                        // 2) full name match (Colorado)
+                        const byName = list.find(
+                            s => s.name.toString().toLowerCase() === value.toLowerCase()
+                        );
+                        if (byName) return byName.code;
+
+                        return value;
+                    },
+
+                    // --- lifecycle -----------------------------------------------
+
+                    init() {
                         this.amount = this.presets[1] ?? 25;
 
+                        // Normalize / default country on the instance
+                        let c = (this.donor.address_country || '').trim();
+                        if (c.length !== 2) {
+                            c = 'US';
+                        } else {
+                            c = c.toUpperCase();
+                        }
+                        this.donor.address_country = c;
+
+                        // Normalize state for this country (handles "Colorado" → "CO")
+                        if (this.donor.address_state) {
+                            this.donor.address_state = this.normalizeStateForCountry(
+                                this.donor.address_country,
+                                this.donor.address_state
+                            );
+                        }
+
+                        console.log(
+                            '[donationWidget] init country/state =',
+                            this.donor.address_country,
+                            this.donor.address_state
+                        );
+
+                        // Stripe Elements setup
                         this.stripe   = Stripe(config.stripeKey);
                         this.elements = this.stripe.elements();
 
+                        // When we enter step 2, mount card elements and hard-sync the selects
                         this.$watch('step', (value) => {
                             if (value === 2) {
                                 this.$nextTick(() => {
                                     this.mountCardElements();
 
-                                    const code = this.donor.address_country || 'US';
-                                    this.donor.address_country = code;
+                                    const countryCode = this.donor.address_country || '';
+                                    const stateCode   = this.normalizeStateForCountry(
+                                        countryCode,
+                                        this.donor.address_state || ''
+                                    );
+
+                                    this.donor.address_country = countryCode;
+                                    this.donor.address_state   = stateCode;
 
                                     if (this.$refs.countrySelect) {
-                                        this.$refs.countrySelect.value = code;
+                                        this.$refs.countrySelect.value = countryCode;
                                     }
+
+                                    // stateSelect only exists when there are states for this country
+                                    if (this.$refs.stateSelect) {
+                                        this.$refs.stateSelect.value = stateCode;
+                                    }
+
+                                    console.log('[donationWidget] step 2 – synced selects', {
+                                        donor_country: this.donor.address_country,
+                                        donor_state:   this.donor.address_state,
+                                        dom_country:   this.$refs.countrySelect && this.$refs.countrySelect.value,
+                                        dom_state:     this.$refs.stateSelect && this.$refs.stateSelect.value,
+                                    });
                                 });
                             }
                         });
                     },
+
 
                     mountCardElements() {
                         if (this.cardNumberElement) return;
@@ -417,6 +508,8 @@
                         this.cardExpiryElement.on('change', handleChange);
                         this.cardCvcElement.on('change', handleChange);
                     },
+
+                    // --- UI helpers ----------------------------------------------
 
                     totalAmount() {
                         return this.customAmount && this.customAmount > 0
@@ -447,6 +540,13 @@
                         return this.states[code] || null;
                     },
 
+                    hasStates() {
+                        const list = this.statesForSelectedCountry();
+                        return Array.isArray(list) && list.length > 0;
+                    },
+
+                    // --- Stripe flow ---------------------------------------------
+
                     async startDonation() {
                         this.loading = true;
                         this.cardError = '';
@@ -475,7 +575,7 @@
 
                             this.step = 2;
                         } catch (e) {
-                            console.error(e);
+                            console.error('[donationWidget] startDonation error:', e);
                             alert('Something went wrong starting your donation.');
                         } finally {
                             this.loading = false;
@@ -520,7 +620,8 @@
                             }
 
                             if (result.error) {
-                                this.cardError = result.error.message;
+                                console.error('[donationWidget] Stripe confirm error:', result.error);
+                                this.cardError = result.error.message || 'Your card was declined.';
                                 return;
                             }
 
@@ -551,23 +652,50 @@
                                 payload.payment_method_id = si.payment_method;
                             }
 
+                            const params = new URLSearchParams();
+                            Object.entries(payload).forEach(([key, value]) => {
+                                if (value !== null && value !== undefined && value !== '') {
+                                    params.append(key, value);
+                                }
+                            });
+
                             const res = await fetch(config.completeUrl, {
                                 method: 'POST',
                                 headers: {
                                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                                    'Accept': 'text/html,application/json',
+                                    'Accept': 'application/json',
                                     'Content-Type': 'application/x-www-form-urlencoded',
                                 },
-                                body: new URLSearchParams(payload),
+                                body: params,
                             });
+
+                            const text = await res.text();
+                            console.log('[donationWidget] complete status', res.status, 'redirect?', res.redirected);
 
                             if (res.redirected) {
                                 window.location = res.url;
-                            } else {
-                                window.location.reload();
+                                return;
                             }
+
+                            if (!res.ok) {
+                                console.error('[donationWidget] complete failed', res.status, text);
+                                this.cardError = 'There was a problem finalizing your donation.';
+                                return;
+                            }
+
+                            try {
+                                const json = JSON.parse(text);
+                                if (json.redirect) {
+                                    window.location = json.redirect;
+                                    return;
+                                }
+                            } catch (e) {
+                                // not JSON
+                            }
+
+                            window.location.reload();
                         } catch (e) {
-                            console.error(e);
+                            console.error('[donationWidget] submitPayment exception', e);
                             this.cardError = 'Something went wrong confirming your payment.';
                         } finally {
                             this.loading = false;
@@ -578,3 +706,4 @@
         }
     </script>
 @endonce
+
