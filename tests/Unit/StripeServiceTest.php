@@ -288,4 +288,52 @@ class StripeServiceTest extends TestCase
         // Because we already had a matching Transaction, it should reuse that customer
         $this->assertSame('cus_existing_123', $customerId);
     }
+
+    public function test_resume_subscription_clears_cancel_at_period_end_and_updates_pledge_fields(): void
+    {
+        $start = now()->subDays(5);
+        $end   = now()->addDays(25);
+
+        $pledge = Pledge::forceCreate([
+            'user_id'                => null,
+            'stripe_subscription_id' => 'sub_resume',
+            'amount_cents'           => 1000,
+            'currency'               => 'usd',
+            'interval'               => 'month',
+            'status'                 => 'active',
+            'cancel_at_period_end'   => true,
+            'current_period_start'   => $start,
+            'current_period_end'     => $end,
+            'next_pledge_at'         => $end,
+        ]);
+
+        $subscription = \Stripe\Subscription::constructFrom([
+            'id'                   => 'sub_resume',
+            'status'               => 'active',
+            'cancel_at_period_end' => false,
+            'current_period_start' => $start->getTimestamp(),
+            'current_period_end'   => $end->getTimestamp(),
+        ], null);
+
+        $subscriptions = \Mockery::mock();
+        $subscriptions
+            ->shouldReceive('update')
+            ->once()
+            ->with('sub_resume', ['cancel_at_period_end' => false])
+            ->andReturn($subscription);
+
+        $stripe = \Mockery::mock(\Stripe\StripeClient::class);
+        $stripe->subscriptions = $subscriptions;
+
+        $service = new \App\Services\StripeService($stripe);
+        $service->resumeSubscription($pledge);
+
+        $pledge->refresh();
+
+        $this->assertSame('active', $pledge->status);
+        $this->assertFalse($pledge->cancel_at_period_end);
+        $this->assertNotNull($pledge->current_period_start);
+        $this->assertNotNull($pledge->current_period_end);
+        $this->assertNotNull($pledge->next_pledge_at);
+    }
 }

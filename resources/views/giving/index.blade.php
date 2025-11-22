@@ -37,27 +37,55 @@
                                         <div class="text-sm text-gray-900 font-semibold">
                                             ${{ number_format($pledge->amount_cents / 100, 2) }} / {{ $pledge->interval }}
                                         </div>
-                                        <div class="text-xs text-gray-500 mt-1">
-                                            Status:
-                                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold
-                                                @class([
-                                                    'bg-green-100 text-green-800' => $pledge->status === 'active',
-                                                    'bg-yellow-100 text-yellow-800' => in_array($pledge->status, ['incomplete', 'past_due']),
-                                                    'bg-red-100 text-red-800' => $pledge->status === 'canceled',
-                                                ])">
-                                                {{ ucfirst($pledge->status) }}
-                                            </span>
-                                            @if ($pledge->cancel_at_period_end)
-                                                <span class="ml-2 text-xs text-red-500">
-                                                    (Will cancel at period end)
+
+                                        <div class="mt-1 space-y-0.5 text-xs text-gray-500">
+                                            <div>
+                                                Status:
+                                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold
+                                                    @class([
+                                                        'bg-green-100 text-green-800' => $pledge->status === 'active',
+                                                        'bg-yellow-100 text-yellow-800' => in_array($pledge->status, ['incomplete', 'past_due']),
+                                                        'bg-red-100 text-red-800' => $pledge->status === 'canceled',
+                                                    ])">
+                                                    {{ ucfirst($pledge->status) }}
                                                 </span>
+
+                                                @if ($pledge->status === 'active' && $pledge->cancel_at_period_end)
+                                                    {{-- Small badge for “Active (will cancel on …)” --}}
+                                                    <span class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-amber-100 text-amber-800">
+                                                        Active (will cancel on
+                                                        {{ optional($pledge->current_period_end)->format('M j, Y') ?? 'end of period' }})
+                                                    </span>
+                                                @endif
+                                            </div>
+
+                                            {{-- Renews / cancels date --}}
+                                            @if ($pledge->current_period_end && ! $pledge->cancel_at_period_end)
+                                                <div>
+                                                    Renews on
+                                                    <span class="font-medium text-gray-700">
+                                                        {{ $pledge->current_period_end->format('M j, Y') }}
+                                                    </span>
+                                                </div>
+                                            @elseif ($pledge->current_period_end && $pledge->cancel_at_period_end)
+                                                <div class="text-red-500">
+                                                    Cancels on
+                                                    <span class="font-medium">
+                                                        {{ $pledge->current_period_end->format('M j, Y') }}
+                                                    </span>
+                                                </div>
+                                            @endif
+
+                                            {{-- Next charge (usually same as current_period_end, but we keep it explicit) --}}
+                                            @if ($pledge->next_pledge_at)
+                                                <div>
+                                                    Next charge:
+                                                    <span class="font-medium text-gray-700">
+                                                        {{ $pledge->next_pledge_at->format('M j, Y') }}
+                                                    </span>
+                                                </div>
                                             @endif
                                         </div>
-                                        @if ($pledge->next_pledge_at)
-                                            <div class="text-xs text-gray-500 mt-1">
-                                                Next charge: {{ optional($pledge->next_pledge_at)->format('M j, Y') }}
-                                            </div>
-                                        @endif
                                     </div>
 
                                     <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
@@ -85,7 +113,7 @@
                                             </form>
                                         @endif
 
-                                        {{-- Cancel at period end --}}
+                                        {{-- Cancel or resume at period end --}}
                                         @if ($pledge->status === 'active' && ! $pledge->cancel_at_period_end)
                                             <form
                                                 method="POST"
@@ -100,7 +128,21 @@
                                                     Cancel at period end
                                                 </button>
                                             </form>
+                                        @elseif ($pledge->status === 'active' && $pledge->cancel_at_period_end)
+                                            <form
+                                                method="POST"
+                                                action="{{ route('giving.subscriptions.resume', $pledge) }}"
+                                            >
+                                                @csrf
+                                                <button
+                                                    type="submit"
+                                                    class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-semibold rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                                                >
+                                                    Keep this monthly donation
+                                                </button>
+                                            </form>
                                         @endif
+
                                     </div>
                                 </div>
                             @endforeach

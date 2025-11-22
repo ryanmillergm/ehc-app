@@ -45,6 +45,22 @@ class GivingController extends Controller
     }
 
     /**
+     * Resume a subscription that was set to cancel at period end.
+     */
+    public function resumeSubscription(
+        Request $request,
+        Pledge $pledge,
+        StripeService $stripe
+    ): RedirectResponse {
+        $this->assertUserOwnsPledge($request, $pledge);
+
+        $stripe->resumeSubscription($pledge);
+
+        return back()->with('status', 'Your monthly donation has been resumed.');
+    }
+
+
+    /**
      * Update the monthly amount on a subscription.
      */
     public function updateSubscriptionAmount(
