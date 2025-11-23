@@ -1,3 +1,6 @@
 <div>
-    @include('partials.navbar')
+    @include('partials.navbar', [
+        'languages' => $languages,
+        'currentLanguage' => $currentLanguage,
+    ])
 </div>

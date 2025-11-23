@@ -6,35 +6,84 @@ use App\Models\Language;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Language>
+ * @extends Factory<Language>
  */
 class LanguageFactory extends Factory
 {
-    /**
-     * Define the model's default state.
-     *
-     * @return array<string, mixed>
-     */
+    protected $model = Language::class;
+
     public function definition(): array
     {
-        $code = $this->getLanguageCode();
+        // Faker languageCode is ISO 639-1 (en, es, fr, ar, etc.)
+        // We make it unique *against the DB*, not just Faker's internal unique list.
+        $code = $this->uniqueLanguageCode();
 
         return [
-            'title'         => $this->faker->word(),
+            'title'         => ucfirst($this->faker->word()),
             'iso_code'      => $code,
             'locale'        => $code,
-            'right_to_left' => $this->faker->boolean(),
+            'right_to_left' => in_array($code, ['ar', 'he', 'fa', 'ur']),
         ];
     }
 
-    public function getLanguageCode()
+    /**
+     * Generate a language code that doesn't already exist in the DB.
+     * This prevents random factory languages from colliding with seeded ones.
+     */
+    protected function uniqueLanguageCode(): string
     {
-        $code = $this->faker->languageCode();
-        $language = Language::where('iso_code')->get()->first();
-        if ($language) {
-            return $this->getLanguageCode();
-        } else {
-            return $code;
-        }
+        do {
+            $code = $this->faker->languageCode();
+        } while (Language::where('iso_code', $code)->exists());
+
+        return $code;
+    }
+
+    // --- States that mirror LanguageSeeder ---
+
+    public function english(): static
+    {
+        return $this->state(fn () => [
+            'title'         => 'English',
+            'iso_code'      => 'en',
+            'locale'        => 'en',
+            'right_to_left' => false,
+        ]);
+    }
+
+    public function spanish(): static
+    {
+        return $this->state(fn () => [
+            'title'         => 'Spanish',
+            'iso_code'      => 'es',
+            'locale'        => 'es',
+            'right_to_left' => false,
+        ]);
+    }
+
+    public function french(): static
+    {
+        return $this->state(fn () => [
+            'title'         => 'French',
+            'iso_code'      => 'fr',
+            'locale'        => 'fr',
+            'right_to_left' => false,
+        ]);
+    }
+
+    public function arabic(): static
+    {
+        return $this->state(fn () => [
+            'title'         => 'Arabic',
+            'iso_code'      => 'ar',
+            'locale'        => 'ar',
+            'right_to_left' => true,
+        ]);
+    }
+
+    // Optional: force RTL on any random language
+    public function rtl(): static
+    {
+        return $this->state(fn () => ['right_to_left' => true]);
     }
 }

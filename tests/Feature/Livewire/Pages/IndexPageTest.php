@@ -6,18 +6,40 @@ use App\Livewire\Pages\IndexPage;
 use App\Models\Language;
 use App\Models\Page;
 use App\Models\PageTranslation;
-use Illuminate\Foundation\Testing\Concerns\WithoutExceptionHandlingHandler;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Livewire\Livewire;
-use Tests\TestCase;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
 
 class IndexPageTest extends TestCase
 {
     use WithFaker, RefreshDatabase;
 
-    /** @test */
+    protected Language $en;
+    protected Language $es;
+    protected Language $fr;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Match your LanguageSeeder exactly
+        $this->en = Language::create([
+            'title' => 'English', 'iso_code' => 'en', 'locale' => 'en', 'right_to_left' => false,
+        ]);
+        $this->es = Language::create([
+            'title' => 'Spanish', 'iso_code' => 'es', 'locale' => 'es', 'right_to_left' => false,
+        ]);
+        $this->fr = Language::create([
+            'title' => 'French', 'iso_code' => 'fr', 'locale' => 'fr', 'right_to_left' => false,
+        ]);
+
+        // Default session language = English unless test overrides
+        session(['language_id' => $this->en->id, 'locale' => 'en']);
+        app()->setLocale('en');
+    }
+
     #[Test]
     public function test_renders_successfully()
     {
@@ -25,29 +47,179 @@ class IndexPageTest extends TestCase
             ->assertStatus(200);
     }
 
-
-    /** @test */
     #[Test]
-    public function displays_all_pages_for_default_language_english()
+    public function displays_pages_in_current_language_when_available()
     {
-        $this->seed();
+        session(['language_id' => $this->es->id, 'locale' => 'es']);
+        app()->setLocale('es');
 
-        $response = $this->get('/pages');
-        $response->assertOk();
-    
-        // Livewire::test(IndexPage::class)
-        //     ->assertViewHas('pageTranslations', function ($translations) {
-        //         return count($translations) == 1;
-        //     });
+        $page = Page::factory()->create(['is_active' => true]);
 
-        $this->get('/pages')
-            ->assertSeeLivewire(IndexPage::class);
+        PageTranslation::factory()->create([
+            'page_id'     => $page->id,
+            'language_id' => $this->en->id,
+            'title'       => 'About Us',
+            'slug'        => 'about-us-en',
+            'description' => 'English description',
+            'content'     => '<p>English content</p>',
+            'is_active'   => true,
+        ]);
+
+        PageTranslation::factory()->create([
+            'page_id'     => $page->id,
+            'language_id' => $this->es->id,
+            'title'       => 'Sobre Nosotros',
+            'slug'        => 'sobre-nosotros-es',
+            'description' => 'Descripción en español',
+            'content'     => '<p>Contenido en español</p>',
+            'is_active'   => true,
+        ]);
 
         Livewire::test(IndexPage::class)
-            ->assertSee('Blog Test Title Example')
-            ->assertDontSee('Blog Test Content Example');
+            ->assertSee('Sobre Nosotros')
+            ->assertSee('Descripción en español')
+            ->assertDontSee('About Us')
+            ->assertDontSee(__('pages.only_available_in_english'));
+    }
 
-        // Need to test that it only displays pages with the language set in the session
-        
+    #[Test]
+    public function falls_back_to_english_and_shows_english_only_badge_when_current_language_missing()
+    {
+        session(['language_id' => $this->es->id, 'locale' => 'es']);
+        app()->setLocale('es');
+
+        $page = Page::factory()->create(['is_active' => true]);
+
+        // Only EN translation exists
+        PageTranslation::factory()->create([
+            'page_id'     => $page->id,
+            'language_id' => $this->en->id,
+            'title'       => 'Privacy Policy',
+            'slug'        => 'privacy-en',
+            'description' => 'English only',
+            'content'     => '<p>English privacy</p>',
+            'is_active'   => true,
+        ]);
+
+        Livewire::test(IndexPage::class)
+            ->assertSee('Privacy Policy')
+            ->assertSee('English only')
+            ->assertSee(__('pages.only_available_in_english'));
+    }
+
+    #[Test]
+    public function falls_back_to_any_active_translation_when_neither_current_nor_english_exist()
+    {
+        session(['language_id' => $this->es->id, 'locale' => 'es']);
+        app()->setLocale('es');
+
+        $page = Page::factory()->create(['is_active' => true]);
+
+        // ONLY French exists
+        PageTranslation::factory()->create([
+            'page_id'     => $page->id,
+            'language_id' => $this->fr->id,
+            'title'       => 'À Propos',
+            'slug'        => 'a-propos-fr',
+            'description' => 'Description FR',
+            'content'     => '<p>Contenu FR</p>',
+            'is_active'   => true,
+        ]);
+
+        Livewire::test(IndexPage::class)
+            ->assertSee('À Propos')
+            ->assertSee('Description FR')
+            ->assertDontSee(__('pages.only_available_in_english')); // not English fallback
+    }
+
+    #[Test]
+    public function excludes_inactive_pages_and_inactive_translations()
+    {
+        session(['language_id' => $this->en->id, 'locale' => 'en']);
+        app()->setLocale('en');
+
+        // Active page + active EN translation (should show)
+        $activePage = Page::factory()->create(['is_active' => true]);
+        PageTranslation::factory()->create([
+            'page_id'     => $activePage->id,
+            'language_id' => $this->en->id,
+            'title'       => 'Donate',
+            'slug'        => 'donate-en',
+            'description' => 'Active EN',
+            'content'     => '<p>Donate content</p>',
+            'is_active'   => true,
+        ]);
+
+        // Active page but ONLY inactive translation (should NOT show)
+        $pageWithInactiveTx = Page::factory()->create(['is_active' => true]);
+        PageTranslation::factory()->create([
+            'page_id'     => $pageWithInactiveTx->id,
+            'language_id' => $this->en->id,
+            'title'       => 'Hidden Page',
+            'slug'        => 'hidden-en',
+            'description' => 'Inactive translation',
+            'content'     => '<p>Hidden</p>',
+            'is_active'   => false,
+        ]);
+
+        // Inactive page even with active translation (should NOT show)
+        $inactivePage = Page::factory()->create(['is_active' => false]);
+        PageTranslation::factory()->create([
+            'page_id'     => $inactivePage->id,
+            'language_id' => $this->en->id,
+            'title'       => 'Inactive Page',
+            'slug'        => 'inactive-en',
+            'description' => 'Inactive page',
+            'content'     => '<p>Inactive</p>',
+            'is_active'   => true,
+        ]);
+
+        Livewire::test(IndexPage::class)
+            ->assertSee('Donate')
+            ->assertDontSee('Hidden Page')
+            ->assertDontSee('Inactive Page');
+    }
+
+    #[Test]
+    public function language_switched_event_re_resolves_translations_in_place()
+    {
+        // Page with EN + ES
+        $page = Page::factory()->create(['is_active' => true]);
+
+        $enTx = PageTranslation::factory()->create([
+            'page_id'     => $page->id,
+            'language_id' => $this->en->id,
+            'title'       => 'About Us',
+            'slug'        => 'about-us-en',
+            'description' => 'English description',
+            'content'     => '<p>English</p>',
+            'is_active'   => true,
+        ]);
+
+        $esTx = PageTranslation::factory()->create([
+            'page_id'     => $page->id,
+            'language_id' => $this->es->id,
+            'title'       => 'Sobre Nosotros',
+            'slug'        => 'sobre-nosotros-es',
+            'description' => 'Descripción en español',
+            'content'     => '<p>Español</p>',
+            'is_active'   => true,
+        ]);
+
+        // Start in EN
+        session(['language_id' => $this->en->id, 'locale' => 'en']);
+        app()->setLocale('en');
+
+        $lw = Livewire::test(IndexPage::class)
+            ->assertSee($enTx->title)
+            ->assertDontSee($esTx->title);
+
+        // Switch session to ES and fire the Livewire event
+        session(['language_id' => $this->es->id, 'locale' => 'es']);
+        app()->setLocale('es');
+
+        $lw->dispatch('language-switched')
+            ->assertSee($esTx->title)
+            ->assertDontSee($enTx->title);
     }
 }

@@ -30,8 +30,22 @@ class Page extends Model
     public function scopeAllActivePagesWithTranslationsByLanguage(Builder $query)
     {
         $query->withWhereHas('pageTranslations', function ($query) {
-            $query->where('is_active', true)->where( 'language_id', session('language_id'));
+            $query->where('is_active', true)
+                  ->where( 'language_id', session('language_id'));
         })->where('is_active', true);
+    }
+
+    /**
+     * NEW scope for IndexPage:
+     * All active pages that have at least ONE active translation (any language),
+     * and eagerly load only active translations.
+     */
+    public function scopeAllActivePagesWithAnyActiveTranslation(Builder $query)
+    {
+        return $query
+            ->where('is_active', true)
+            ->whereHas('pageTranslations', fn ($q) => $q->where('is_active', true))
+            ->with(['pageTranslations' => fn ($q) => $q->where('is_active', true)]);
     }
 
     /**
@@ -42,10 +56,11 @@ class Page extends Model
      */
     public function scopeTranslationByDefaultLanguage(Builder $query)
     {
-        $language = Language::first();
+        $languageId = Language::first()?->id;
 
         $query->where(function ($query, $language) {
-            $query->where('language_id', $language)->where('is_active', true);
+            $query->where('language_id', $language)
+                  ->where('is_active', true);
         });
     }
 

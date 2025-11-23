@@ -29,46 +29,78 @@
                 </div>
             </div>
 
-            {{-- Right: Auth / user (desktop) --}}
-            <div class="hidden md:flex items-center justify-end gap-3 text-sm">
-                @auth
-                    <span class="hidden lg:inline-block text-slate-700">
-                        Hi, {{ Auth::user()->name }}
-                    </span>
+            {{-- Right side (desktop): language picker + auth --}}
+            <div class="hidden md:flex items-center justify-end gap-4 text-sm">
+                {{-- Language picker --}}
+                <div class="relative">
+                    <label for="lang-select" class="sr-only">Language</label>
+                    <select
+                        id="lang-select"
+                        wire:change="switchLanguage($event.target.value)"
+                        class="appearance-none rounded-full border border-slate-200 bg-white
+                               px-3 py-1.5 pr-9 text-xs font-medium text-slate-700
+                               hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                        @foreach ($languages as $lang)
+                            <option
+                                value="{{ $lang->locale }}"
+                                @selected($currentLanguage?->id === $lang->id)
+                            >
+                                {{ $lang->title }}
+                            </option>
+                        @endforeach
+                    </select>
 
-                    <a href="{{ route('dashboard') }}"
-                       class="inline-flex items-center rounded-full border border-slate-200
-                              px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
-                        Dashboard
-                    </a>
+                    {{-- Custom chevron --}}
+                    <svg
+                        class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500"
+                        viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
+                    >
+                        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.24 4.5a.75.75 0 01-1.08 0l-4.24-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                    </svg>
+                </div>
 
-                    <form method="POST" action="{{ route('logout') }}">
-                        @csrf
-                        <button
-                            type="submit"
-                            class="inline-flex items-center rounded-full bg-indigo-600 px-3 py-1.5
-                                   text-xs font-semibold text-white shadow-sm hover:bg-indigo-700"
-                        >
-                            Log out
-                        </button>
-                    </form>
-                @else
-                    @if (Route::has('login'))
-                        <a href="{{ route('login') }}"
+                {{-- Auth / user --}}
+                <div class="flex items-center gap-3 text-sm">
+                    @auth
+                        <span class="hidden lg:inline-block text-slate-700">
+                            Hi, {{ Auth::user()->name }}
+                        </span>
+
+                        <a href="{{ route('dashboard') }}"
                            class="inline-flex items-center rounded-full border border-slate-200
                                   px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
-                            Log in
+                            Dashboard
                         </a>
-                    @endif
 
-                    @if (Route::has('register'))
-                        <a href="{{ route('register') }}"
-                           class="inline-flex items-center rounded-full bg-indigo-600 px-3 py-1.5
-                                  text-xs font-semibold text-white shadow-sm hover:bg-indigo-700">
-                            Sign up
-                        </a>
-                    @endif
-                @endauth
+                        <form method="POST" action="{{ route('logout') }}">
+                            @csrf
+                            <button
+                                type="submit"
+                                class="inline-flex items-center rounded-full bg-indigo-600 px-3 py-1.5
+                                       text-xs font-semibold text-white shadow-sm hover:bg-indigo-700"
+                            >
+                                Log out
+                            </button>
+                        </form>
+                    @else
+                        @if (Route::has('login'))
+                            <a href="{{ route('login') }}"
+                               class="inline-flex items-center rounded-full border border-slate-200
+                                      px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
+                                Log in
+                            </a>
+                        @endif
+
+                        @if (Route::has('register'))
+                            <a href="{{ route('register') }}"
+                               class="inline-flex items-center rounded-full bg-indigo-600 px-3 py-1.5
+                                      text-xs font-semibold text-white shadow-sm hover:bg-indigo-700">
+                                Sign up
+                            </a>
+                        @endif
+                    @endauth
+                </div>
             </div>
 
             {{-- Mobile: hamburger --}}
@@ -134,6 +166,35 @@
                 <a href="{{ url('/children') }}" class="block py-2 border-b border-slate-800/60 hover:text-indigo-300">Children</a>
                 <a href="{{ url('/teams') }}" class="block py-2 border-b border-slate-800/60 hover:text-indigo-300">Teams</a>
             </nav>
+
+            {{-- Mobile language picker --}}
+            <div class="pt-4 border-t border-slate-800/60 space-y-2">
+                <p class="text-xs text-slate-400">Language</p>
+                <div class="relative">
+                    <select
+                        wire:change="switchLanguage($event.target.value)"
+                        class="w-full appearance-none rounded-full border border-slate-700 bg-slate-900
+                               px-3 py-2 pr-9 text-xs font-medium text-slate-100
+                               hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    >
+                        @foreach ($languages as $lang)
+                            <option
+                                value="{{ $lang->locale }}"
+                                @selected($currentLanguage?->id === $lang->id)
+                            >
+                                {{ $lang->title }}
+                            </option>
+                        @endforeach
+                    </select>
+
+                    <svg
+                        class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400"
+                        viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
+                    >
+                        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.24 4.5a.75.75 0 01-1.08 0l-4.24-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+            </div>
 
             <div class="pt-4 border-t border-slate-800/60">
                 @auth

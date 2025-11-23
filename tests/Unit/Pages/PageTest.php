@@ -8,8 +8,6 @@ use App\Models\PageTranslation;
 use Tests\TestCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
-use Illuminate\Support\Facades\DB;
-// use Illuminate\Support\Facades\Session;
 
 class PageTest extends TestCase
 {
@@ -21,50 +19,47 @@ class PageTest extends TestCase
     public function test_a_page_can_add_a_translation(): void
     {
         $page = Page::factory()->create();
-
         $language = Language::factory()->create();
 
         $attributes = [
-            'language_id'   => $language->id,
-            'title'         => 'Blog Test Title Example',
-            'slug'          => 'blog-test-example',
-            'description'   => 'Blog Test Description Example',
-            'content'       => 'Blog Test Content Example',
-            'is_active'     => true,
+            'language_id' => $language->id,
+            'title'       => 'Blog Test Title Example',
+            'slug'        => 'blog-test-example',
+            'description' => 'Blog Test Description Example',
+            'content'     => 'Blog Test Content Example',
+            'is_active'   => true,
         ];
 
         $page->addTranslation($attributes);
+
+        $page->refresh(); // ensure relationship reload
 
         $this->assertCount(1, $page->pageTranslations);
     }
 
     /**
-     * Test a Page can have a  PageTranslation relationship
+     * Test a Page can have a PageTranslation relationship
      */
     public function test_a_page_can_have_a_page_translation()
     {
-        $page = Page::factory()->create();
+        $page  = Page::factory()->create();
         $page2 = Page::factory()->create();
         $page3 = Page::factory()->create();
 
-        $language = Language::factory()->create();
+        $language  = Language::factory()->create();
         $language2 = Language::factory()->create();
         $language3 = Language::factory()->create();
 
-        $translation = PageTranslation::factory()->create(['language_id' => $language->id, 'page_id' => $page->id]);
+        $translation  = PageTranslation::factory()->create(['language_id' => $language->id,  'page_id' => $page->id]);
         $translation2 = PageTranslation::factory()->create(['language_id' => $language2->id, 'page_id' => $page2->id]);
         $translation3 = PageTranslation::factory()->create(['language_id' => $language3->id, 'page_id' => $page3->id]);
 
-        // Method 1: A Page Translation exists in a Languages pageTranslation collections.
+        $page->refresh();
+
         $this->assertTrue($page->pageTranslations->contains($translation));
-
-        // Method 2: Count that a Page pageTranslations collection exists.
         $this->assertEquals(1, $page->pageTranslations->count());
-
-        // Method 3: PageTranslations are related to Pages and is a collection instance.
-        $this->assertInstanceOf('Illuminate\Database\Eloquent\Collection', $page->pageTranslations);
+        $this->assertInstanceOf(\Illuminate\Database\Eloquent\Collection::class, $page->pageTranslations);
     }
-
 
     /**
      * Test a Page has many PageTranslations relationship
@@ -72,75 +67,168 @@ class PageTest extends TestCase
     public function test_a_page_has_many_page_translations()
     {
         $page = Page::factory()->create();
-        $page2 = Page::factory()->create();
-        $page3 = Page::factory()->create();
 
-        $language = Language::factory()->create();
+        $language  = Language::factory()->create();
         $language2 = Language::factory()->create();
         $language3 = Language::factory()->create();
 
-        $translation = PageTranslation::factory()->create(['language_id' => $language->id, 'page_id' => $page->id]);
+        $translation  = PageTranslation::factory()->create(['language_id' => $language->id,  'page_id' => $page->id]);
         $translation2 = PageTranslation::factory()->create(['language_id' => $language2->id, 'page_id' => $page->id]);
         $translation3 = PageTranslation::factory()->create(['language_id' => $language3->id, 'page_id' => $page->id]);
 
-        // Method 1: A Page Translation exists in a Languages pageTranslation collections.
+        $page->refresh();
+
         $this->assertTrue($page->pageTranslations->contains($translation));
-
-        // Method 2: Count that a Page pageTranslations collection exists.
         $this->assertEquals(3, $page->pageTranslations->count());
-
-        // Method 3: PageTranslations are related to Pages and is a collection instance.
-        $this->assertInstanceOf('Illuminate\Database\Eloquent\Collection', $page->pageTranslations);
+        $this->assertInstanceOf(\Illuminate\Database\Eloquent\Collection::class, $page->pageTranslations);
     }
-    
+
     /**
-     * A list of active pages can be queried with Page Translations by language - scopePageTranslationsByLanguage
-     *
-     * @return void
+     * Scope:
+     * All active pages with active translations for current session language.
      */
-    public function test_active_pages_can_scope_active_translations_by_language() 
+    public function test_active_pages_can_scope_active_translations_by_language()
     {
-        $this->seed();
-              
-        $english_language = Language::where('locale', 'en')->first();
-        $spanish_language = Language::where('locale', 'es')->first();
-        $french_language = Language::where('locale', 'fr')->first();
+        // Create languages exactly like seeder
+        $english = Language::create([
+            'title' => 'English', 'iso_code' => 'en', 'locale' => 'en', 'right_to_left' => false,
+        ]);
+        $spanish = Language::create([
+            'title' => 'Spanish', 'iso_code' => 'es', 'locale' => 'es', 'right_to_left' => false,
+        ]);
+        $french = Language::create([
+            'title' => 'French', 'iso_code' => 'fr', 'locale' => 'fr', 'right_to_left' => false,
+        ]);
 
-        session(['language_id' => $english_language->id]);
-
-        // Active Pages
-        $page = Page::factory()->create(['is_active' => true]);
+        // Active pages
+        $page1 = Page::factory()->create(['is_active' => true]);
         $page2 = Page::factory()->create(['is_active' => true]);
         $page3 = Page::factory()->create(['is_active' => true]);
 
-        // Not Active Pages
+        // Inactive page
         $page4 = Page::factory()->create(['is_active' => false]);
 
-        // Active Translations
-        $translation = PageTranslation::factory()->create(['language_id' => $spanish_language->id, 'page_id' => $page->id, 'is_active' => true]);
-        $translation2 = PageTranslation::factory()->create(['language_id' => $english_language->id, 'page_id' => $page->id, 'is_active' => true]);
-        $translation3 = PageTranslation::factory()->create(['language_id' => $french_language->id, 'page_id' => $page->id, 'is_active' => true]);
-        $translation4 = PageTranslation::factory()->create(['language_id' => $english_language->id, 'page_id' => $page4->id, 'is_active' => true]);
-        $translation5 = PageTranslation::factory()->create(['language_id' => $spanish_language->id, 'page_id' => $page4->id, 'is_active' => true]);
-        
-        // Not Active Translations
-        $translation_en = PageTranslation::factory()->create(['language_id' => $english_language->id, 'page_id' => $page3->id, 'is_active' => false]);
+        // Active translations
+        // page1 has EN + ES + FR active
+        PageTranslation::factory()->create([
+            'language_id' => $english->id, 'page_id' => $page1->id, 'is_active' => true,
+        ]);
+        PageTranslation::factory()->create([
+            'language_id' => $spanish->id, 'page_id' => $page1->id, 'is_active' => true,
+        ]);
+        PageTranslation::factory()->create([
+            'language_id' => $french->id, 'page_id' => $page1->id, 'is_active' => true,
+        ]);
 
-        $pages_with_translations_by_english_language = Page::allActivePagesWithTranslationsByLanguage()->get();
-        $this->assertEquals(2, count($pages_with_translations_by_english_language));
+        // page2 has EN only active
+        PageTranslation::factory()->create([
+            'language_id' => $english->id, 'page_id' => $page2->id, 'is_active' => true,
+        ]);
 
-        session(['language_id' => $spanish_language->id]);
+        // page3 has EN inactive
+        PageTranslation::factory()->create([
+            'language_id' => $english->id, 'page_id' => $page3->id, 'is_active' => false,
+        ]);
 
-        $pages_with_translations_by_spanish_language = Page::allActivePagesWithTranslationsByLanguage()->get();
-        $this->assertEquals(2, count($pages_with_translations_by_spanish_language));
-        
-        // Active Spanish Translations
-        $translation_es = PageTranslation::factory()->create(['language_id' => $spanish_language->id, 'page_id' => $page3->id, 'is_active' => true]);
+        // page4 inactive page but translations active
+        PageTranslation::factory()->create([
+            'language_id' => $english->id, 'page_id' => $page4->id, 'is_active' => true,
+        ]);
+        PageTranslation::factory()->create([
+            'language_id' => $spanish->id, 'page_id' => $page4->id, 'is_active' => true,
+        ]);
 
-        // Not Active Spanish Translations
-        $translation2_es = PageTranslation::factory()->create(['language_id' => $spanish_language->id, 'page_id' => $page2->id, 'is_active' => false]);
+        // ---- EN session: should return page1 + page2 ----
+        session(['language_id' => $english->id]);
 
-        $pages_with_translations_by_spanish_language = Page::allActivePagesWithTranslationsByLanguage()->get();
-        $this->assertEquals(3, count($pages_with_translations_by_spanish_language));
+        $pagesEn = Page::allActivePagesWithTranslationsByLanguage()->get();
+
+        $this->assertCount(2, $pagesEn);
+        $this->assertTrue($pagesEn->pluck('id')->contains($page1->id));
+        $this->assertTrue($pagesEn->pluck('id')->contains($page2->id));
+        $this->assertFalse($pagesEn->pluck('id')->contains($page3->id));
+        $this->assertFalse($pagesEn->pluck('id')->contains($page4->id));
+
+        // ---- ES session: should return ONLY page1 ----
+        session(['language_id' => $spanish->id]);
+
+        $pagesEs = Page::allActivePagesWithTranslationsByLanguage()->get();
+
+        $this->assertCount(1, $pagesEs);
+        $this->assertTrue($pagesEs->pluck('id')->contains($page1->id));
+
+        // Add ES active to page3 → now ES should return page1 + page3
+        PageTranslation::factory()->create([
+            'language_id' => $spanish->id, 'page_id' => $page3->id, 'is_active' => true,
+        ]);
+
+        $pagesEsAfter = Page::allActivePagesWithTranslationsByLanguage()->get();
+
+        $this->assertCount(2, $pagesEsAfter);
+        $this->assertTrue($pagesEsAfter->pluck('id')->contains($page3->id));
+    }
+
+    /**
+     * NEW Scope:
+     * All active pages that have at least one active translation (any language),
+     * and eager-load ONLY active translations.
+     */
+    public function test_active_pages_can_scope_any_active_translation()
+    {
+        // Languages (not strictly required, but clearer)
+        $english = Language::create([
+            'title' => 'English', 'iso_code' => 'en', 'locale' => 'en', 'right_to_left' => false,
+        ]);
+        $spanish = Language::create([
+            'title' => 'Spanish', 'iso_code' => 'es', 'locale' => 'es', 'right_to_left' => false,
+        ]);
+
+        // Active pages
+        $pageWithActiveTx = Page::factory()->create(['is_active' => true]);
+        $pageWithInactiveOnlyTx = Page::factory()->create(['is_active' => true]);
+
+        // Inactive page
+        $inactivePage = Page::factory()->create(['is_active' => false]);
+
+        // ---- Translations ----
+
+        // pageWithActiveTx has one active EN and one inactive ES
+        PageTranslation::factory()->create([
+            'page_id' => $pageWithActiveTx->id,
+            'language_id' => $english->id,
+            'is_active' => true,
+        ]);
+        PageTranslation::factory()->create([
+            'page_id' => $pageWithActiveTx->id,
+            'language_id' => $spanish->id,
+            'is_active' => false,
+        ]);
+
+        // pageWithInactiveOnlyTx has only inactive translations
+        PageTranslation::factory()->create([
+            'page_id' => $pageWithInactiveOnlyTx->id,
+            'language_id' => $english->id,
+            'is_active' => false,
+        ]);
+
+        // inactivePage has active translations but should be excluded due to page inactive
+        PageTranslation::factory()->create([
+            'page_id' => $inactivePage->id,
+            'language_id' => $english->id,
+            'is_active' => true,
+        ]);
+
+        $pages = Page::allActivePagesWithAnyActiveTranslation()->get();
+
+        // Only the active page that has at least one active translation should appear
+        $this->assertCount(1, $pages);
+        $this->assertTrue($pages->pluck('id')->contains($pageWithActiveTx->id));
+        $this->assertFalse($pages->pluck('id')->contains($pageWithInactiveOnlyTx->id));
+        $this->assertFalse($pages->pluck('id')->contains($inactivePage->id));
+
+        // And the eager-loaded translations are active-only
+        $this->assertTrue($pages->first()->relationLoaded('pageTranslations'));
+        $this->assertCount(1, $pages->first()->pageTranslations);
+        $this->assertTrue($pages->first()->pageTranslations->every(fn ($tx) => $tx->is_active));
     }
 }
