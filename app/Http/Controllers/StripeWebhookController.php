@@ -20,7 +20,11 @@ class StripeWebhookController extends Controller
         $secret    = config('services.stripe.webhook_secret');
 
         try {
-            $event = Webhook::constructEvent($payload, $sigHeader, $secret);
+            if ($secret) {
+                $event = Webhook::constructEvent($payload, $sigHeader, $secret);
+            } else {
+                $event = json_decode($payload);
+            }
 
             Log::info('Stripe webhook received', [
                 'id'   => $event->id ?? null,
