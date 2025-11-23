@@ -470,4 +470,157 @@ class StripeWebhookControllerTest extends TestCase
         // Sanity check: exactly one refund
         $this->assertSame(1, Refund::count());
     }
+
+    public function test_invoice_paid_uses_charges_data_fallback_when_charge_is_null(): void
+    {
+        $pledge = Pledge::forceCreate([
+            'user_id'                => null,
+            'amount_cents'           => 102,
+            'currency'               => 'usd',
+            'interval'               => 'month',
+            'status'                 => 'incomplete',
+            'donor_email'            => 'donor@example.test',
+            'donor_name'             => 'Test Donor',
+            'stripe_subscription_id' => 'sub_charge_fallback',
+            'stripe_customer_id'     => 'cus_charge_fallback',
+        ]);
+
+        $periodStart = 1_900_000_000;
+        $periodEnd   = $periodStart + 2_592_000;
+
+        $event = (object) [
+            'type' => 'invoice.paid',
+            'data' => (object) [
+                'object' => (object) [
+                    'id'             => 'in_charge_fallback',
+                    'subscription'   => 'sub_charge_fallback',
+                    'customer'       => 'cus_charge_fallback',
+                    'payment_intent' => 'pi_charge_fallback',
+                    'amount_paid'    => 102,
+                    'amount_due'     => 102,
+                    'currency'       => 'usd',
+
+                    // charge is null, so controller must use charges.data[0].id
+                    'charge'  => null,
+                    'charges' => (object) [
+                        'data' => [
+                            (object) [
+                                'id' => 'ch_from_charges',
+                            ],
+                        ],
+                    ],
+
+                    'customer_email'     => 'donor@example.test',
+                    'hosted_invoice_url' => 'https://example.test/invoices/in_charge_fallback',
+                    'lines'              => (object) [
+                        'data' => [
+                            (object) [
+                                'subscription' => 'sub_charge_fallback',
+                                'period'       => (object) [
+                                    'start' => $periodStart,
+                                    'end'   => $periodEnd,
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $controller = new StripeWebhookController();
+        $controller->handleEvent($event);
+
+        $this->assertDatabaseHas('transactions', [
+            'pledge_id'         => $pledge->id,
+            'payment_intent_id' => 'pi_charge_fallback',
+            'subscription_id'   => 'sub_charge_fallback',
+            // must be the fallback charge id, not null
+            'charge_id'         => 'ch_from_charges',
+            'type'              => 'subscription_recurring',
+            'status'            => 'succeeded',
+        ]);
+    }
+
+    public function test_charge_succeeded_does_not_clobber_existing_payment_method_or_customer_id(): void
+    {
+        $tx = Transaction::factory()->create([
+            'payment_intent_id' => 'pi_keep',
+            'status'            => 'succeeded',
+            'payment_method_id' => 'pm_old',
+            'customer_id'       => 'cus_old',
+            'charge_id'         => null,
+            'receipt_url'       => null,
+            'metadata'          => [],
+        ]);
+
+        $event = (object) [
+            'type' => 'charge.succeeded',
+            'data' => (object) [
+                'object' => (object) [
+                    'id'             => 'ch_new',
+                    'payment_intent' => 'pi_keep',
+
+                    // These would be "new" values if the controller tries to backfill.
+                    // Test ensures they won't overwrite existing tx values.
+                    'payment_method' => 'pm_new',
+                    'customer'       => 'cus_new',
+
+                    'receipt_url'     => 'https://example.test/new-receipt',
+                    'billing_details' => (object) [
+                        'email' => 'donor@example.test',
+                        'name'  => 'Test Donor',
+                    ],
+                    'payment_method_details' => (object) [
+                        'card' => (object) [
+                            'brand'   => 'visa',
+                            'last4'   => '4242',
+                            'country' => 'US',
+                            'funding' => 'credit',
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $controller = new StripeWebhookController();
+        $controller->handleEvent($event);
+
+        $tx->refresh();
+
+        // Charge enrichment is fine…
+        $this->assertSame('ch_new', $tx->charge_id);
+
+        // …but existing IDs must NOT be overwritten.
+        $this->assertSame('pm_old', $tx->payment_method_id);
+        $this->assertSame('cus_old', $tx->customer_id);
+    }
+
+    public function test_payment_intent_succeeded_does_not_explode_when_latest_charge_missing(): void
+    {
+        $tx = Transaction::factory()->create([
+            'payment_intent_id' => 'pi_no_latest',
+            'status'            => 'pending',
+            'paid_at'           => null,
+        ]);
+
+        // Stripe PI event with no latest_charge on the object
+        $event = (object) [
+            'type' => 'payment_intent.succeeded',
+            'data' => (object) [
+                'object' => (object) [
+                    'id' => 'pi_no_latest',
+                    // intentionally missing latest_charge
+                ],
+            ],
+        ];
+
+        $controller = new StripeWebhookController();
+        $controller->handleEvent($event);
+
+        $tx->refresh();
+
+        $this->assertSame('succeeded', $tx->status);
+        $this->assertNotNull($tx->paid_at);
+        // If you ever add latest_charge backfilling, this test ensures null-safe handling.
+    }
 }
