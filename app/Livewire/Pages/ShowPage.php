@@ -4,101 +4,101 @@ namespace App\Livewire\Pages;
 
 use App\Models\Language;
 use App\Models\PageTranslation;
-use Livewire\Attributes\Session;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class ShowPage extends Component
 {
-    public $translation;
+    public ?PageTranslation $translation = null;
 
-    #[Session(key: 'redirect_from_translation')]
-    public $redirectFromTranslation = false;  
+    /** Stable slug from the URL we mounted with */
+    public string $slug;
 
-    public function mount($slug) {
-        $this->translation = $this->findTranslationBySlugOrDefault($slug);
-    }
-
-    public function findTranslationBySlugOrDefault($slug)
+    public function mount(string $slug): void
     {
-        $translationQuery = PageTranslation::translationBySlug($slug);
-        $translation = $translationQuery->get()->first();
-        
-        if (!$translation || !$translation->page->is_active) {
-            session()->flash('status', "Sorry. The page you were looking for does not exist.");
-            return $this->redirectToPages($slug);
-        }
-        
-        if ($this->redirectFromTranslation) {
-            $this->toggleRedirectFromTranslation();
-            
-            return $translation;
+        $this->slug = $slug;
+
+        $resolved = $this->resolveTranslation($slug);
+
+        if (! $resolved) {
+            // If the slug is truly invalid or page inactive, bounce to index
+            $this->redirect('/pages', navigate: true);
+            return;
         }
 
-        $language = Language::find(session('language_id')) ?? getLanguage();
-        
-        // If Translation By Slug Doesn't Match Current Language, find which translation it should dispaly.
-        if ($translation->language_id !== $language->id) {
-            
-            $this->findTranslationToDisplay($slug, $translation, $language);
+        $this->translation = $resolved;
+    }
+
+    /**
+     * Decide which translation to display (no redirect).
+     * Returns null ONLY if slug doesn't exist / inactive.
+     */
+    protected function resolveTranslation(string $slug): ?PageTranslation
+    {
+        $slugTx = PageTranslation::translationBySlug($slug)->first();
+
+        if (! $slugTx || ! $slugTx->is_active || ! $slugTx->page?->is_active) {
+            session()->flash('status', "Sorry. The page '{$slug}' does not exist.");
+            return null;
         }
 
-        return $translation;
+        $page = $slugTx->page;
+
+        $currentLanguage =
+            Language::find(session('language_id'))
+            ?? Language::where('locale', app()->getLocale())->first()
+            ?? Language::first();
+
+        $defaultLanguage = Language::first(); // English in your seeder
+
+        $activeFor = fn (Language $lang) =>
+            $page->pageTranslations
+                ->where('language_id', $lang->id)
+                ->where('is_active', true)
+                ->first();
+
+        // 1) Slug matches current language? show it.
+        if ($slugTx->language_id === $currentLanguage->id) {
+            return $slugTx;
+        }
+
+        // 2) Show current language if exists
+        if ($currentTx = $activeFor($currentLanguage)) {
+            session()->flash('status', "Showing {$currentLanguage->title} version.");
+            return $currentTx;
+        }
+
+        // 3) Otherwise default (English) if exists
+        if ($defaultTx = $activeFor($defaultLanguage)) {
+            session()->flash(
+                'status',
+                "{$currentLanguage->title} version not available. Showing {$defaultLanguage->title} instead."
+            );
+            return $defaultTx;
+        }
+
+        // 4) Last fallback: show the slug translation
+        $slugLang = Language::find($slugTx->language_id);
+        session()->flash('status', "Showing {$slugLang?->title} version.");
+        return $slugTx;
     }
 
-    public function findTranslationToDisplay($slug, $translation, $language)
+    /**
+     * Fired by Navbar::switchLanguage().
+     * Re-resolves in place (no full reload).
+     */
+    #[On('language-switched')]
+    public function onLanguageSwitched(?string $code = null): void
     {
-        $page = $translation->page;
-            $translation_for_current_language = $page->pageTranslations->where('language_id', $language->id)->first();
-
-            // If translation found for current Language redirect to that translation's slug
-            if ($translation_for_current_language) {
-                session()->flash('status', "Found Page for {$language->title} language.");
-                // $this->translation = $translation_for_current_language;
-
-                $this->toggleRedirectFromTranslation();
-                return $this->redirect('/pages/' . $translation_for_current_language->slug, navigate: true);  
-            } 
-            
-            $default_language = Language::first();
-            session()->flash('status', "{$language->title} page not available.");
-            
-            $translation_for_default_language = $page->pageTranslations->where('language_id', $default_language->id)->first();
-            
-            // If there is a translation for default language, redirect to translation's slug
-            if ($translation_for_default_language) {
-                session()->flash('status', "Found {$default_language->title} page intead.");
-                // $this->translation = $translation_for_default_language;
-                $this->toggleRedirectFromTranslation();
-                return $this->redirect('/pages/' . $translation_for_default_language->slug, navigate: true);
-            }
-
-            // If current and default language translations are not available, return current slug's translation in different language or if no translation exists at all, redirect to pages index.
-            if($translation) {
-                $translation_language = Language::find($translation->language_id);
-
-                session()->flash('status', "Found {$translation_language->title} page intead.");
-                $this->translation = $translation;
-            } else {
-                session()->flash('status', "Sorry. The page you were looking for does not exist");
-                return $this->redirectToPages($slug);
-            }
-
-        return $translation;
-    }
-
-    public function toggleRedirectFromTranslation()
-    {
-        $this->redirectFromTranslation = !$this->redirectFromTranslation;
-    }
-
-    public function redirectToPages($slug) 
-    {
-        session()->flash('status', "Sorry, the page '{$slug}' does not exist.");
-        $this->redirect(IndexPage::class, navigate: true);
+        if ($resolved = $this->resolveTranslation($this->slug)) {
+            $this->translation = $resolved;
+        }
     }
 
     public function render()
     {
-        return view('livewire.pages.show-page');
+        return view('livewire.pages.show-page', [
+            'translation' => $this->translation,
+        ]);
     }
 }

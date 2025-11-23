@@ -18,7 +18,7 @@
         @livewireStyles
     </head>
     <body class="font-sans text-gray-900 antialiased bg-gray-100">
-        @include('partials.navbar')
+        <livewire:navbar />
 
         <div class="pt-16">
             <p>Layout for Auth Users in General App</p>

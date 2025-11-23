@@ -12,10 +12,24 @@ class StripeService
 {
     protected StripeClient $stripe;
 
-    public function __construct(?StripeClient $stripe = null)
+    public function __construct($stripe = null)
     {
-        $this->stripe = $stripe ?: new StripeClient(config('services.stripe.secret'));
+        if ($stripe instanceof StripeClient) {
+            $this->stripe = $stripe;
+            return;
+        }
+
+        $secret = config('services.stripe.secret') ?: env('STRIPE_SECRET');
+
+        throw_if(
+            empty($secret),
+            \RuntimeException::class,
+            'Stripe secret is missing. Set STRIPE_SECRET in .env and map it in config/services.php.'
+        );
+
+        $this->stripe = new StripeClient($secret);
     }
+
 
     /**
      * Ensure we have a Stripe customer id.
@@ -300,6 +314,18 @@ class StripeService
             ],
         ]);
 
+        // Stripe may return metadata as StripeObject, array-ish, or stdClass depending on context.
+        $metadata = [];
+        if ($stripeRefund->metadata) {
+            if (is_array($stripeRefund->metadata)) {
+                $metadata = $stripeRefund->metadata;
+            } elseif (method_exists($stripeRefund->metadata, 'toArray')) {
+                $metadata = $stripeRefund->metadata->toArray();
+            } else {
+                $metadata = (array) $stripeRefund->metadata;
+            }
+        }
+
         return Refund::create([
             'transaction_id'   => $transaction->id,
             'stripe_refund_id' => $stripeRefund->id,
@@ -308,7 +334,7 @@ class StripeService
             'currency'         => $stripeRefund->currency,
             'status'           => $stripeRefund->status,
             'reason'           => $stripeRefund->reason,
-            'metadata'         => $stripeRefund->metadata ? $stripeRefund->metadata->toArray() : [],
+            'metadata'         => $metadata,
         ]);
     }
 
@@ -333,6 +359,31 @@ class StripeService
         );
 
         // Only update status + cancel flag; keep period dates as-is.
+        $pledge->update([
+            'status'               => $subscription->status,
+            'cancel_at_period_end' => (bool) $subscription->cancel_at_period_end,
+        ]);
+    }
+
+    /**
+     * Resume a subscription that was set to cancel at period end.
+     *
+     * Like cancelSubscriptionAtPeriodEnd(), we avoid touching current_period_* here
+     * because Stripe may omit them. Webhooks keep them in sync.
+     */
+    public function resumeSubscription(Pledge $pledge): void
+    {
+        if (! $pledge->stripe_subscription_id) {
+            return;
+        }
+
+        $subscription = $this->stripe->subscriptions->update(
+            $pledge->stripe_subscription_id,
+            [
+                'cancel_at_period_end' => false,
+            ]
+        );
+
         $pledge->update([
             'status'               => $subscription->status,
             'cancel_at_period_end' => (bool) $subscription->cancel_at_period_end,

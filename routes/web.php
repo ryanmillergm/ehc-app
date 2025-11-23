@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Home;
 use App\Livewire\Pages\ShowPage;
 use App\Livewire\Pages\IndexPage;
 use App\Http\Middleware\Localization;
@@ -17,9 +18,17 @@ use App\Http\Controllers\Donations\DonationsController;
 
 Route::get('lang/{lang}', LanguageSwitch::class)->name('lang');
 
-Route::get('/', function () {
-    return view('welcome');
-})->name('welcome');
+Route::get('/', Home::class)->name('home');
+
+// Route::get('/', function () {
+//     return view('welcome');
+// })->name('welcome');
+
+/*
+|--------------------------------------------------------------------------
+| Public donation flow (no auth required)
+|--------------------------------------------------------------------------
+*/
 
 Route::get('/give', [DonationsController::class, 'show'])
     ->name('donations.show');
@@ -38,64 +47,92 @@ Route::prefix('donations')->name('donations.')->group(function () {
         ->name('thankyou-subscription');
 });
 
-
-// Webhook endpoint (Stripe dashboard will call this)
+/*
+|--------------------------------------------------------------------------
+| Stripe webhook (Stripe → your app)
+|--------------------------------------------------------------------------
+|
+| Protected by Stripe's signing secret, not by auth.
+*/
 Route::post('/stripe/webhook', StripeWebhookController::class)
     ->name('stripe.webhook');
+
+/*
+|--------------------------------------------------------------------------
+| Authenticated area (Jetstream dashboard, My Giving, etc.)
+|--------------------------------------------------------------------------
+*/
 
 Route::middleware([
     'auth:sanctum',
     config('jetstream.auth_session'),
     'verified',
-    ])->group(function () {
-        Route::get('/dashboard', function () {
-            return view('dashboard');
-        })->name('dashboard');
+])->group(function () {
+    Route::get('/dashboard', function () {
+        return view('dashboard');
+    })->name('dashboard');
 
-        // Addresses
-        Route::get('/addresses', [AddressController::class, 'index'])
-            ->name('addresses.index');
+    // Addresses
+    Route::get('/addresses', [AddressController::class, 'index'])
+        ->name('addresses.index');
 
-        Route::post('/addresses', [AddressController::class, 'store'])
-            ->name('addresses.store');
+    Route::post('/addresses', [AddressController::class, 'store'])
+        ->name('addresses.store');
 
-        Route::get('/addresses/{address}/edit', [AddressController::class, 'edit'])
-            ->name('addresses.edit');
+    Route::get('/addresses/{address}/edit', [AddressController::class, 'edit'])
+        ->name('addresses.edit');
 
-        Route::put('/addresses/{address}', [AddressController::class, 'update'])
-            ->name('addresses.update');
+    Route::put('/addresses/{address}', [AddressController::class, 'update'])
+        ->name('addresses.update');
 
-        Route::delete('/addresses/{address}', [AddressController::class, 'destroy'])
-            ->name('addresses.destroy');
+    Route::delete('/addresses/{address}', [AddressController::class, 'destroy'])
+        ->name('addresses.destroy');
 
-        Route::post('/addresses/{address}/primary', [AddressController::class, 'makePrimary'])
-            ->name('addresses.make-primary');
+    Route::post('/addresses/{address}/primary', [AddressController::class, 'makePrimary'])
+        ->name('addresses.make-primary');
 
-        // My Giving (user-facing giving dashboard)
-        Route::prefix('giving')->name('giving.')->group(function () {
-            Route::get('/', [GivingController::class, 'index'])->name('index');
+    /*
+    |--------------------------------------------------------------------------
+    | My Giving (user-facing giving dashboard)
+    |--------------------------------------------------------------------------
+    */
 
-            // Manage subscriptions
-            Route::post('/subscriptions/{pledge}/cancel', [GivingController::class, 'cancelSubscription'])
-                ->name('subscriptions.cancel');
+    Route::prefix('giving')->name('giving.')->group(function () {
+        Route::get('/', [GivingController::class, 'index'])->name('index');
 
-            Route::post('/subscriptions/{pledge}/amount', [GivingController::class, 'updateSubscriptionAmount'])
-                ->name('subscriptions.amount');
-        });
+        // Manage subscriptions
+        Route::post('/subscriptions/{pledge}/cancel', [GivingController::class, 'cancelSubscription'])
+            ->name('subscriptions.cancel');
 
-        Route::resource('children', ChildrenController::class);
-        Route::resource('languages', LanguagesController::class);
-        Route::resource('teams', TeamController::class);
-        Route::resource('pages', PageController::class)->only([
-            'store'
-        ]);
+        Route::post('/subscriptions/{pledge}/amount', [GivingController::class, 'updateSubscriptionAmount'])
+            ->name('subscriptions.amount');
 
-        Route::prefix('pages/{page}')->group(function () {
-            Route::resource('translations', PageTranslationController::class)->only([
-                'store'
-            ]);
-        });
+        Route::post('/subscriptions/{pledge}/resume', [GivingController::class, 'resumeSubscription'])
+            ->name('subscriptions.resume');
+    });
+
+    // Children
+    Route::resource('children', ChildrenController::class);
+
+    // Languages
+    Route::resource('languages', LanguagesController::class);
+
+    // Teams
+    Route::resource('teams', TeamController::class);
+
+    // Pages + translations
+    Route::resource('pages', PageController::class)->only(['store']);
+
+    Route::prefix('pages/{page}')->group(function () {
+        Route::resource('translations', PageTranslationController::class)->only(['store']);
+    });
 });
 
+/*
+|--------------------------------------------------------------------------
+| Public pages (Livewire)
+|--------------------------------------------------------------------------
+*/
+
 Route::get('/pages/{slug}', ShowPage::class);
-Route::get('/pages/', IndexPage::class);
+Route::get('/pages', IndexPage::class);

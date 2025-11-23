@@ -33,7 +33,10 @@ class NavbarTest extends TestCase
     #[Test]
     function pages_contains_navbar_livewire_component()
     {
-        $translation = PageTranslation::factory()->create();
+        $translation = PageTranslation::factory()->create([
+            'is_active' => true,
+            'page_id' => Page::factory()->create(['is_active' => true])->id,
+        ]);
         
         $this->get('/pages/' . $translation->slug)->assertSeeLivewire('navbar');
     }

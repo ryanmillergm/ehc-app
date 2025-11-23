@@ -2,10 +2,11 @@
 
 namespace Tests\Feature\Filament;
 
-use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Foundation\Testing\WithFaker;
 use Tests\TestCase;
+use App\Models\User;
+use Spatie\Permission\PermissionRegistrar;
+use Illuminate\Foundation\Testing\WithFaker;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
 class AdminPanelTest extends TestCase
 {
@@ -16,6 +17,8 @@ class AdminPanelTest extends TestCase
         parent::setUp();
 
         $this->seed('PermissionSeeder');
+
+        $this->app->make(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 
     /**
@@ -45,15 +48,15 @@ class AdminPanelTest extends TestCase
     /**
      * An authenticated user with Super Admin role can visit admin page.
      */
-    public function test_an_authenticated_user_with_permissions_can_visit_admin_page(): void
-    {
-        $user = User::factory()->create();
-        $this->signInWithPermissions($user, ['admin.panel']);
+public function test_an_authenticated_user_with_permissions_can_visit_admin_page(): void
+{
+    // $this->withoutExceptionHandling();
 
-        $response = $this->get('/admin');
+    $user = User::factory()->create();
+    $this->signInWithPermissions($user, ['admin.panel']);
 
-        $response->assertStatus(200);
-    }
+    $this->get('/admin')->assertOk();
+}
 
     /**
      * An authenticated user with Super Admin role can visit admin page.

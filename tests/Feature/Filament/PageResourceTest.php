@@ -70,15 +70,22 @@ class PageResourceTest extends TestCase
      */
     public function test_page_resource_page_can_list_pages(): void
     {
-        $this->signInWithPermissions(null, ['pages.read', 'pages.create', 'pages.update', 'pages.delete', 'admin.panel']);
-        $num = 7;
-        $count = Page::all()->count() + $num;
-        Page::factory()->count($num)->create();
-        $pages = Page::all();
+        $this->signInWithPermissions(null, [
+            'pages.read', 'pages.create', 'pages.update', 'pages.delete', 'admin.panel'
+        ]);
 
-        livewire::test(ListPages::class)
-        ->assertCountTableRecords($count)
-        ->assertCanSeeTableRecords($pages);
+        $num = 7;
+
+        Page::factory()->count($num)->create();
+
+        $pages = Page::all();
+        $count = $pages->count();
+
+        Livewire::test(ListPages::class)
+            // avoid pagination hiding seeded + new records
+            ->set('tableRecordsPerPage', 50)
+            ->assertCountTableRecords($count)
+            ->assertCanSeeTableRecords($pages);
     }
 
     /**

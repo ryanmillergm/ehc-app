@@ -8,6 +8,7 @@
 
 <div
     id="donation-widget-root"
+    wire:ignore.self
     x-data="donationWidget(@js([
         'startUrl'    => route('donations.start'),
         'completeUrl' => route('donations.complete'),
@@ -27,7 +28,7 @@
         'countries' => $countries,
         'states'    => $states,
     ]))"
-    x-init="init()"
+    x-init="if ($el.__donationWidgetInit) return; $el.__donationWidgetInit = true; init()"
     class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6"
 >
     {{-- Step 1: amount + frequency --}}
