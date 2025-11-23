@@ -101,6 +101,7 @@ class StripeWebhookControllerTest extends TestCase
             'type'              => 'subscription_recurring',
             'status'            => 'succeeded',
             'source'            => 'stripe_webhook',
+            'customer_id'       => 'cus_123',
         ]);
 
         // Pledge is marked active and latest_invoice_id stored
@@ -363,6 +364,58 @@ class StripeWebhookControllerTest extends TestCase
 
         $this->assertArrayHasKey('card_brand', $tx->metadata);
         $this->assertSame('visa', $tx->metadata['card_brand']);
+    }
+
+    public function test_charge_succeeded_backfills_payment_method_id_and_customer_id_when_missing(): void
+    {
+        $tx = Transaction::factory()->create([
+            'payment_intent_id' => 'pi_123',
+            'status'            => 'succeeded',
+            'charge_id'         => null,
+            'receipt_url'       => null,
+            'payer_email'       => null,
+            'payer_name'        => null,
+            'payment_method_id' => null,
+            'customer_id'       => null,
+            'metadata'          => [],
+        ]);
+
+        $event = (object) [
+            'type' => 'charge.succeeded',
+            'data' => (object) [
+                'object' => (object) [
+                    'id'              => 'ch_123',
+                    'payment_intent'  => 'pi_123',
+                    'payment_method'  => 'pm_abc123',
+                    'customer'        => 'cus_abc123',
+                    'receipt_url'     => 'https://example.test/stripe-receipt',
+                    'billing_details' => (object) [
+                        'email' => 'donor@example.test',
+                        'name'  => 'Test Donor',
+                    ],
+                    'payment_method_details' => (object) [
+                        'card' => (object) [
+                            'brand'   => 'visa',
+                            'last4'   => '4242',
+                            'country' => 'US',
+                            'funding' => 'credit',
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $controller = new StripeWebhookController();
+        $controller->handleEvent($event);
+
+        $tx->refresh();
+
+        $this->assertSame('ch_123', $tx->charge_id);
+        $this->assertSame('https://example.test/stripe-receipt', $tx->receipt_url);
+        $this->assertSame('donor@example.test', $tx->payer_email);
+        $this->assertSame('Test Donor', $tx->payer_name);
+        $this->assertSame('pm_abc123', $tx->payment_method_id);
+        $this->assertSame('cus_abc123', $tx->customer_id);
     }
 
     public function test_charge_refunded_marks_transaction_refunded_and_creates_refund_row(): void
