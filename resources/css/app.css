@@ -6,6 +6,8 @@
     display: none !important;
 }
 
+html { scroll-behavior: smooth; }
+
 /* === Mobile navbar hamburger === */
 
 .navbar-hamburger-icon {
