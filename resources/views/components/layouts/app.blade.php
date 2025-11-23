@@ -21,14 +21,18 @@
             </style>
             @vite(['resources/css/app.css', 'resources/js/app.js'])
         @endif
+
+        @livewireStyles
     </head>
     <body class="font-sans antialiased bg-gray-100">
-        @include('partials.navbar')
+        <livewire:navbar />
 
         <main class="pt-16" style="margin-bottom: 1000px;">
             {{ $slot }}
 
             <p>Layout for Auth Users in General App</p>
         </main>
+        
+        @livewireScripts
     </body>
 </html>
