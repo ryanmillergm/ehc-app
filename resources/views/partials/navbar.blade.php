@@ -1,5 +1,17 @@
 {{-- resources/views/partials/navbar.blade.php --}}
 
+@php
+    use App\Models\Language;
+
+    // Make partial safe everywhere (guest + app layouts)
+    $languages = $languages
+        ?? Language::query()->orderBy('title')->get();
+
+    $currentLanguage = $currentLanguage
+        ?? Language::find(session('language_id'))
+        ?? Language::first();
+@endphp
+
 <nav
     id="main-navbar"
     class="fixed top-0 inset-x-0 z-50 bg-white/80 backdrop-blur border-b border-slate-200
@@ -36,9 +48,9 @@
                     <label for="lang-select" class="sr-only">Language</label>
                     <select
                         id="lang-select"
-                        wire:change="switchLanguage($event.target.value)"
+                        data-lang-select
                         class="appearance-none rounded-full border border-slate-200 bg-white
-                               px-3 py-1.5 pr-9 text-xs font-medium text-slate-700
+                               px-3 py-1.5 pr-12 text-xs font-medium text-slate-700
                                hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
                         @foreach ($languages as $lang)
@@ -61,46 +73,44 @@
                 </div>
 
                 {{-- Auth / user --}}
-                <div class="flex items-center gap-3 text-sm">
-                    @auth
-                        <span class="hidden lg:inline-block text-slate-700">
-                            Hi, {{ Auth::user()->name }}
-                        </span>
+                @auth
+                    <span class="hidden lg:inline-block text-slate-700">
+                        Hi, {{ Auth::user()->name }}
+                    </span>
 
-                        <a href="{{ route('dashboard') }}"
+                    <a href="{{ route('dashboard') }}"
+                       class="inline-flex items-center rounded-full border border-slate-200
+                              px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
+                        Dashboard
+                    </a>
+
+                    <form method="POST" action="{{ route('logout') }}">
+                        @csrf
+                        <button
+                            type="submit"
+                            class="inline-flex items-center rounded-full bg-indigo-600 px-3 py-1.5
+                                   text-xs font-semibold text-white shadow-sm hover:bg-indigo-700"
+                        >
+                            Log out
+                        </button>
+                    </form>
+                @else
+                    @if (Route::has('login'))
+                        <a href="{{ route('login') }}"
                            class="inline-flex items-center rounded-full border border-slate-200
                                   px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
-                            Dashboard
+                            Log in
                         </a>
+                    @endif
 
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
-                            <button
-                                type="submit"
-                                class="inline-flex items-center rounded-full bg-indigo-600 px-3 py-1.5
-                                       text-xs font-semibold text-white shadow-sm hover:bg-indigo-700"
-                            >
-                                Log out
-                            </button>
-                        </form>
-                    @else
-                        @if (Route::has('login'))
-                            <a href="{{ route('login') }}"
-                               class="inline-flex items-center rounded-full border border-slate-200
-                                      px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
-                                Log in
-                            </a>
-                        @endif
-
-                        @if (Route::has('register'))
-                            <a href="{{ route('register') }}"
-                               class="inline-flex items-center rounded-full bg-indigo-600 px-3 py-1.5
-                                      text-xs font-semibold text-white shadow-sm hover:bg-indigo-700">
-                                Sign up
-                            </a>
-                        @endif
-                    @endauth
-                </div>
+                    @if (Route::has('register'))
+                        <a href="{{ route('register') }}"
+                           class="inline-flex items-center rounded-full bg-indigo-600 px-3 py-1.5
+                                  text-xs font-semibold text-white shadow-sm hover:bg-indigo-700">
+                            Sign up
+                        </a>
+                    @endif
+                @endauth
             </div>
 
             {{-- Mobile: hamburger --}}
@@ -108,7 +118,7 @@
                 <button
                     id="mobile-menu-toggle"
                     type="button"
-                    class="md:hidden inline-flex items-center justify-center p-2 rounded-full 
+                    class="md:hidden inline-flex items-center justify-center p-2 rounded-full
                            bg-white/80 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     aria-label="Toggle navigation"
                     data-state="closed"
@@ -159,23 +169,19 @@
         </div>
 
         <div class="flex-1 overflow-y-auto px-6 py-4 space-y-6">
-            {{-- Mobile nav links --}}
-            <nav class="space-y-1 text-sm">
-                <a href="{{ url('/') }}" class="block py-2 border-b border-slate-800/60 hover:text-indigo-300">Home</a>
-                <a href="{{ url('/pages') }}" class="block py-2 border-b border-slate-800/60 hover:text-indigo-300">Pages</a>
-                <a href="{{ url('/children') }}" class="block py-2 border-b border-slate-800/60 hover:text-indigo-300">Children</a>
-                <a href="{{ url('/teams') }}" class="block py-2 border-b border-slate-800/60 hover:text-indigo-300">Teams</a>
-            </nav>
-
             {{-- Mobile language picker --}}
-            <div class="pt-4 border-t border-slate-800/60 space-y-2">
-                <p class="text-xs text-slate-400">Language</p>
+            <div>
+                <label for="lang-select-mobile" class="block text-xs text-slate-300 mb-2">
+                    Language
+                </label>
+
                 <div class="relative">
                     <select
-                        wire:change="switchLanguage($event.target.value)"
-                        class="w-full appearance-none rounded-full border border-slate-700 bg-slate-900
-                               px-3 py-2 pr-9 text-xs font-medium text-slate-100
-                               hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        id="lang-select-mobile"
+                        data-lang-select
+                        class="w-full appearance-none rounded-lg border border-slate-700 bg-slate-800
+                               px-3 py-2 pr-10 text-sm text-white
+                               focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
                         @foreach ($languages as $lang)
                             <option
@@ -188,13 +194,21 @@
                     </select>
 
                     <svg
-                        class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400"
+                        class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300"
                         viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
                     >
                         <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.24 4.5a.75.75 0 01-1.08 0l-4.24-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
                     </svg>
                 </div>
             </div>
+
+            {{-- Mobile nav links --}}
+            <nav class="space-y-1 text-sm">
+                <a href="{{ url('/') }}" class="block py-2 border-b border-slate-800/60 hover:text-indigo-300">Home</a>
+                <a href="{{ url('/pages') }}" class="block py-2 border-b border-slate-800/60 hover:text-indigo-300">Pages</a>
+                <a href="{{ url('/children') }}" class="block py-2 border-b border-slate-800/60 hover:text-indigo-300">Children</a>
+                <a href="{{ url('/teams') }}" class="block py-2 border-b border-slate-800/60 hover:text-indigo-300">Teams</a>
+            </nav>
 
             <div class="pt-4 border-t border-slate-800/60">
                 @auth
@@ -245,3 +259,29 @@
         </div>
     </div>
 </div>
+
+@once
+    <script>
+        document.addEventListener('change', function (e) {
+            const select = e.target.closest('[data-lang-select]');
+            if (!select) return;
+
+            const code = select.value;
+            const url = `/lang/${code}`;
+
+            // If Livewire is present, do slick swap-without-reload
+            if (window.Livewire && typeof window.Livewire.dispatch === 'function') {
+                fetch(url, {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                }).then(() => {
+                    window.Livewire.dispatch('language-switched', { code });
+                });
+            } else {
+                // Non-Livewire pages (guest/auth): normal redirect
+                window.location.href = url;
+            }
+        });
+    </script>
+@endonce

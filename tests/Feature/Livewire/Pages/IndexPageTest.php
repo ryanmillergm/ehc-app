@@ -16,6 +16,12 @@ class IndexPageTest extends TestCase
 {
     use WithFaker, RefreshDatabase;
 
+    /**
+     * If your base TestCase auto-seeds, this tells Laravel’s RefreshDatabase
+     * not to seed for this class (where supported).
+     */
+    protected bool $seed = false;
+
     protected Language $en;
     protected Language $es;
     protected Language $fr;
@@ -24,18 +30,37 @@ class IndexPageTest extends TestCase
     {
         parent::setUp();
 
-        // Match your LanguageSeeder exactly
+        /**
+         * ✅ HARD RESET for this suite:
+         * If your base TestCase or traits seeded Pages/Translations,
+         * wipe them so each test controls the universe.
+         */
+        PageTranslation::query()->delete();
+        Page::query()->delete();
+        Language::query()->delete();
+
+        // Recreate languages exactly like LanguageSeeder
         $this->en = Language::create([
-            'title' => 'English', 'iso_code' => 'en', 'locale' => 'en', 'right_to_left' => false,
-        ]);
-        $this->es = Language::create([
-            'title' => 'Spanish', 'iso_code' => 'es', 'locale' => 'es', 'right_to_left' => false,
-        ]);
-        $this->fr = Language::create([
-            'title' => 'French', 'iso_code' => 'fr', 'locale' => 'fr', 'right_to_left' => false,
+            'title' => 'English',
+            'iso_code' => 'en',
+            'locale' => 'en',
+            'right_to_left' => false,
         ]);
 
-        // Default session language = English unless test overrides
+        $this->es = Language::create([
+            'title' => 'Spanish',
+            'iso_code' => 'es',
+            'locale' => 'es',
+            'right_to_left' => false,
+        ]);
+
+        $this->fr = Language::create([
+            'title' => 'French',
+            'iso_code' => 'fr',
+            'locale' => 'fr',
+            'right_to_left' => false,
+        ]);
+
         session(['language_id' => $this->en->id, 'locale' => 'en']);
         app()->setLocale('en');
     }
@@ -90,7 +115,6 @@ class IndexPageTest extends TestCase
 
         $page = Page::factory()->create(['is_active' => true]);
 
-        // Only EN translation exists
         PageTranslation::factory()->create([
             'page_id'     => $page->id,
             'language_id' => $this->en->id,
@@ -115,7 +139,6 @@ class IndexPageTest extends TestCase
 
         $page = Page::factory()->create(['is_active' => true]);
 
-        // ONLY French exists
         PageTranslation::factory()->create([
             'page_id'     => $page->id,
             'language_id' => $this->fr->id,
@@ -129,16 +152,12 @@ class IndexPageTest extends TestCase
         Livewire::test(IndexPage::class)
             ->assertSee('À Propos')
             ->assertSee('Description FR')
-            ->assertDontSee(__('pages.only_available_in_english')); // not English fallback
+            ->assertDontSee(__('pages.only_available_in_english'));
     }
 
     #[Test]
     public function excludes_inactive_pages_and_inactive_translations()
     {
-        session(['language_id' => $this->en->id, 'locale' => 'en']);
-        app()->setLocale('en');
-
-        // Active page + active EN translation (should show)
         $activePage = Page::factory()->create(['is_active' => true]);
         PageTranslation::factory()->create([
             'page_id'     => $activePage->id,
@@ -150,7 +169,6 @@ class IndexPageTest extends TestCase
             'is_active'   => true,
         ]);
 
-        // Active page but ONLY inactive translation (should NOT show)
         $pageWithInactiveTx = Page::factory()->create(['is_active' => true]);
         PageTranslation::factory()->create([
             'page_id'     => $pageWithInactiveTx->id,
@@ -162,7 +180,6 @@ class IndexPageTest extends TestCase
             'is_active'   => false,
         ]);
 
-        // Inactive page even with active translation (should NOT show)
         $inactivePage = Page::factory()->create(['is_active' => false]);
         PageTranslation::factory()->create([
             'page_id'     => $inactivePage->id,
@@ -183,7 +200,6 @@ class IndexPageTest extends TestCase
     #[Test]
     public function language_switched_event_re_resolves_translations_in_place()
     {
-        // Page with EN + ES
         $page = Page::factory()->create(['is_active' => true]);
 
         $enTx = PageTranslation::factory()->create([
@@ -206,7 +222,6 @@ class IndexPageTest extends TestCase
             'is_active'   => true,
         ]);
 
-        // Start in EN
         session(['language_id' => $this->en->id, 'locale' => 'en']);
         app()->setLocale('en');
 
@@ -214,7 +229,6 @@ class IndexPageTest extends TestCase
             ->assertSee($enTx->title)
             ->assertDontSee($esTx->title);
 
-        // Switch session to ES and fire the Livewire event
         session(['language_id' => $this->es->id, 'locale' => 'es']);
         app()->setLocale('es');
 
