@@ -287,8 +287,6 @@ class StripeWebhookControllerTest extends TestCase
             'cancel_at_period_end'   => false,
         ]);
 
-        // Stripe sends a subscription.updated with NULL period timestamps when you
-        // toggle cancel_at_period_end from the dashboard.
         $event = (object) [
             'type' => 'customer.subscription.updated',
             'data' => (object) [
@@ -307,11 +305,9 @@ class StripeWebhookControllerTest extends TestCase
 
         $pledge->refresh();
 
-        // Status + cancel flag updated
         $this->assertSame('active', $pledge->status);
         $this->assertTrue($pledge->cancel_at_period_end);
 
-        // But the existing period dates were preserved
         $this->assertEquals($existingStart->timestamp, $pledge->current_period_start->timestamp);
         $this->assertEquals($existingEnd->timestamp, $pledge->current_period_end->timestamp);
         $this->assertEquals($existingEnd->timestamp, $pledge->next_pledge_at->timestamp);
@@ -352,8 +348,7 @@ class StripeWebhookControllerTest extends TestCase
             ],
         ];
 
-        $controller = new StripeWebhookController();
-        $controller->handleEvent($event);
+        (new StripeWebhookController())->handleEvent($event);
 
         $tx->refresh();
 
@@ -405,8 +400,7 @@ class StripeWebhookControllerTest extends TestCase
             ],
         ];
 
-        $controller = new StripeWebhookController();
-        $controller->handleEvent($event);
+        (new StripeWebhookController())->handleEvent($event);
 
         $tx->refresh();
 
@@ -448,16 +442,13 @@ class StripeWebhookControllerTest extends TestCase
             ],
         ];
 
-        $controller = new StripeWebhookController();
-        $controller->handleEvent($event);
+        (new StripeWebhookController())->handleEvent($event);
 
-        // Transaction is marked refunded
         $this->assertDatabaseHas('transactions', [
             'id'     => $tx->id,
             'status' => 'refunded',
         ]);
 
-        // Refund row created
         $this->assertDatabaseHas('refunds', [
             'transaction_id'   => $tx->id,
             'stripe_refund_id' => 're_123',
@@ -467,7 +458,6 @@ class StripeWebhookControllerTest extends TestCase
             'status'           => 'succeeded',
         ]);
 
-        // Sanity check: exactly one refund
         $this->assertSame(1, Refund::count());
     }
 
@@ -500,7 +490,6 @@ class StripeWebhookControllerTest extends TestCase
                     'amount_due'     => 102,
                     'currency'       => 'usd',
 
-                    // charge is null, so controller must use charges.data[0].id
                     'charge'  => null,
                     'charges' => (object) [
                         'data' => [
@@ -527,14 +516,12 @@ class StripeWebhookControllerTest extends TestCase
             ],
         ];
 
-        $controller = new StripeWebhookController();
-        $controller->handleEvent($event);
+        (new StripeWebhookController())->handleEvent($event);
 
         $this->assertDatabaseHas('transactions', [
             'pledge_id'         => $pledge->id,
             'payment_intent_id' => 'pi_charge_fallback',
             'subscription_id'   => 'sub_charge_fallback',
-            // must be the fallback charge id, not null
             'charge_id'         => 'ch_from_charges',
             'type'              => 'subscription_recurring',
             'status'            => 'succeeded',
@@ -559,13 +546,9 @@ class StripeWebhookControllerTest extends TestCase
                 'object' => (object) [
                     'id'             => 'ch_new',
                     'payment_intent' => 'pi_keep',
-
-                    // These would be "new" values if the controller tries to backfill.
-                    // Test ensures they won't overwrite existing tx values.
                     'payment_method' => 'pm_new',
                     'customer'       => 'cus_new',
-
-                    'receipt_url'     => 'https://example.test/new-receipt',
+                    'receipt_url'    => 'https://example.test/new-receipt',
                     'billing_details' => (object) [
                         'email' => 'donor@example.test',
                         'name'  => 'Test Donor',
@@ -582,15 +565,11 @@ class StripeWebhookControllerTest extends TestCase
             ],
         ];
 
-        $controller = new StripeWebhookController();
-        $controller->handleEvent($event);
+        (new StripeWebhookController())->handleEvent($event);
 
         $tx->refresh();
 
-        // Charge enrichment is fine…
         $this->assertSame('ch_new', $tx->charge_id);
-
-        // …but existing IDs must NOT be overwritten.
         $this->assertSame('pm_old', $tx->payment_method_id);
         $this->assertSame('cus_old', $tx->customer_id);
     }
@@ -603,24 +582,247 @@ class StripeWebhookControllerTest extends TestCase
             'paid_at'           => null,
         ]);
 
-        // Stripe PI event with no latest_charge on the object
         $event = (object) [
             'type' => 'payment_intent.succeeded',
             'data' => (object) [
                 'object' => (object) [
                     'id' => 'pi_no_latest',
-                    // intentionally missing latest_charge
                 ],
             ],
         ];
 
-        $controller = new StripeWebhookController();
-        $controller->handleEvent($event);
+        (new StripeWebhookController())->handleEvent($event);
 
         $tx->refresh();
 
         $this->assertSame('succeeded', $tx->status);
         $this->assertNotNull($tx->paid_at);
-        // If you ever add latest_charge backfilling, this test ensures null-safe handling.
+    }
+
+    // ------------------------------------------------------------------
+    // Additional coverage
+    // ------------------------------------------------------------------
+
+    public function test_payment_intent_failed_sets_transaction_failed(): void
+    {
+        $tx = Transaction::factory()->create([
+            'payment_intent_id' => 'pi_fail',
+            'status'            => 'pending',
+        ]);
+
+        $event = (object)[
+            'type' => 'payment_intent.payment_failed',
+            'data' => (object)[
+                'object' => (object)[
+                    'id' => 'pi_fail',
+                ],
+            ],
+        ];
+
+        (new StripeWebhookController())->handleEvent($event);
+
+        $this->assertDatabaseHas('transactions', [
+            'id'     => $tx->id,
+            'status' => 'failed',
+        ]);
+    }
+
+    public function test_charge_succeeded_ignores_when_payment_intent_missing(): void
+    {
+        $tx = Transaction::factory()->create([
+            'payment_intent_id' => 'pi_123',
+            'status'            => 'succeeded',
+            'charge_id'         => null,
+        ]);
+
+        $event = (object)[
+            'type' => 'charge.succeeded',
+            'data' => (object)[
+                'object' => (object)[
+                    'id' => 'ch_no_pi',
+                    // payment_intent intentionally missing
+                ],
+            ],
+        ];
+
+        (new StripeWebhookController())->handleEvent($event);
+
+        $tx->refresh();
+
+        $this->assertNull($tx->charge_id);
+    }
+
+    public function test_invoice_paid_does_not_clobber_existing_customer_or_payment_method_ids(): void
+    {
+        $pledge = Pledge::forceCreate([
+            'amount_cents'           => 1000,
+            'currency'               => 'usd',
+            'interval'               => 'month',
+            'status'                 => 'incomplete',
+            'donor_email'            => 'donor@example.test',
+            'donor_name'             => 'Test Donor',
+            'stripe_subscription_id' => 'sub_keep',
+            'stripe_customer_id'     => 'cus_keep',
+        ]);
+
+        $tx = Transaction::factory()->create([
+            'pledge_id'         => $pledge->id,
+            'subscription_id'   => 'sub_keep',
+            'payment_intent_id' => 'pi_keep',
+            'customer_id'       => 'cus_old',
+            'payment_method_id' => 'pm_old',
+            'type'              => 'subscription_recurring',
+            'status'            => 'succeeded',
+        ]);
+
+        $event = (object)[
+            'type' => 'invoice.paid',
+            'data' => (object)[
+                'object' => (object)[
+                    'id'           => 'in_keep',
+                    'subscription' => 'sub_keep',
+                    'customer'     => 'cus_new',
+
+                    // Real Stripe: payment_intent is usually a string unless expanded,
+                    // but controller handles either shape. We send expanded shape here.
+                    'payment_intent' => (object)[
+                        'id'             => 'pi_keep',
+                        'payment_method' => 'pm_new',
+                    ],
+
+                    'amount_paid' => 1000,
+                    'currency'    => 'usd',
+                    'charge'      => 'ch_keep',
+                    'lines'       => (object)['data' => [(object)['subscription' => 'sub_keep']]],
+                ],
+            ],
+        ];
+
+        (new StripeWebhookController())->handleEvent($event);
+
+        $tx->refresh();
+
+        $this->assertSame('cus_old', $tx->customer_id);
+        $this->assertSame('pm_old', $tx->payment_method_id);
+    }
+
+    public function test_invoice_paid_merges_metadata(): void
+    {
+        $pledge = Pledge::forceCreate([
+            'amount_cents'           => 500,
+            'currency'               => 'usd',
+            'interval'               => 'month',
+            'status'                 => 'incomplete',
+            'donor_email'            => 'donor@example.test',
+            'donor_name'             => 'Test Donor',
+            'stripe_subscription_id' => 'sub_meta',
+            'stripe_customer_id'     => 'cus_meta',
+        ]);
+
+        $tx = Transaction::factory()->create([
+            'payment_intent_id' => 'pi_meta',
+            'metadata'          => ['foo' => 'bar'],
+        ]);
+
+        $event = (object)[
+            'type' => 'invoice.paid',
+            'data' => (object)[
+                'object' => (object)[
+                    'id'             => 'in_meta',
+                    'subscription'   => 'sub_meta',
+                    'customer'       => 'cus_meta',
+                    'payment_intent' => 'pi_meta',
+                    'amount_paid'    => 500,
+                    'currency'       => 'usd',
+                    'charge'         => 'ch_meta',
+                    'lines'          => (object)['data' => [(object)['subscription' => 'sub_meta']]],
+                ],
+            ],
+        ];
+
+        (new StripeWebhookController())->handleEvent($event);
+
+        $tx->refresh();
+
+        $this->assertSame('bar', $tx->metadata['foo']);
+        $this->assertSame('in_meta', $tx->metadata['stripe_invoice_id']);
+        $this->assertSame('sub_meta', $tx->metadata['stripe_subscription_id']);
+    }
+
+    public function test_subscription_created_routes_to_handler_and_updates_status(): void
+    {
+        $pledge = Pledge::forceCreate([
+            'stripe_subscription_id' => 'sub_created',
+            'status'                 => 'incomplete',
+            'cancel_at_period_end'   => false,
+        ]);
+
+        $event = (object)[
+            'type' => 'customer.subscription.created',
+            'data' => (object)[
+                'object' => (object)[
+                    'id'                   => 'sub_created',
+                    'status'               => 'active',
+                    'cancel_at_period_end' => false,
+
+                    // Stripe always includes these keys (can be null)
+                    'current_period_start' => null,
+                    'current_period_end'   => null,
+                ],
+            ],
+        ];
+
+        (new StripeWebhookController())->handleEvent($event);
+
+        $pledge->refresh();
+
+        $this->assertSame('active', $pledge->status);
+    }
+
+    public function test_subscription_deleted_routes_to_handler_and_updates_status(): void
+    {
+        $pledge = Pledge::forceCreate([
+            'stripe_subscription_id' => 'sub_deleted',
+            'status'                 => 'active',
+        ]);
+
+        $event = (object)[
+            'type' => 'customer.subscription.deleted',
+            'data' => (object)[
+                'object' => (object)[
+                    'id'                   => 'sub_deleted',
+                    'status'               => 'canceled',
+                    'cancel_at_period_end' => false,
+
+                    // Stripe always includes these keys (can be null)
+                    'current_period_start' => null,
+                    'current_period_end'   => null,
+                ],
+            ],
+        ];
+
+        (new StripeWebhookController())->handleEvent($event);
+
+        $pledge->refresh();
+
+        $this->assertSame('canceled', $pledge->status);
+    }
+
+    public function test_invoice_payment_failed_noops_when_pledge_missing(): void
+    {
+        $event = (object)[
+            'type' => 'invoice.payment_failed',
+            'data' => (object)[
+                'object' => (object)[
+                    'id'           => 'in_missing',
+                    'subscription' => 'sub_missing',
+                ],
+            ],
+        ];
+
+        (new StripeWebhookController())->handleEvent($event);
+
+        $this->assertDatabaseCount('pledges', 0);
+        $this->assertDatabaseCount('transactions', 0);
     }
 }
