@@ -16,21 +16,11 @@ class DonationsController extends Controller
         protected StripeService $stripe
     ) {}
 
-    /**
-     * Example full-page donation route (could just as well be embedded).
-     */
     public function show()
     {
         return view('donations.give');
     }
 
-    /**
-     * Step 1:
-     *  - validate amount + frequency
-     *  - create Transaction (one-time) OR Pledge (monthly)
-     *  - create PaymentIntent or SetupIntent
-     *  - return clientSecret + IDs as JSON for Stripe.js on the page
-     */
     public function start(Request $request)
     {
         $data = $request->validate([
@@ -42,7 +32,6 @@ class DonationsController extends Controller
         $frequency   = $data['frequency'];
         $user        = Auth::user();
 
-        // Basic donor info for creating Stripe customer
         $donor = [
             'email' => $user?->email,
             'name'  => $user ? trim("{$user->name}") : null,
@@ -94,24 +83,19 @@ class DonationsController extends Controller
     }
 
     /**
-     * Called from the front-end after Stripe confirms the payment
-     * (for one-time payments) or setup (monthly).
-     *
-     * Webhooks also run for robustness, but this gives immediate redirect behavior
-     * and sets the ephemeral session key for the thank-you pages.
+     * Front-end MUST call this after Stripe confirms.
      */
     public function complete(Request $request)
     {
         $data = $request->validate([
-            'mode'           => ['required', 'in:payment,subscription'],
-            'transaction_id' => ['nullable', 'integer', 'required_if:mode,payment'],
-            'pledge_id'      => ['nullable', 'integer', 'required_if:mode,subscription'],
+            'mode'              => ['required', 'in:payment,subscription'],
+            'transaction_id'    => ['nullable', 'integer', 'required_if:mode,payment'],
+            'pledge_id'         => ['nullable', 'integer', 'required_if:mode,subscription'],
 
-            'payment_intent_id'   => ['nullable', 'string'], // one-time only
-            'subscription_id'     => ['nullable', 'string'], // not used here
-            'charge_id'           => ['nullable', 'string'],
-            'payment_method_id'   => ['nullable', 'string', 'required_if:mode,subscription'],
-            'receipt_url'         => ['nullable', 'url'],
+            'payment_intent_id' => ['nullable', 'string'],
+            'charge_id'         => ['nullable', 'string'],
+            'payment_method_id' => ['nullable', 'string', 'required_if:mode,subscription'],
+            'receipt_url'       => ['nullable', 'url'],
 
             'donor_first_name' => ['nullable', 'string', 'max:100'],
             'donor_last_name'  => ['nullable', 'string', 'max:100'],
@@ -125,15 +109,16 @@ class DonationsController extends Controller
             'address_country'  => ['nullable', 'string', 'max:2'],
         ]);
 
-        // 1) Update user basic info (NO card details)
+        // ---------------------------------------------------------
+        // Update authenticated user + primary address
+        // ---------------------------------------------------------
         if ($user = Auth::user()) {
             $user->fill([
                 'first_name' => $data['donor_first_name'] ?? $user->first_name,
-                'last_name'  => $data['donor_last_name'] ?? $user->last_name,
-                'email'      => $data['donor_email'] ?? $user->email,
+                'last_name'  => $data['donor_last_name']  ?? $user->last_name,
+                'email'      => $data['donor_email']      ?? $user->email,
             ])->save();
 
-            // 2) Upsert their primary address if any address fields given
             $hasAddressInput = ! empty($data['address_line1'])
                 || ! empty($data['address_city'])
                 || ! empty($data['address_postal']);
@@ -149,28 +134,29 @@ class DonationsController extends Controller
                 }
 
                 $primary->fill([
-                    'first_name'   => $data['donor_first_name'] ?? $primary->first_name ?? $user->first_name,
-                    'last_name'    => $data['donor_last_name']  ?? $primary->last_name  ?? $user->last_name,
-                    'phone'        => $data['donor_phone']      ?? $primary->phone,
-                    'line1'        => $data['address_line1']    ?? $primary->line1,
-                    'line2'        => $data['address_line2']    ?? $primary->line2,
-                    'city'         => $data['address_city']     ?? $primary->city,
-                    'state'        => $data['address_state']    ?? $primary->state,
-                    'postal_code'  => $data['address_postal']   ?? $primary->postal_code,
-                    'country'      => $data['address_country']  ?? $primary->country ?? 'US',
-                    'is_primary'   => true,
+                    'first_name'  => $data['donor_first_name'] ?? $primary->first_name ?? $user->first_name,
+                    'last_name'   => $data['donor_last_name']  ?? $primary->last_name  ?? $user->last_name,
+                    'phone'       => $data['donor_phone']      ?? $primary->phone,
+                    'line1'       => $data['address_line1']    ?? $primary->line1,
+                    'line2'       => $data['address_line2']    ?? $primary->line2,
+                    'city'        => $data['address_city']     ?? $primary->city,
+                    'state'       => $data['address_state']    ?? $primary->state,
+                    'postal_code' => $data['address_postal']   ?? $primary->postal_code,
+                    'country'     => $data['address_country']  ?? $primary->country ?? 'US',
+                    'is_primary'  => true,
                 ])->save();
             }
         }
 
-        // ----- One-time payment completion -----
-        if ($data['mode'] === 'payment') {
-            /** @var \App\Models\Transaction $transaction */
-            $transaction = Transaction::findOrFail($data['transaction_id']);
+        $fullName = trim(
+            ($data['donor_first_name'] ?? '') . ' ' . ($data['donor_last_name'] ?? '')
+        );
 
-            $fullName = trim(
-                ($data['donor_first_name'] ?? '') . ' ' . ($data['donor_last_name'] ?? '')
-            );
+        // ---------------------------------------------------------
+        // One-time payment completion
+        // ---------------------------------------------------------
+        if ($data['mode'] === 'payment') {
+            $transaction = Transaction::findOrFail($data['transaction_id']);
 
             $transaction->fill([
                 'payment_intent_id' => $data['payment_intent_id'] ?? $transaction->payment_intent_id,
@@ -178,9 +164,8 @@ class DonationsController extends Controller
                 'payment_method_id' => $data['payment_method_id'] ?? $transaction->payment_method_id,
                 'receipt_url'       => $data['receipt_url']       ?? $transaction->receipt_url,
 
-                // store who actually paid
                 'payer_email'       => $data['donor_email']       ?? $transaction->payer_email,
-                'payer_name'        => $fullName                  ?: $transaction->payer_name,
+                'payer_name'        => $fullName ?: $transaction->payer_name,
 
                 'status'            => 'succeeded',
                 'paid_at'           => now(),
@@ -200,13 +185,10 @@ class DonationsController extends Controller
                 ->with('success', 'Thank you for your donation!');
         }
 
-        // ----- Subscription completion -----
-        /** @var \App\Models\Pledge $pledge */
+        // ---------------------------------------------------------
+        // Subscription completion
+        // ---------------------------------------------------------
         $pledge = Pledge::findOrFail($data['pledge_id']);
-
-        $fullName = trim(
-            ($data['donor_first_name'] ?? '') . ' ' . ($data['donor_last_name'] ?? '')
-        );
 
         if (! empty($data['donor_email'])) {
             $pledge->donor_email = $data['donor_email'];
@@ -216,13 +198,13 @@ class DonationsController extends Controller
         }
         $pledge->save();
 
-        // This creates/updates the Stripe subscription & sets stripe_* IDs
+        // IMPORTANT: actually create the Stripe subscription here
+        // StripeService should set stripe_subscription_id + stripe_customer_id on pledge.
         $this->stripe->createSubscriptionForPledge(
             $pledge,
             $data['payment_method_id']
         );
 
-        // Store pledge ID in session for a single-use thank-you view
         $request->session()->put('pledge_thankyou_id', $pledge->id);
 
         if ($request->wantsJson()) {
@@ -257,18 +239,16 @@ class DonationsController extends Controller
      */
     public function thankYouSubscription(Request $request)
     {
-        // Pull removes it from the session so it can't be reused
         $pledgeId = $request->session()->pull('pledge_thankyou_id');
 
         if (! $pledgeId) {
             abort(404);
         }
 
-        /** @var \App\Models\Pledge $pledge */
         $pledge = Pledge::findOrFail($pledgeId);
 
         $subscriptionTransaction = Transaction::where('pledge_id', $pledge->id)
-            ->where('type', 'subscription_recurring')
+            ->whereIn('type', ['subscription_initial', 'subscription_recurring'])
             ->latest('paid_at')
             ->first();
 
