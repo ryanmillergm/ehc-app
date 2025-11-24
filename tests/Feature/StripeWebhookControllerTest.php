@@ -6,6 +6,7 @@ use App\Http\Controllers\StripeWebhookController;
 use App\Models\Pledge;
 use App\Models\Refund;
 use App\Models\Transaction;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -824,5 +825,180 @@ class StripeWebhookControllerTest extends TestCase
 
         $this->assertDatabaseCount('pledges', 0);
         $this->assertDatabaseCount('transactions', 0);
+    }
+
+    public function test_early_charge_then_invoice_paid_preserves_payment_intent_and_charge_ids(): void
+    {
+        $user = User::factory()->create();
+
+        $pledge = Pledge::forceCreate([
+            'user_id'                => $user->id,
+            'amount_cents'           => 10000,
+            'currency'               => 'usd',
+            'interval'               => 'month',
+            'status'                 => 'incomplete',
+            'donor_email'            => 'donor@example.test',
+            'donor_name'             => 'Test Donor',
+            'stripe_subscription_id' => 'sub_real',
+            'stripe_customer_id'     => 'cus_real',
+        ]);
+
+        // Pretend charge.succeeded ran FIRST and created an “early charge” tx:
+        $earlyTx = Transaction::factory()->create([
+            'user_id'           => $user->id,
+            'pledge_id'         => $pledge->id,
+            'type'              => 'subscription_recurring',
+            'subscription_id'   => null,          // early charge doesn't yet know sub
+            'payment_intent_id' => 'pi_early',
+            'charge_id'         => 'ch_early',
+            'customer_id'       => 'cus_real',
+            'payment_method_id' => null,
+            'amount_cents'      => 10000,
+            'currency'          => 'usd',
+            'status'            => 'succeeded',
+            'metadata'          => [],
+            'source'            => 'stripe_webhook',
+        ]);
+
+        $periodStart = now()->timestamp;
+        $periodEnd   = now()->addMonth()->timestamp;
+
+        // Realistic invoice.payment_succeeded payload:
+        // - NO invoice.subscription
+        // - NO lines.data.0.subscription
+        // - subscription lives under lines.data.0.parent.subscription_item_details.subscription
+        // - NO payment_intent or charge on invoice
+        $invoice = (object) [
+            'id'                 => 'in_real',
+            'customer'           => 'cus_real',
+            'customer_email'     => 'donor@example.test',
+            'status'             => 'paid',
+            'amount_paid'        => 10000,
+            'currency'           => 'usd',
+            'hosted_invoice_url' => 'https://example.test/invoices/in_real',
+            'lines'              => (object) [
+                'data' => [
+                    (object) [
+                        'period' => (object) [
+                            'start' => $periodStart,
+                            'end'   => $periodEnd,
+                        ],
+                        'parent' => (object) [
+                            'subscription_item_details' => (object) [
+                                'subscription' => 'sub_real',
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            'parent' => (object) [
+                'subscription_details' => (object) [
+                    'subscription' => 'sub_real',
+                ],
+            ],
+            // intentionally missing: payment_intent, charge
+        ];
+
+        $event = (object) [
+            'type' => 'invoice.payment_succeeded',
+            'data' => (object) [
+                'object' => $invoice,
+            ],
+        ];
+
+        (new StripeWebhookController())->handleEvent($event);
+
+        $earlyTx->refresh();
+
+        // ✅ PI + charge preserved (invoice had nulls)
+        $this->assertSame('pi_early', $earlyTx->payment_intent_id);
+        $this->assertSame('ch_early', $earlyTx->charge_id);
+
+        // ✅ subscription attached from invoice lines parent
+        $this->assertSame('sub_real', $earlyTx->subscription_id);
+
+        // ✅ invoice metadata merged
+        $this->assertSame('in_real', $earlyTx->metadata['stripe_invoice_id']);
+        $this->assertSame('sub_real', $earlyTx->metadata['stripe_subscription_id']);
+
+        // still succeeded
+        $this->assertSame('succeeded', $earlyTx->status);
+    }
+
+    public function test_invoice_paid_does_not_clobber_existing_payment_intent_or_charge_with_nulls(): void
+    {
+        $pledge = Pledge::forceCreate([
+            'user_id'                => null,
+            'amount_cents'           => 1000,
+            'currency'               => 'usd',
+            'interval'               => 'month',
+            'status'                 => 'active',
+            'donor_email'            => 'donor@example.test',
+            'donor_name'             => 'Test Donor',
+            'stripe_subscription_id' => 'sub_keep_pi',
+            'stripe_customer_id'     => 'cus_keep_pi',
+        ]);
+
+        $tx = Transaction::factory()->create([
+            'pledge_id'         => $pledge->id,
+            'subscription_id'   => 'sub_keep_pi',
+            'type'              => 'subscription_recurring',
+            'status'            => 'succeeded',
+            'payment_intent_id' => 'pi_old',
+            'charge_id'         => 'ch_old',
+        ]);
+
+        $event = (object)[
+            'type' => 'invoice.paid',
+            'data' => (object)[
+                'object' => (object)[
+                    'id'             => 'in_keep_pi',
+                    'subscription'   => null,
+                    'customer'       => 'cus_keep_pi',
+                    'payment_intent' => null,  // incoming nulls
+                    'charge'         => null,
+                    'amount_paid'    => 1000,
+                    'currency'       => 'usd',
+                    'lines' => (object)['data' => [(object)[]]],
+                ],
+            ],
+        ];
+
+        (new StripeWebhookController())->handleEvent($event);
+
+        $tx->refresh();
+
+        $this->assertSame('pi_old', $tx->payment_intent_id);
+        $this->assertSame('ch_old', $tx->charge_id);
+    }
+
+    public function test_invoice_payment_paid_is_ignored_and_does_not_warn_or_mutate(): void
+    {
+        $pledge = Pledge::forceCreate([
+            'amount_cents'           => 1000,
+            'currency'               => 'usd',
+            'interval'               => 'month',
+            'status'                 => 'active',
+            'stripe_subscription_id' => 'sub_ignore',
+            'stripe_customer_id'     => 'cus_ignore',
+        ]);
+
+        $event = (object)[
+            'type' => 'invoice_payment.paid',
+            'data' => (object)[
+                'object' => (object)[
+                    'id' => 'inpay_123',
+                    // This object is NOT an invoice and doesn't have what handleInvoicePaid needs.
+                    'invoice' => 'in_abc', // even if present, we ignore currently
+                ],
+            ],
+        ];
+
+        (new StripeWebhookController())->handleEvent($event);
+
+        // Should not create new tx or alter pledge
+        $this->assertDatabaseCount('transactions', 0);
+        $pledge->refresh();
+        $this->assertSame('active', $pledge->status);
     }
 }

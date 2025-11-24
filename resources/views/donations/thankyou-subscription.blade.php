@@ -9,7 +9,7 @@
             <p class="text-sm text-slate-600">
                 We’ve set up your recurring donation of
                 <span class="font-semibold">
-                    ${{ number_format($pledge->amount_dollars, 2) }}
+                    ${{ number_format($pledge->amount_dollars ?? ($pledge->amount_cents / 100), 2) }}
                 </span>
                 per month.
             </p>
@@ -21,20 +21,21 @@
             @endif
 
             @if (! empty($subscriptionTransaction?->receipt_url))
-                <p class="text-xs text-slate-500">
-                    <a href="{{ $subscriptionTransaction->receipt_url }}"
-                       target="_blank"
-                       rel="noopener"
-                       class="underline">
-                        View Stripe receipt
-                    </a>
-                </p>
+                <a
+                    href="{{ $subscriptionTransaction->receipt_url }}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex items-center justify-center rounded-full bg-indigo-600 px-4 py-2
+                           text-xs font-semibold text-white shadow-sm hover:bg-indigo-700"
+                >
+                    View Stripe receipt
+                </a>
             @endif
 
             <a
                 href="{{ route('home') }}"
-                class="inline-flex items-center justify-center rounded-full bg-indigo-600 px-4 py-2
-                       text-xs font-semibold text-white shadow-sm hover:bg-indigo-700"
+                class="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2
+                       text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
             >
                 Back to home
             </a>

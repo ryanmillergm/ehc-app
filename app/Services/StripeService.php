@@ -286,7 +286,7 @@ class StripeService
                 'amount_cents'    => $latestInvoice->amount_paid,
                 'currency'        => $pledge->currency,
                 'type'            => 'subscription_recurring',
-                'status'          => 'succeeded',
+                'status'          => 'pending',
                 'payer_email'     => $pledge->donor_email,
                 'payer_name'      => $pledge->donor_name,
                 'receipt_url'     => $latestInvoice->hosted_invoice_url ?? $tx->receipt_url,

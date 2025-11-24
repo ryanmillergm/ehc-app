@@ -245,7 +245,6 @@
                     </template>
                 </div>
 
-
                 <div>
                     <label class="block text-xs font-medium text-slate-600">Postal / ZIP</label>
                     <input
@@ -334,15 +333,6 @@
     <script>
         if (typeof window.donationWidget === 'undefined') {
             window.donationWidget = function (config) {
-                console.log('[donationWidget] raw prefill:', config.prefill);
-
-                console.log(
-                    '[donationWidget] prefill country/state from PHP:',
-                    config.prefill.address_country,
-                    config.prefill.address_state
-                );
-
-
                 // Normalize prefill country → 2-letter code, default US
                 let prefillCountry = (config.prefill.address_country || 'US').toString().trim();
                 if (prefillCountry.length !== 2) {
@@ -358,8 +348,6 @@
                 if (!config.countries.find(c => c.code === 'US')) {
                     config.countries.unshift({ code: 'US', name: 'United States' });
                 }
-
-                console.log('[donationWidget] normalized prefillCountry:', prefillCountry);
 
                 return {
                     step: 1,
@@ -407,13 +395,11 @@
 
                         const value = rawState.toString().trim();
 
-                        // 1) exact code match (CO vs co)
                         const byCode = list.find(
                             s => s.code.toString().toUpperCase() === value.toUpperCase()
                         );
                         if (byCode) return byCode.code;
 
-                        // 2) full name match (Colorado)
                         const byName = list.find(
                             s => s.name.toString().toLowerCase() === value.toLowerCase()
                         );
@@ -427,16 +413,12 @@
                     init() {
                         this.amount = this.presets[1] ?? 25;
 
-                        // Normalize / default country on the instance
+                        // Normalize country
                         let c = (this.donor.address_country || '').trim();
-                        if (c.length !== 2) {
-                            c = 'US';
-                        } else {
-                            c = c.toUpperCase();
-                        }
-                        this.donor.address_country = c;
+                        if (c.length !== 2) c = 'US';
+                        this.donor.address_country = c.toUpperCase();
 
-                        // Normalize state for this country (handles "Colorado" → "CO")
+                        // Normalize initial state
                         if (this.donor.address_state) {
                             this.donor.address_state = this.normalizeStateForCountry(
                                 this.donor.address_country,
@@ -444,17 +426,30 @@
                             );
                         }
 
-                        console.log(
-                            '[donationWidget] init country/state =',
-                            this.donor.address_country,
-                            this.donor.address_state
-                        );
+                        // Re-normalize state whenever the country changes
+                        this.$watch('donor.address_country', (newCountry) => {
+                            if (!newCountry) return;
+                            const cc = newCountry.toString().trim().toUpperCase();
+                            this.donor.address_country = cc;
+
+                            if (this.donor.address_state) {
+                                const normalized = this.normalizeStateForCountry(cc, this.donor.address_state);
+
+                                // If country has a list and the normalized value isn't in it, clear it
+                                const list = this.states[cc] || [];
+                                if (Array.isArray(list) && list.length) {
+                                    const valid = list.find(s => s.code === normalized);
+                                    this.donor.address_state = valid ? normalized : '';
+                                } else {
+                                    this.donor.address_state = normalized;
+                                }
+                            }
+                        });
 
                         // Stripe Elements setup
                         this.stripe   = Stripe(config.stripeKey);
                         this.elements = this.stripe.elements();
 
-                        // When we enter step 2, mount card elements and hard-sync the selects
                         this.$watch('step', (value) => {
                             if (value === 2) {
                                 this.$nextTick(() => {
@@ -472,18 +467,9 @@
                                     if (this.$refs.countrySelect) {
                                         this.$refs.countrySelect.value = countryCode;
                                     }
-
-                                    // stateSelect only exists when there are states for this country
                                     if (this.$refs.stateSelect) {
                                         this.$refs.stateSelect.value = stateCode;
                                     }
-
-                                    console.log('[donationWidget] step 2 – synced selects', {
-                                        donor_country: this.donor.address_country,
-                                        donor_state:   this.donor.address_state,
-                                        dom_country:   this.$refs.countrySelect && this.$refs.countrySelect.value,
-                                        dom_state:     this.$refs.stateSelect && this.$refs.stateSelect.value,
-                                    });
                                 });
                             }
                         });
@@ -541,11 +527,6 @@
                         return this.states[code] || null;
                     },
 
-                    hasStates() {
-                        const list = this.statesForSelectedCountry();
-                        return Array.isArray(list) && list.length > 0;
-                    },
-
                     // --- Stripe flow ---------------------------------------------
 
                     async startDonation() {
@@ -555,6 +536,7 @@
                         try {
                             const res = await fetch(config.startUrl, {
                                 method: 'POST',
+                                credentials: 'same-origin',
                                 headers: {
                                     'Content-Type': 'application/json',
                                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
@@ -566,9 +548,14 @@
                                 }),
                             });
 
-                            if (!res.ok) throw new Error('Unable to start donation');
+                            if (!res.ok) {
+                                const errText = await res.text();
+                                console.error('[donationWidget] startDonation failed:', res.status, errText);
+                                throw new Error('Unable to start donation');
+                            }
 
                             const data = await res.json();
+
                             this.mode          = data.mode;
                             this.clientSecret  = data.clientSecret;
                             this.transactionId = data.transactionId || null;
@@ -590,14 +577,14 @@
                         const billingDetails = {
                             name: `${this.donor.first_name} ${this.donor.last_name}`.trim(),
                             email: this.donor.email,
-                            phone: this.donor.phone,
+                            phone: this.donor.phone || undefined,
                             address: {
                                 line1:       this.donor.address_line1 || undefined,
                                 line2:       this.donor.address_line2 || undefined,
                                 city:        this.donor.address_city || undefined,
                                 state:       this.donor.address_state || undefined,
                                 postal_code: this.donor.address_postal || undefined,
-                                country:     this.donor.address_country || undefined,
+                                country:     (this.donor.address_country || undefined),
                             },
                         };
 
@@ -628,10 +615,12 @@
 
                             const payload = {
                                 mode: this.mode === 'payment' ? 'payment' : 'subscription',
+
                                 donor_first_name: this.donor.first_name,
                                 donor_last_name:  this.donor.last_name,
                                 donor_email:      this.donor.email,
                                 donor_phone:      this.donor.phone,
+
                                 address_line1:    this.donor.address_line1,
                                 address_line2:    this.donor.address_line2,
                                 address_city:     this.donor.address_city,
@@ -662,6 +651,7 @@
 
                             const res = await fetch(config.completeUrl, {
                                 method: 'POST',
+                                credentials: 'same-origin',
                                 headers: {
                                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                                     'Accept': 'application/json',
@@ -671,12 +661,6 @@
                             });
 
                             const text = await res.text();
-                            console.log('[donationWidget] complete status', res.status, 'redirect?', res.redirected);
-
-                            if (res.redirected) {
-                                window.location = res.url;
-                                return;
-                            }
 
                             if (!res.ok) {
                                 console.error('[donationWidget] complete failed', res.status, text);
@@ -684,16 +668,24 @@
                                 return;
                             }
 
+                            // The controller returns JSON when Accept: application/json
                             try {
                                 const json = JSON.parse(text);
                                 if (json.redirect) {
-                                    window.location = json.redirect;
+                                    window.location.assign(json.redirect);
                                     return;
                                 }
                             } catch (e) {
                                 // not JSON
                             }
 
+                            // If Laravel ever responds with a redirect, respect it
+                            if (res.redirected) {
+                                window.location.assign(res.url);
+                                return;
+                            }
+
+                            // Fallback
                             window.location.reload();
                         } catch (e) {
                             console.error('[donationWidget] submitPayment exception', e);
@@ -707,4 +699,3 @@
         }
     </script>
 @endonce
-

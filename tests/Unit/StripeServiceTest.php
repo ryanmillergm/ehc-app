@@ -2,15 +2,16 @@
 
 namespace Tests\Unit;
 
+use Mockery;
+use Tests\TestCase;
 use App\Models\Pledge;
 use App\Models\Refund;
+use Stripe\StripeClient;
 use App\Models\Transaction;
 use App\Services\StripeService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Mockery;
-use Stripe\StripeClient;
 use Stripe\Subscription as StripeSubscription;
-use Tests\TestCase;
+use App\Http\Controllers\StripeWebhookController;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
 class StripeServiceTest extends TestCase
 {
@@ -87,9 +88,98 @@ class StripeServiceTest extends TestCase
             'subscription_id' => 'sub_999',
             'amount_cents'    => 1000,
             'type'            => 'subscription_recurring',
-            'status'          => 'succeeded',
+            'status'          => 'pending',
             'source'          => 'donation_widget',
         ]);
+    }
+
+    public function test_invoice_paid_updates_existing_pending_widget_transaction_and_does_not_duplicate(): void
+    {
+        $pledge = Pledge::forceCreate([
+            'user_id'                => null,
+            'amount_cents'           => 1500,
+            'currency'               => 'usd',
+            'interval'               => 'month',
+            'status'                 => 'incomplete',
+            'donor_email'            => 'donor@example.test',
+            'donor_name'             => 'Test Donor',
+            'stripe_subscription_id' => 'sub_123',
+            'stripe_customer_id'     => 'cus_123',
+        ]);
+
+        // This simulates the widget-created tx from StripeService
+        $pendingTx = Transaction::factory()->create([
+            'pledge_id'         => $pledge->id,
+            'subscription_id'   => 'sub_123',
+            'customer_id'       => 'cus_123',
+            'payment_intent_id' => null,
+            'charge_id'         => null,
+            'amount_cents'      => 1500,
+            'currency'          => 'usd',
+            'type'              => 'subscription_recurring',
+            'status'            => 'pending',
+            'source'            => 'donation_widget',
+            'paid_at'           => null,
+            'metadata'          => [],
+            'created_at'        => now(), // keep within your 2-hour matching window
+        ]);
+
+        $periodStart = 1_700_000_000;
+        $periodEnd   = $periodStart + 2_592_000;
+
+        $event = (object) [
+            'type' => 'invoice.paid',
+            'data' => (object) [
+                'object' => (object) [
+                    'id'                 => 'in_123',
+                    'subscription'       => 'sub_123',
+                    'customer'           => 'cus_123',
+                    'payment_intent'     => 'pi_456',
+                    'amount_paid'        => 1500,
+                    'amount_due'         => 1500,
+                    'currency'           => 'usd',
+                    'charge'             => 'ch_456',
+                    'customer_email'     => 'alt@example.test',
+                    'hosted_invoice_url' => 'https://example.test/invoices/in_123',
+                    'lines'              => (object) [
+                        'data' => [
+                            (object) [
+                                'subscription' => 'sub_123',
+                                'period' => (object) [
+                                    'start' => $periodStart,
+                                    'end'   => $periodEnd,
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        (new StripeWebhookController())->handleEvent($event);
+
+        // ✅ still only one transaction for this pledge
+        $this->assertSame(
+            1,
+            Transaction::where('pledge_id', $pledge->id)
+                ->where('type', 'subscription_recurring')
+                ->count()
+        );
+
+        // ✅ that same row got upgraded by the webhook
+        $pendingTx->refresh();
+
+        $this->assertSame('succeeded', $pendingTx->status);
+        $this->assertSame('pi_456', $pendingTx->payment_intent_id);
+        $this->assertSame('ch_456', $pendingTx->charge_id);
+        $this->assertSame('stripe_webhook', $pendingTx->source);
+        $this->assertNotNull($pendingTx->paid_at);
+
+        // extra safety: PI lookup hits the same row
+        $this->assertSame(
+            $pendingTx->id,
+            Transaction::where('payment_intent_id', 'pi_456')->value('id')
+        );
     }
 
     public function test_cancel_subscription_at_period_end_updates_pledge_fields(): void
