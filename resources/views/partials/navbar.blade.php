@@ -21,13 +21,12 @@
         <div class="flex h-16 items-center justify-between gap-4">
             {{-- Left: Logo --}}
             <div class="flex items-center">
-                <a href="{{ url('/') }}" class="flex items-center gap-2">
-                    <div class="h-9 w-9 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-lg">
-                        LOGO
-                    </div>
-                    <span class="hidden sm:inline-block text-base font-semibold text-slate-900">
-                        {{ config('app.name', 'Laravel') }}
-                    </span>
+                <a href="{{ route('home') }}" class="flex items-center gap-3">
+                    <img
+                        src="{{ asset('images/logos/bread-of-grace-logo-clean.png') }}"
+                        alt="Bread of Grace Ministries"
+                        class="h-8 w-auto sm:h-9"
+                    />
                 </a>
             </div>
 
@@ -75,7 +74,7 @@
                 {{-- Auth / user --}}
                 @auth
                     <span class="hidden lg:inline-block text-slate-700">
-                        Hi, {{ Auth::user()->name }}
+                        Hi, {{ Auth::user()->fullName }}
                     </span>
 
                     <a href="{{ route('dashboard') }}"
