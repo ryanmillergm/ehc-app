@@ -64,6 +64,9 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants
      */
     protected $appends = [
         'profile_photo_url',
+        'full_name',
+        'initials',
+        'navbar_photo_url',
     ];
 
     /**
@@ -86,6 +89,48 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants
     {
         return Attribute::make(
             get: fn ($value, $attributes) => $attributes['first_name'] . ' ' . $attributes['last_name'],
+        );
+    }
+
+    /**
+     * Initials accessor (e.g. "RM").
+     */
+    protected function initials(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value, array $attributes) {
+                $base = trim(
+                    ($attributes['first_name'] ?? '') . ' ' . ($attributes['last_name'] ?? '')
+                );
+
+                if ($base === '' && isset($attributes['email'])) {
+                    $base = $attributes['email'];
+                }
+
+                $parts = preg_split('/\s+/', $base, -1, PREG_SPLIT_NO_EMPTY);
+
+                $initials = '';
+                if (! empty($parts)) {
+                    $initials = mb_substr($parts[0], 0, 1);
+                    if (count($parts) > 1) {
+                        $initials .= mb_substr(end($parts), 0, 1);
+                    }
+                }
+
+                return mb_strtoupper($initials ?: 'U');
+            },
+        );
+    }
+
+    /**
+     * Navbar-specific photo URL.
+     * Returns NULL when there is no custom uploaded photo
+     * so the UI can show initials avatar instead.
+     */
+    protected function navbarPhotoUrl(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->profile_photo_path ? $this->profile_photo_url : null,
         );
     }
 
