@@ -1,5 +1,5 @@
 <div class="bg-white text-slate-900">
-    {{-- HERO (donation-first + clear next steps) --}}
+    {{-- HERO --}}
     <section id="hero" class="relative overflow-hidden">
         {{-- Background --}}
         <div class="absolute inset-0">
@@ -11,7 +11,6 @@
         <div class="relative mx-auto max-w-screen-2xl px-6 sm:px-8 lg:px-12 2xl:px-20 pt-12 lg:pt-20 pb-16 lg:pb-24">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
 
-                {{-- Copy --}}
                 <div class="lg:col-span-6 space-y-6">
                     <div class="flex flex-wrap items-center gap-2">
                         <span class="inline-flex items-center gap-2 rounded-full bg-slate-900 text-white px-4 py-1.5 text-xs font-semibold tracking-wide">
@@ -539,147 +538,11 @@
         </div>
     </section>
 
-    {{-- FINAL CTA (short + punchy + not “salesy”) --}}
-    <section class="bg-gradient-to-r from-rose-800 to-slate-900">
-        <div class="mx-auto max-w-screen-2xl px-6 sm:px-8 lg:px-12 2xl:px-20 py-14 sm:py-16">
-        {{-- top CTA bar --}}
-        <div class="rounded-3xl border border-white/20 bg-slate-950 backdrop-blur-md p-6 sm:p-8">
-            <div class="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-                <div>
-                    <div class="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-xs font-semibold text-white/85 ring-1 ring-white/10">
-                        Church Without Walls • Sacramento
-                        <span class="h-1.5 w-1.5 rounded-full bg-rose-400"></span>
-                        Thu + Sun 11am
-                    </div>
-                    <h3 class="mt-3 text-white text-2xl sm:text-3xl font-extrabold tracking-tight">
-                        Be part of someone’s next step.
-                    </h3>
-                    <p class="mt-2 max-w-2xl text-white/70">
-                        Your gift fuels hot meals, survival supplies, discipleship, and real pathways toward stability.
-                    </p>
-                </div>
+    {{-- FINAL CTA BAR --}}
+    <x-final-cta give-href="#give-form" />
 
-                <div class="flex flex-col sm:flex-row gap-3">
-                    <a href="#give-form"
-                       class="inline-flex items-center justify-center rounded-full bg-rose-600 px-7 py-3.5 text-sm font-semibold text-white shadow-sm hover:bg-rose-500 transition">
-                        Give now
-                    </a>
-                    <a href="#serve"
-                       class="inline-flex items-center justify-center rounded-full bg-white/10 px-7 py-3.5 text-sm font-semibold text-white ring-1 ring-white/15 hover:bg-white/15 transition">
-                        Volunteer
-                    </a>
-                    <a href="#visit"
-                       class="inline-flex items-center justify-center rounded-full px-7 py-3.5 text-sm font-semibold text-white/80 hover:text-white transition">
-                        Visit →
-                    </a>
-                </div>
-            </div>
-        </div>
-        </div>
-    </section>
-
-    {{-- FOOTER --}}
-    <footer class="relative overflow-hidden bg-slate-950 text-white">
-        {{-- subtle glow --}}
-        <div aria-hidden="true" class="absolute inset-0">
-            <div class="absolute -top-32 -right-24 h-80 w-80 rounded-full bg-rose-500/10 blur-3xl"></div>
-            <div class="absolute -bottom-32 -left-24 h-80 w-80 rounded-full bg-indigo-500/10 blur-3xl"></div>
-            <div class="absolute inset-0 bg-gradient-to-b from-slate-950 via-slate-950 to-black"></div>
-        </div>
-
-        <div class="relative mx-auto max-w-screen-2xl px-6 sm:px-8 lg:px-12 2xl:px-20 pt-14 pb-10">
-            {{-- main footer grid --}}
-            <div class="mt-10 grid grid-cols-1 lg:grid-cols-12 gap-10">
-                {{-- brand --}}
-                <div class="lg:col-span-5 space-y-4">
-                    <div class="flex items-center justify-center sm:justify-start gap-3">
-                        <div class="h-11 w-11 rounded-2xl bg-white/10 ring-1 ring-white/10 flex items-center justify-center font-extrabold">
-                            BG
-                        </div>
-                        <div class="text-center sm:text-left">
-                            <div class="text-lg font-extrabold">Bread of Grace Ministries</div>
-                            <div class="text-sm text-white/60">Christ-centered street outreach</div>
-                        </div>
-                    </div>
-
-                    <p class="text-white/70 max-w-xl leading-relaxed text-center sm:text-left">
-                        Serving the homeless and at-risk community with the Word of God and practical support:
-                        meals, supplies, mentorship, and pathways to housing.
-                    </p>
-
-                    {{-- socials (center on mobile) --}}
-                    <div class="flex items-center justify-center sm:justify-start gap-3 pt-1">
-                        <a href="#" class="group inline-flex items-center justify-center h-11 w-11 rounded-2xl bg-white/5 ring-1 ring-white/10 hover:bg-white/10 transition" aria-label="Facebook">
-                            <img src="{{ asset('images/icon-facebook.svg') }}" alt="" class="h-6 w-6 opacity-85 group-hover:opacity-100 transition">
-                        </a>
-                        <a href="#" class="group inline-flex items-center justify-center h-11 w-11 rounded-2xl bg-white/5 ring-1 ring-white/10 hover:bg-white/10 transition" aria-label="YouTube">
-                            <img src="{{ asset('images/icon-youtube.svg') }}" alt="" class="h-6 w-6 opacity-85 group-hover:opacity-100 transition">
-                        </a>
-                        <a href="#" class="group inline-flex items-center justify-center h-11 w-11 rounded-2xl bg-white/5 ring-1 ring-white/10 hover:bg-white/10 transition" aria-label="Instagram">
-                            <img src="{{ asset('images/icon-instagram.svg') }}" alt="" class="h-6 w-6 opacity-85 group-hover:opacity-100 transition">
-                        </a>
-                    </div>
-                </div>
-
-                {{-- links (center on mobile) --}}
-                <div class="lg:col-span-3 text-center sm:text-left">
-                    <div class="text-lg font-semibold text-white/80">Explore</div>
-
-                    <div class="mt-4 grid grid-cols-2 gap-3 text-sm justify-items-center sm:justify-items-start">
-                        <a href="#about" class="rounded-xl px-3 py-2 bg-white/0 hover:bg-white/5 text-white/80 hover:text-white transition">About</a>
-                        <a href="#serve" class="rounded-xl px-3 py-2 bg-white/0 hover:bg-white/5 text-white/80 hover:text-white transition">Serve</a>
-                        <a href="#give-form" class="rounded-xl px-3 py-2 bg-white/0 hover:bg-white/5 text-white/80 hover:text-white transition">Give</a>
-                        <a href="#visit" class="rounded-xl px-3 py-2 bg-white/0 hover:bg-white/5 text-white/80 hover:text-white transition">Visit</a>
-                    </div>
-                </div>
-
-                {{-- newsletter --}}
-                <div class="lg:col-span-4">
-                    <div class="rounded-3xl bg-white/5 ring-1 ring-white/10 p-6">
-                        <div class="flex items-start justify-between gap-4">
-                            <div>
-                                <div class="text-sm font-semibold">Stay connected</div>
-                                <p class="mt-1 text-sm text-white/65">
-                                    Monthly updates: outreach stories, needs, and ways to help.
-                                </p>
-                            </div>
-                        </div>
-
-                        <form action="#" class="mt-5 space-y-3">
-                            <div class="flex flex-col sm:flex-row gap-3">
-                                <input
-                                    type="email"
-                                    class="w-full rounded-full px-4 py-3 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-400"
-                                    placeholder="Email address"
-                                />
-                                <button
-                                    class="shrink-0 rounded-full bg-rose-600 px-6 py-3 font-semibold hover:bg-rose-500 transition">
-                                    Subscribe
-                                </button>
-                            </div>
-
-                            <div class="text-xs text-white/55 text-center sm:text-left">
-                                <span>By subscribing, you agree to receive email updates.</span>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
-            {{-- bottom bar (center on mobile) --}}
-            <div class="mt-12 pt-8 border-t border-white/10 flex flex-col items-center gap-3 text-xs text-white/55 text-center sm:flex-row sm:justify-between sm:text-left">
-                <div>
-                    © {{ now()->year }} Bread of Grace Ministries. All rights reserved.
-                </div>
-
-                <div class="flex items-center justify-center gap-4">
-                    <a href="#give-form" class="hover:text-white transition">Donate</a>
-                    <a href="#visit" class="hover:text-white transition">Directions</a>
-                    <a href="#about" class="hover:text-white transition">Mission</a>
-                </div>
-            </div>
-        </div>
-    </footer>
+    {{-- FOOTER--}}
+    <x-footer />
 
     {{-- Smooth scroll for anchor links --}}
     @once
@@ -694,8 +557,8 @@
 
                 e.preventDefault();
 
-                const header = document.getElementById('site-header'); // add this id to your sticky header
-                const offset = (header?.offsetHeight ?? 0) + 12; // +12px breathing room
+                const header = document.getElementById('site-header');
+                const offset = (header?.offsetHeight ?? 0) + 12;
 
                 const top = el.getBoundingClientRect().top + window.scrollY - offset;
 
