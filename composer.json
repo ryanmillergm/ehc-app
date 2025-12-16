@@ -42,6 +42,8 @@
         }
     },
     "scripts": {
+        "dev": "call scripts\\\\dev.bat",
+        "stripe:status": "php artisan stripe:webhook-status",
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi",
