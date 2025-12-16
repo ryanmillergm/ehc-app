@@ -47,10 +47,10 @@
     <body class="font-sans antialiased bg-gray-100">
         <livewire:navbar />
 
-        <main class="pt-16" style="margin-bottom: 1000px;">
+        <main class="pt-16">
             {{ $slot }}
 
-            <p>Layout for Auth Users in General App</p>
+            {{-- <p>Layout for Auth Users in General App</p> --}}
         </main>
         
         @livewireScripts
