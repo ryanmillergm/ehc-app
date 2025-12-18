@@ -21,8 +21,8 @@
         <livewire:navbar />
 
         <div class="pt-16">
-            <p>Layout for Auth Users in General App</p>
-            <p>resources\views\layouts\guest.blade.php</p>
+            {{-- <p>Layout for Auth Users in General App</p>
+            <p>resources\views\layouts\guest.blade.php</p> --}}
             {{ $slot }}
         </div>
 

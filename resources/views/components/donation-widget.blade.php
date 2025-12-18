@@ -10,10 +10,13 @@
     id="donation-widget-root"
     wire:ignore.self
     x-data="donationWidget(@js([
-        'startUrl'    => route('donations.start'),
-        'completeUrl' => route('donations.complete'),
-        'stripeKey'   => config('services.stripe.key'),
-        'prefill'     => [
+        'startUrl'                  => route('donations.start'),
+        'completeUrl'               => route('donations.complete'),
+        'returnUrl'                 => route('donations.return'),
+        'thankYouUrl'               => route('donations.thankyou'),
+        'thankYouSubscriptionUrl'   => route('donations.thankyou-subscription'),
+        'stripeKey'                 => config('services.stripe.key'),
+        'prefill'                   => [
             'first_name'      => $user?->first_name ?? '',
             'last_name'       => $user?->last_name ?? '',
             'email'           => $user?->email ?? '',
@@ -197,7 +200,7 @@
                     x-ref="countrySelect"
                     x-model="donor.address_country"
                     class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm
-                        focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                           focus:border-indigo-500 focus:ring-indigo-500 bg-white"
                 >
                     <option value="">Select country</option>
                     <template x-for="country in countries" :key="country.code">
@@ -226,7 +229,7 @@
                             x-ref="stateSelect"
                             x-model="donor.address_state"
                             class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm
-                                focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                                   focus:border-indigo-500 focus:ring-indigo-500 bg-white"
                         >
                             <option value="">Select state</option>
                             <template x-for="state in statesForSelectedCountry()" :key="state.code">
@@ -240,7 +243,7 @@
                             x-model="donor.address_state"
                             type="text"
                             class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm
-                                focus:border-indigo-500 focus:ring-indigo-500"
+                                   focus:border-indigo-500 focus:ring-indigo-500"
                         >
                     </template>
                 </div>
@@ -283,7 +286,6 @@
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-600">Postal / ZIP</label>
-                        {{-- Mirrors billing postal code so it stays in sync --}}
                         <input
                             x-model="donor.address_postal"
                             type="text"
@@ -321,13 +323,15 @@
                 class="block w-full text-center text-xs text-slate-500 hover:text-slate-700 mt-1"
             >
                 Back to change amount
+                {{-- If "Back" = brand new attempt, use this instead:
+                @click="clearAttemptId(); step = 1"
+                --}}
             </button>
         </form>
     </template>
 </div>
 
 @once
-    {{-- Stripe.js --}}
     <script src="https://js.stripe.com/v3/"></script>
 
     <script>
@@ -349,17 +353,29 @@
                     config.countries.unshift({ code: 'US', name: 'United States' });
                 }
 
+                const absUrl = (url) => {
+                    if (!url) return window.location.origin + '/';
+                    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+                    if (url.startsWith('/')) return window.location.origin + url;
+                    return window.location.origin + '/' + url;
+                };
+
                 return {
+                    attemptId: null,
+                    attemptKey: 'donation_widget_attempt_id',
+
                     step: 1,
                     presets: [10, 25, 50, 100, 250, 500],
                     frequency: 'one_time',
                     amount: 25,
                     customAmount: null,
+
                     loading: false,
-                    mode: null,
+                    mode: null, // 'payment' or 'subscription'
                     transactionId: null,
                     pledgeId: null,
                     clientSecret: null,
+
                     stripe: null,
                     elements: null,
                     cardNumberElement: null,
@@ -381,6 +397,39 @@
                         address_state:   config.prefill.address_state || '',
                         address_postal:  config.prefill.address_postal || '',
                         address_country: prefillCountry,
+                    },
+
+                    // --- attempt helpers ----------------------------------------
+
+                    getOrCreateAttemptId() {
+                        let id = sessionStorage.getItem(this.attemptKey);
+
+                        if (!id) {
+                            id = (crypto?.randomUUID?.() || this.fallbackUuid());
+                            sessionStorage.setItem(this.attemptKey, id);
+                        }
+
+                        this.attemptId = id;
+                        return id;
+                    },
+
+                    setAttemptId(id) {
+                        if (!id) return;
+                        sessionStorage.setItem(this.attemptKey, id);
+                        this.attemptId = id;
+                    },
+
+                    clearAttemptId() {
+                        sessionStorage.removeItem(this.attemptKey);
+                        this.attemptId = null;
+                    },
+
+                    fallbackUuid() {
+                        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+                            const r = Math.random() * 16 | 0;
+                            const v = (c === 'x') ? r : (r & 0x3 | 0x8);
+                            return v.toString(16);
+                        });
                     },
 
                     // --- helpers -------------------------------------------------
@@ -408,9 +457,24 @@
                         return value;
                     },
 
+                    thankYouUrlForMode() {
+                        const oneTime = config.thankYouUrl || '/donations/thank-you';
+                        const sub     = config.thankYouSubscriptionUrl || '/donations/thank-you-subscription';
+                        return absUrl(this.mode === 'payment' ? oneTime : sub);
+                    },
+
+                    returnUrl() {
+                        // Stripe redirect
+                        return absUrl(config.returnUrl || '/donations/return');
+                    },
+
                     // --- lifecycle -----------------------------------------------
 
                     init() {
+                        // Don’t create a new attempt on init; just read if it exists.
+                        const existing = sessionStorage.getItem(this.attemptKey);
+                        if (existing) this.attemptId = existing;
+
                         this.amount = this.presets[1] ?? 25;
 
                         // Normalize country
@@ -435,7 +499,6 @@
                             if (this.donor.address_state) {
                                 const normalized = this.normalizeStateForCountry(cc, this.donor.address_state);
 
-                                // If country has a list and the normalized value isn't in it, clear it
                                 const list = this.states[cc] || [];
                                 if (Array.isArray(list) && list.length) {
                                     const valid = list.find(s => s.code === normalized);
@@ -474,7 +537,6 @@
                             }
                         });
                     },
-
 
                     mountCardElements() {
                         if (this.cardNumberElement) return;
@@ -530,10 +592,21 @@
                     // --- Stripe flow ---------------------------------------------
 
                     async startDonation() {
+                        if (this.loading) return;
+
                         this.loading = true;
                         this.cardError = '';
 
+                        // Clear stale flow state before starting a new start call
+                        this.mode = null;
+                        this.clientSecret = null;
+                        this.transactionId = null;
+                        this.pledgeId = null;
+
                         try {
+                            // Create attempt lazily on first "Donate"
+                            const attemptId = this.attemptId || this.getOrCreateAttemptId();
+
                             const res = await fetch(config.startUrl, {
                                 method: 'POST',
                                 credentials: 'same-origin',
@@ -543,23 +616,27 @@
                                     'Accept': 'application/json',
                                 },
                                 body: JSON.stringify({
+                                    attempt_id: attemptId,
                                     amount: this.totalAmount(),
                                     frequency: this.frequency,
                                 }),
                             });
 
                             if (!res.ok) {
-                                const errText = await res.text();
-                                console.error('[donationWidget] startDonation failed:', res.status, errText);
+                                const err = await res.text();
+                                console.error('[donationWidget] startDonation failed:', res.status, err);
                                 throw new Error('Unable to start donation');
                             }
 
                             const data = await res.json();
 
-                            this.mode          = data.mode;
+                            this.mode          = data.mode; // 'payment' or 'subscription'
                             this.clientSecret  = data.clientSecret;
                             this.transactionId = data.transactionId || null;
                             this.pledgeId      = data.pledgeId || null;
+
+                            // Server is source of truth. Persist it.
+                            this.setAttemptId(data.attemptId || attemptId);
 
                             this.step = 2;
                         } catch (e) {
@@ -571,6 +648,8 @@
                     },
 
                     async submitPayment() {
+                        if (this.loading) return;
+
                         this.loading = true;
                         this.cardError = '';
 
@@ -597,6 +676,7 @@
                                         card: this.cardNumberElement,
                                         billing_details: billingDetails,
                                     },
+                                    return_url: this.returnUrl(),
                                 });
                             } else {
                                 result = await this.stripe.confirmCardSetup(this.clientSecret, {
@@ -604,6 +684,7 @@
                                         card: this.cardNumberElement,
                                         billing_details: billingDetails,
                                     },
+                                    return_url: this.returnUrl(),
                                 });
                             }
 
@@ -614,6 +695,7 @@
                             }
 
                             const payload = {
+                                attempt_id: this.attemptId || this.getOrCreateAttemptId(),
                                 mode: this.mode === 'payment' ? 'payment' : 'subscription',
 
                                 donor_first_name: this.donor.first_name,
@@ -642,51 +724,29 @@
                                 payload.payment_method_id = si.payment_method;
                             }
 
-                            const params = new URLSearchParams();
-                            Object.entries(payload).forEach(([key, value]) => {
-                                if (value !== null && value !== undefined && value !== '') {
-                                    params.append(key, value);
-                                }
-                            });
-
                             const res = await fetch(config.completeUrl, {
                                 method: 'POST',
                                 credentials: 'same-origin',
                                 headers: {
                                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                                     'Accept': 'application/json',
-                                    'Content-Type': 'application/x-www-form-urlencoded',
+                                    'Content-Type': 'application/json',
                                 },
-                                body: params,
+                                body: JSON.stringify(payload),
                             });
 
-                            const text = await res.text();
-
                             if (!res.ok) {
-                                console.error('[donationWidget] complete failed', res.status, text);
+                                const err = await res.text();
+                                console.error('[donationWidget] complete failed', res.status, err);
                                 this.cardError = 'There was a problem finalizing your donation.';
                                 return;
                             }
 
-                            // The controller returns JSON when Accept: application/json
-                            try {
-                                const json = JSON.parse(text);
-                                if (json.redirect) {
-                                    window.location.assign(json.redirect);
-                                    return;
-                                }
-                            } catch (e) {
-                                // not JSON
-                            }
+                            const json = await res.json();
 
-                            // If Laravel ever responds with a redirect, respect it
-                            if (res.redirected) {
-                                window.location.assign(res.url);
-                                return;
-                            }
-
-                            // Fallback
-                            window.location.reload();
+                            // Navigate to thank-you (server sets session ids)
+                            const redirectUrl = absUrl(json.redirect || this.thankYouUrlForMode());
+                            window.location.assign(redirectUrl);
                         } catch (e) {
                             console.error('[donationWidget] submitPayment exception', e);
                             this.cardError = 'Something went wrong confirming your payment.';

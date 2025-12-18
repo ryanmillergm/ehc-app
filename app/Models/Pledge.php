@@ -16,6 +16,8 @@ class Pledge extends Model
         'stripe_subscription_id',
         'stripe_customer_id',
         'stripe_price_id',
+        'setup_intent_id',
+        'attempt_id',
         'amount_cents',
         'currency',
         'interval',

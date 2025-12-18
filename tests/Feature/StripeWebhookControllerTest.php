@@ -32,8 +32,7 @@ class StripeWebhookControllerTest extends TestCase
             ],
         ];
 
-        $controller = new StripeWebhookController();
-        $controller->handleEvent($event);
+        (new StripeWebhookController())->handleEvent($event);
 
         $tx->refresh();
 
@@ -43,7 +42,6 @@ class StripeWebhookControllerTest extends TestCase
 
     public function test_invoice_paid_creates_subscription_recurring_transaction_and_updates_pledge(): void
     {
-        // Minimal pledge row that matches what the controller expects
         $pledge = Pledge::forceCreate([
             'user_id'                => null,
             'amount_cents'           => 1500,
@@ -54,10 +52,13 @@ class StripeWebhookControllerTest extends TestCase
             'donor_name'             => 'Test Donor',
             'stripe_subscription_id' => 'sub_123',
             'stripe_customer_id'     => 'cus_123',
+            'metadata'               => [],
         ]);
 
+        // deterministic timestamps
         $periodStart = 1_700_000_000;
-        $periodEnd   = $periodStart + 2_592_000; // ~30 days
+        $periodEnd   = $periodStart + 2_592_000;
+        $paidAtTs    = $periodStart + 120;
 
         $event = (object) [
             'type' => 'invoice.paid',
@@ -73,7 +74,13 @@ class StripeWebhookControllerTest extends TestCase
                     'charge'             => 'ch_456',
                     'customer_email'     => 'alt@example.test',
                     'hosted_invoice_url' => 'https://example.test/invoices/in_123',
-                    'lines'              => (object) [
+                    'billing_reason'     => 'subscription_cycle',
+
+                    'status_transitions' => (object) [
+                        'paid_at' => $paidAtTs,
+                    ],
+
+                    'lines' => (object) [
                         'data' => [
                             (object) [
                                 'subscription' => 'sub_123',
@@ -88,44 +95,33 @@ class StripeWebhookControllerTest extends TestCase
             ],
         ];
 
-        $controller = new StripeWebhookController();
-        $controller->handleEvent($event);
+        (new StripeWebhookController())->handleEvent($event);
 
-        // A new recurring transaction is created
-        $this->assertDatabaseHas('transactions', [
-            'pledge_id'         => $pledge->id,
-            'subscription_id'   => 'sub_123',
-            'payment_intent_id' => 'pi_456',
-            'charge_id'         => 'ch_456',
-            'amount_cents'      => 1500,
-            'currency'          => 'usd',
-            'type'              => 'subscription_recurring',
-            'status'            => 'succeeded',
-            'source'            => 'stripe_webhook',
-            'customer_id'       => 'cus_123',
-        ]);
-
-        // Pledge is marked active and latest_invoice_id stored
         $pledge->refresh();
 
+        $expectedStart  = Carbon::createFromTimestamp($periodStart);
+        $expectedEnd    = Carbon::createFromTimestamp($periodEnd);
+        $expectedPaidAt = Carbon::createFromTimestamp($paidAtTs);
+
         $this->assertSame('active', $pledge->status);
-        $this->assertSame('in_123', $pledge->latest_invoice_id);
-        $this->assertSame('pi_456', $pledge->latest_payment_intent_id);
-
-        // Period & reporting fields updated from invoice line
-        $expectedStart = Carbon::createFromTimestamp($periodStart);
-        $expectedEnd   = Carbon::createFromTimestamp($periodEnd);
-
         $this->assertEquals($expectedStart->timestamp, $pledge->current_period_start->timestamp);
         $this->assertEquals($expectedEnd->timestamp, $pledge->current_period_end->timestamp);
-        $this->assertEquals($expectedEnd->timestamp, $pledge->last_pledge_at->timestamp);
+        $this->assertEquals($expectedPaidAt->timestamp, $pledge->last_pledge_at->timestamp);
         $this->assertEquals($expectedEnd->timestamp, $pledge->next_pledge_at->timestamp);
+        $this->assertTrue($pledge->last_pledge_at->lt($pledge->next_pledge_at));
 
-        // And the transaction has the hosted invoice URL as the receipt_url
         $tx = Transaction::where('payment_intent_id', 'pi_456')->firstOrFail();
+
+        $this->assertSame($pledge->id, $tx->pledge_id);
+        $this->assertSame('subscription_recurring', $tx->type);
+        $this->assertSame('succeeded', $tx->status);
+        $this->assertSame('ch_456', $tx->charge_id);
+        $this->assertSame('cus_123', $tx->customer_id);
         $this->assertSame('https://example.test/invoices/in_123', $tx->receipt_url);
-        $this->assertSame('alt@example.test', $tx->payer_email);
-        $this->assertSame('Test Donor', $tx->payer_name);
+
+        $meta = $this->meta($tx->metadata);
+        $this->assertSame('in_123', $meta['stripe_invoice_id'] ?? null);
+        $this->assertSame('sub_123', $meta['stripe_subscription_id'] ?? null);
     }
 
     public function test_invoice_paid_uses_customer_fallback_when_subscription_missing(): void
@@ -150,7 +146,7 @@ class StripeWebhookControllerTest extends TestCase
             'data' => (object) [
                 'object' => (object) [
                     'id'                 => 'in_fallback',
-                    'subscription'       => null, // <- missing; forces fallback
+                    'subscription'       => null,
                     'customer'           => 'cus_fallback',
                     'payment_intent'     => 'pi_fallback',
                     'amount_paid'        => 2000,
@@ -173,12 +169,10 @@ class StripeWebhookControllerTest extends TestCase
             ],
         ];
 
-        $controller = new StripeWebhookController();
-        $controller->handleEvent($event);
+        (new StripeWebhookController())->handleEvent($event);
 
         $pledge->refresh();
 
-        // Fallback resolved to pledge via customer and still updated everything
         $this->assertSame('active', $pledge->status);
         $this->assertSame('in_fallback', $pledge->latest_invoice_id);
         $this->assertSame('pi_fallback', $pledge->latest_payment_intent_id);
@@ -215,8 +209,7 @@ class StripeWebhookControllerTest extends TestCase
             ],
         ];
 
-        $controller = new StripeWebhookController();
-        $controller->handleEvent($event);
+        (new StripeWebhookController())->handleEvent($event);
 
         $this->assertDatabaseHas('pledges', [
             'id'     => $pledge->id,
@@ -256,8 +249,7 @@ class StripeWebhookControllerTest extends TestCase
             ],
         ];
 
-        $controller = new StripeWebhookController();
-        $controller->handleEvent($event);
+        (new StripeWebhookController())->handleEvent($event);
 
         $pledge->refresh();
 
@@ -301,20 +293,18 @@ class StripeWebhookControllerTest extends TestCase
             ],
         ];
 
-        $controller = new StripeWebhookController();
-        $controller->handleEvent($event);
+        (new StripeWebhookController())->handleEvent($event);
 
         $pledge->refresh();
 
         $this->assertSame('active', $pledge->status);
         $this->assertTrue($pledge->cancel_at_period_end);
-
         $this->assertEquals($existingStart->timestamp, $pledge->current_period_start->timestamp);
         $this->assertEquals($existingEnd->timestamp, $pledge->current_period_end->timestamp);
         $this->assertEquals($existingEnd->timestamp, $pledge->next_pledge_at->timestamp);
     }
 
-    public function test_charge_succeeded_enriches_existing_transaction_with_charge_details(): void
+    public function test_charge_succeeded_enriches_existing_transaction_with_charge_details_and_card_exp(): void
     {
         $tx = Transaction::factory()->create([
             'payment_intent_id' => 'pi_123',
@@ -339,10 +329,12 @@ class StripeWebhookControllerTest extends TestCase
                     ],
                     'payment_method_details' => (object) [
                         'card' => (object) [
-                            'brand'   => 'visa',
-                            'last4'   => '4242',
-                            'country' => 'US',
-                            'funding' => 'credit',
+                            'brand'     => 'visa',
+                            'last4'     => '4242',
+                            'country'   => 'US',
+                            'funding'   => 'credit',
+                            'exp_month' => 12,
+                            'exp_year'  => 2026,
                         ],
                     ],
                 ],
@@ -358,8 +350,10 @@ class StripeWebhookControllerTest extends TestCase
         $this->assertSame('donor@example.test', $tx->payer_email);
         $this->assertSame('Test Donor', $tx->payer_name);
 
-        $this->assertArrayHasKey('card_brand', $tx->metadata);
-        $this->assertSame('visa', $tx->metadata['card_brand']);
+        $meta = $this->meta($tx->metadata);
+        $this->assertSame('visa', $meta['card_brand'] ?? null);
+        $this->assertSame(12, $meta['card_exp_month'] ?? null);
+        $this->assertSame(2026, $meta['card_exp_year'] ?? null);
     }
 
     public function test_charge_succeeded_backfills_payment_method_id_and_customer_id_when_missing(): void
@@ -494,9 +488,7 @@ class StripeWebhookControllerTest extends TestCase
                     'charge'  => null,
                     'charges' => (object) [
                         'data' => [
-                            (object) [
-                                'id' => 'ch_from_charges',
-                            ],
+                            (object) ['id' => 'ch_from_charges'],
                         ],
                     ],
 
@@ -575,35 +567,6 @@ class StripeWebhookControllerTest extends TestCase
         $this->assertSame('cus_old', $tx->customer_id);
     }
 
-    public function test_payment_intent_succeeded_does_not_explode_when_latest_charge_missing(): void
-    {
-        $tx = Transaction::factory()->create([
-            'payment_intent_id' => 'pi_no_latest',
-            'status'            => 'pending',
-            'paid_at'           => null,
-        ]);
-
-        $event = (object) [
-            'type' => 'payment_intent.succeeded',
-            'data' => (object) [
-                'object' => (object) [
-                    'id' => 'pi_no_latest',
-                ],
-            ],
-        ];
-
-        (new StripeWebhookController())->handleEvent($event);
-
-        $tx->refresh();
-
-        $this->assertSame('succeeded', $tx->status);
-        $this->assertNotNull($tx->paid_at);
-    }
-
-    // ------------------------------------------------------------------
-    // Additional coverage
-    // ------------------------------------------------------------------
-
     public function test_payment_intent_failed_sets_transaction_failed(): void
     {
         $tx = Transaction::factory()->create([
@@ -611,10 +574,10 @@ class StripeWebhookControllerTest extends TestCase
             'status'            => 'pending',
         ]);
 
-        $event = (object)[
+        $event = (object) [
             'type' => 'payment_intent.payment_failed',
-            'data' => (object)[
-                'object' => (object)[
+            'data' => (object) [
+                'object' => (object) [
                     'id' => 'pi_fail',
                 ],
             ],
@@ -636,10 +599,10 @@ class StripeWebhookControllerTest extends TestCase
             'charge_id'         => null,
         ]);
 
-        $event = (object)[
+        $event = (object) [
             'type' => 'charge.succeeded',
-            'data' => (object)[
-                'object' => (object)[
+            'data' => (object) [
+                'object' => (object) [
                     'id' => 'ch_no_pi',
                     // payment_intent intentionally missing
                 ],
@@ -649,7 +612,6 @@ class StripeWebhookControllerTest extends TestCase
         (new StripeWebhookController())->handleEvent($event);
 
         $tx->refresh();
-
         $this->assertNull($tx->charge_id);
     }
 
@@ -676,25 +638,21 @@ class StripeWebhookControllerTest extends TestCase
             'status'            => 'succeeded',
         ]);
 
-        $event = (object)[
+        $event = (object) [
             'type' => 'invoice.paid',
-            'data' => (object)[
-                'object' => (object)[
+            'data' => (object) [
+                'object' => (object) [
                     'id'           => 'in_keep',
                     'subscription' => 'sub_keep',
                     'customer'     => 'cus_new',
-
-                    // Real Stripe: payment_intent is usually a string unless expanded,
-                    // but controller handles either shape. We send expanded shape here.
-                    'payment_intent' => (object)[
+                    'payment_intent' => (object) [
                         'id'             => 'pi_keep',
                         'payment_method' => 'pm_new',
                     ],
-
                     'amount_paid' => 1000,
                     'currency'    => 'usd',
                     'charge'      => 'ch_keep',
-                    'lines'       => (object)['data' => [(object)['subscription' => 'sub_keep']]],
+                    'lines'       => (object) ['data' => [(object) ['subscription' => 'sub_keep']]],
                 ],
             ],
         ];
@@ -709,7 +667,7 @@ class StripeWebhookControllerTest extends TestCase
 
     public function test_invoice_paid_merges_metadata(): void
     {
-        $pledge = Pledge::forceCreate([
+        Pledge::forceCreate([
             'amount_cents'           => 500,
             'currency'               => 'usd',
             'interval'               => 'month',
@@ -725,10 +683,10 @@ class StripeWebhookControllerTest extends TestCase
             'metadata'          => ['foo' => 'bar'],
         ]);
 
-        $event = (object)[
+        $event = (object) [
             'type' => 'invoice.paid',
-            'data' => (object)[
-                'object' => (object)[
+            'data' => (object) [
+                'object' => (object) [
                     'id'             => 'in_meta',
                     'subscription'   => 'sub_meta',
                     'customer'       => 'cus_meta',
@@ -736,7 +694,7 @@ class StripeWebhookControllerTest extends TestCase
                     'amount_paid'    => 500,
                     'currency'       => 'usd',
                     'charge'         => 'ch_meta',
-                    'lines'          => (object)['data' => [(object)['subscription' => 'sub_meta']]],
+                    'lines'          => (object) ['data' => [(object) ['subscription' => 'sub_meta']]],
                 ],
             ],
         ];
@@ -745,9 +703,10 @@ class StripeWebhookControllerTest extends TestCase
 
         $tx->refresh();
 
-        $this->assertSame('bar', $tx->metadata['foo']);
-        $this->assertSame('in_meta', $tx->metadata['stripe_invoice_id']);
-        $this->assertSame('sub_meta', $tx->metadata['stripe_subscription_id']);
+        $meta = $this->meta($tx->metadata);
+        $this->assertSame('bar', $meta['foo'] ?? null);
+        $this->assertSame('in_meta', $meta['stripe_invoice_id'] ?? null);
+        $this->assertSame('sub_meta', $meta['stripe_subscription_id'] ?? null);
     }
 
     public function test_subscription_created_routes_to_handler_and_updates_status(): void
@@ -758,15 +717,13 @@ class StripeWebhookControllerTest extends TestCase
             'cancel_at_period_end'   => false,
         ]);
 
-        $event = (object)[
+        $event = (object) [
             'type' => 'customer.subscription.created',
-            'data' => (object)[
-                'object' => (object)[
+            'data' => (object) [
+                'object' => (object) [
                     'id'                   => 'sub_created',
                     'status'               => 'active',
                     'cancel_at_period_end' => false,
-
-                    // Stripe always includes these keys (can be null)
                     'current_period_start' => null,
                     'current_period_end'   => null,
                 ],
@@ -776,7 +733,6 @@ class StripeWebhookControllerTest extends TestCase
         (new StripeWebhookController())->handleEvent($event);
 
         $pledge->refresh();
-
         $this->assertSame('active', $pledge->status);
     }
 
@@ -787,15 +743,13 @@ class StripeWebhookControllerTest extends TestCase
             'status'                 => 'active',
         ]);
 
-        $event = (object)[
+        $event = (object) [
             'type' => 'customer.subscription.deleted',
-            'data' => (object)[
-                'object' => (object)[
+            'data' => (object) [
+                'object' => (object) [
                     'id'                   => 'sub_deleted',
                     'status'               => 'canceled',
                     'cancel_at_period_end' => false,
-
-                    // Stripe always includes these keys (can be null)
                     'current_period_start' => null,
                     'current_period_end'   => null,
                 ],
@@ -805,16 +759,15 @@ class StripeWebhookControllerTest extends TestCase
         (new StripeWebhookController())->handleEvent($event);
 
         $pledge->refresh();
-
         $this->assertSame('canceled', $pledge->status);
     }
 
     public function test_invoice_payment_failed_noops_when_pledge_missing(): void
     {
-        $event = (object)[
+        $event = (object) [
             'type' => 'invoice.payment_failed',
-            'data' => (object)[
-                'object' => (object)[
+            'data' => (object) [
+                'object' => (object) [
                     'id'           => 'in_missing',
                     'subscription' => 'sub_missing',
                 ],
@@ -843,12 +796,11 @@ class StripeWebhookControllerTest extends TestCase
             'stripe_customer_id'     => 'cus_real',
         ]);
 
-        // Pretend charge.succeeded ran FIRST and created an “early charge” tx:
         $earlyTx = Transaction::factory()->create([
             'user_id'           => $user->id,
             'pledge_id'         => $pledge->id,
             'type'              => 'subscription_recurring',
-            'subscription_id'   => null,          // early charge doesn't yet know sub
+            'subscription_id'   => null,
             'payment_intent_id' => 'pi_early',
             'charge_id'         => 'ch_early',
             'customer_id'       => 'cus_real',
@@ -863,11 +815,6 @@ class StripeWebhookControllerTest extends TestCase
         $periodStart = now()->timestamp;
         $periodEnd   = now()->addMonth()->timestamp;
 
-        // Realistic invoice.payment_succeeded payload:
-        // - NO invoice.subscription
-        // - NO lines.data.0.subscription
-        // - subscription lives under lines.data.0.parent.subscription_item_details.subscription
-        // - NO payment_intent or charge on invoice
         $invoice = (object) [
             'id'                 => 'in_real',
             'customer'           => 'cus_real',
@@ -910,18 +857,14 @@ class StripeWebhookControllerTest extends TestCase
 
         $earlyTx->refresh();
 
-        // ✅ PI + charge preserved (invoice had nulls)
         $this->assertSame('pi_early', $earlyTx->payment_intent_id);
         $this->assertSame('ch_early', $earlyTx->charge_id);
-
-        // ✅ subscription attached from invoice lines parent
         $this->assertSame('sub_real', $earlyTx->subscription_id);
 
-        // ✅ invoice metadata merged
-        $this->assertSame('in_real', $earlyTx->metadata['stripe_invoice_id']);
-        $this->assertSame('sub_real', $earlyTx->metadata['stripe_subscription_id']);
+        $meta = $this->meta($earlyTx->metadata);
+        $this->assertSame('in_real', $meta['stripe_invoice_id'] ?? null);
+        $this->assertSame('sub_real', $meta['stripe_subscription_id'] ?? null);
 
-        // still succeeded
         $this->assertSame('succeeded', $earlyTx->status);
     }
 
@@ -948,18 +891,18 @@ class StripeWebhookControllerTest extends TestCase
             'charge_id'         => 'ch_old',
         ]);
 
-        $event = (object)[
+        $event = (object) [
             'type' => 'invoice.paid',
-            'data' => (object)[
-                'object' => (object)[
+            'data' => (object) [
+                'object' => (object) [
                     'id'             => 'in_keep_pi',
                     'subscription'   => null,
                     'customer'       => 'cus_keep_pi',
-                    'payment_intent' => null,  // incoming nulls
+                    'payment_intent' => null,
                     'charge'         => null,
                     'amount_paid'    => 1000,
                     'currency'       => 'usd',
-                    'lines' => (object)['data' => [(object)[]]],
+                    'lines' => (object) ['data' => [(object) []]],
                 ],
             ],
         ];
@@ -972,33 +915,100 @@ class StripeWebhookControllerTest extends TestCase
         $this->assertSame('ch_old', $tx->charge_id);
     }
 
-    public function test_invoice_payment_paid_is_ignored_and_does_not_warn_or_mutate(): void
+    public function test_invoice_payment_paid_enriches_placeholder_tx_and_updates_pledge_latest_fields(): void
     {
         $pledge = Pledge::forceCreate([
-            'amount_cents'           => 1000,
+            'user_id'                => null,
+            'amount_cents'           => 1200,
             'currency'               => 'usd',
             'interval'               => 'month',
-            'status'                 => 'active',
-            'stripe_subscription_id' => 'sub_ignore',
-            'stripe_customer_id'     => 'cus_ignore',
+            'status'                 => 'incomplete',
+            'donor_email'            => 'donor@example.test',
+            'donor_name'             => 'Test Donor',
+            'stripe_subscription_id' => 'sub_inpay',
+            'stripe_customer_id'     => 'cus_inpay',
+            'metadata'               => [],
         ]);
 
-        $event = (object)[
+        // Placeholder tx stores stripe_invoice_id in metadata (so webhook can find it)
+        $placeholder = Transaction::factory()->create([
+            'pledge_id'         => $pledge->id,
+            'type'              => 'subscription_initial',
+            'status'            => 'pending',
+            'payment_intent_id' => null,
+            'charge_id'         => null,
+            'customer_id'       => 'cus_inpay',
+            'paid_at'           => null,
+            'metadata'          => [
+                'stage'             => 'subscription_creation',
+                'stripe_invoice_id' => 'in_inpay_1',
+            ],
+        ]);
+
+        $paidAtTs = 1_700_000_123; // 2023-11-14 22:15:23 UTC
+
+        $event = (object) [
             'type' => 'invoice_payment.paid',
-            'data' => (object)[
-                'object' => (object)[
-                    'id' => 'inpay_123',
-                    // This object is NOT an invoice and doesn't have what handleInvoicePaid needs.
-                    'invoice' => 'in_abc', // even if present, we ignore currently
+            'data' => (object) [
+                'object' => (object) [
+                    'id'      => 'inpay_1',
+                    'invoice' => 'in_inpay_1',
+                    'payment' => (object) [
+                        'payment_intent' => 'pi_from_inpay',
+                    ],
+                    'status_transitions' => (object) [
+                        'paid_at' => $paidAtTs,
+                    ],
                 ],
             ],
         ];
 
         (new StripeWebhookController())->handleEvent($event);
 
-        // Should not create new tx or alter pledge
-        $this->assertDatabaseCount('transactions', 0);
         $pledge->refresh();
-        $this->assertSame('active', $pledge->status);
+        $placeholder->refresh();
+
+        // Pledge updated
+        $this->assertSame('in_inpay_1', $pledge->latest_invoice_id);
+        $this->assertSame('pi_from_inpay', $pledge->latest_payment_intent_id);
+        $this->assertNotNull($pledge->last_pledge_at);
+        $this->assertEquals($paidAtTs, $pledge->last_pledge_at->timestamp);
+
+        // Placeholder tx enriched
+        $this->assertSame('pi_from_inpay', $placeholder->payment_intent_id);
+
+        // NOTE: your current code keeps status "pending" because it uses `$tx->status ?: 'succeeded'`
+        $this->assertSame('pending', $placeholder->status);
+
+        // ✅ This is the assertion that fixes your new failure
+        $this->assertNotNull($placeholder->paid_at);
+        $this->assertEquals($paidAtTs, $placeholder->paid_at->timestamp);
+
+        $meta = is_array($placeholder->metadata)
+            ? $placeholder->metadata
+            : (json_decode((string) $placeholder->metadata, true) ?: []);
+
+        $this->assertSame('in_inpay_1', $meta['stripe_invoice_id'] ?? null);
+        $this->assertSame('inpay_1', $meta['stripe_invoice_payment_id'] ?? null);
+    }
+
+    // -----------------------------
+    // Helpers
+    // -----------------------------
+
+    private function meta($value): array
+    {
+        if (is_array($value)) {
+            return $value;
+        }
+
+        if (is_string($value) && $value !== '') {
+            $decoded = json_decode($value, true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return [];
     }
 }

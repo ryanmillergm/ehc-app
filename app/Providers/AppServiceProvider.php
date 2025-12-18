@@ -5,6 +5,7 @@ namespace App\Providers;
 use Filament\Tables\Actions\CreateAction;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Gate;
+use Stripe\StripeClient;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -13,7 +14,17 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(StripeClient::class, function () {
+            $secret = config('services.stripe.secret');
+
+            throw_if(
+                empty($secret),
+                \RuntimeException::class,
+                'Stripe secret is missing. Set STRIPE_SECRET in .env and map it in config/services.php.'
+            );
+
+            return new StripeClient($secret);
+        });
     }
 
     /**

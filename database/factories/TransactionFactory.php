@@ -26,7 +26,6 @@ class TransactionFactory extends Factory
             'amount_cents'      => $this->faker->numberBetween(1000, 10000),
             'currency'          => 'usd',
 
-            // pending|requires_action|processing|succeeded|canceled|failed
             'status'            => 'pending',
 
             'payer_email'       => $this->faker->safeEmail(),

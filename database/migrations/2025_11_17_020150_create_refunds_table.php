@@ -15,7 +15,7 @@ return new class extends Migration {
                 ->cascadeOnDelete();
 
             // Stripe identifiers
-            $table->string('stripe_refund_id')->unique();   // re_...
+            $table->string('stripe_refund_id')->unique();     // re_...
             $table->string('charge_id')->nullable()->index(); // ch_...
 
             // Money
@@ -24,7 +24,7 @@ return new class extends Migration {
 
             // Status: pending|succeeded|failed|canceled
             $table->string('status')->index();
-            $table->string('reason')->nullable();           // duplicate, requested_by_customer, etc.
+            $table->string('reason')->nullable(); // duplicate, requested_by_customer, etc.
 
             $table->json('metadata')->nullable();
             $table->timestamps();

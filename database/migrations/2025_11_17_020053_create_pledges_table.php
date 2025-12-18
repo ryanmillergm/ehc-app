@@ -7,41 +7,47 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
-        Schema::create('pledges', function (Blueprint $t) {
-            $t->id();
+        Schema::create('pledges', function (Blueprint $table) {
+            $table->id();
 
             // Optional link to a Laravel user
-            $t->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
+
+            $table->string('attempt_id')->nullable()->unique();
 
             // Stripe references
-            $t->string('stripe_subscription_id')->nullable()->unique();   // sub_...
-            $t->string('stripe_customer_id')->nullable()->index();        // cus_...
-            $t->string('stripe_price_id')->nullable();                    // price_...
+            $table->string('stripe_subscription_id')->nullable()->unique();   // sub_...
+            $table->string('stripe_customer_id')->nullable()->index();        // cus_...
+            $table->string('stripe_price_id')->nullable()->index();           // price_...
+
+            $table->string('setup_intent_id')->nullable()->index();           // seti_...
 
             // Money + cadence
-            $t->integer('amount_cents')->nullable();
-            $t->string('currency', 10)->default('usd');
-            $t->string('interval', 20)->default('month');     // month, year, etc.
+            $table->integer('amount_cents')->nullable();
+            $table->string('currency', 10)->default('usd');
+            $table->string('interval', 20)->default('month'); // month, year, etc.
 
             // Lifecycle
             // incomplete, incomplete_expired, trialing, active, past_due, canceled, unpaid
-            $t->string('status')->default('incomplete')->index();
-            $t->boolean('cancel_at_period_end')->default(false);
-            $t->timestamp('current_period_start')->nullable();
-            $t->timestamp('current_period_end')->nullable();
+            $table->string('status')->default('incomplete')->index();
+            $table->boolean('cancel_at_period_end')->default(false);
+            $table->timestamp('current_period_start')->nullable();
+            $table->timestamp('current_period_end')->nullable();
 
             // Convenience / reporting
-            $t->timestamp('last_pledge_at')->nullable();      // updated on invoice.paid
-            $t->timestamp('next_pledge_at')->nullable();      // usually = current_period_end
-            $t->string('latest_invoice_id')->nullable();      // in_...
-            $t->string('latest_payment_intent_id')->nullable(); // pi_...
+            $table->timestamp('last_pledge_at')->nullable();        // updated on invoice.paid
+            $table->timestamp('next_pledge_at')->nullable();        // usually = current_period_end
+            $table->string('latest_invoice_id')->nullable()->index();        // in_...
+            $table->string('latest_payment_intent_id')->nullable()->index(); // pi_...
 
             // Donor hints (optional)
-            $t->string('donor_email')->nullable();
-            $t->string('donor_name')->nullable();
+            $table->string('donor_email')->nullable()->index();
+            $table->string('donor_name')->nullable();
 
-            $t->json('metadata')->nullable();
-            $t->timestamps();
+            $table->json('metadata')->nullable();
+            $table->timestamps();
+
+            $table->index(['stripe_customer_id', 'created_at']);
         });
     }
 

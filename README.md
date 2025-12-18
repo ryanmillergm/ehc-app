@@ -49,6 +49,11 @@ This has pages by language translations. A page has many translations and a tran
  - `$ php artisan serve`
  - Access local endpoints at `http://127.0.0.1:8000`
  
+ or
+
+ ## All in one command - Run Vite Build, php server and stripe listen --forward-to,
+ - `$ composer dev` 
+
 ## Running the Test Suite
  - `php artisan test`
 

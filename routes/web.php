@@ -11,18 +11,26 @@ use App\Http\Controllers\TeamController;
 use App\Http\Controllers\GivingController;
 use App\Http\Controllers\AddressController;
 use App\Http\Controllers\ChildrenController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LanguagesController;
 use App\Http\Controllers\StripeWebhookController;
 use App\Http\Controllers\PageTranslationController;
 use App\Http\Controllers\Donations\DonationsController;
+use App\Http\Middleware\LogStripeWebhookHit;
 
 Route::get('lang/{lang}', LanguageSwitch::class)->name('lang');
 
 Route::get('/', Home::class)->name('home');
 
-// Route::get('/', function () {
-//     return view('welcome');
-// })->name('welcome');
+Route::get('/dev/stripe/webhook-status', function () {
+    abort_unless(app()->environment('local'), 404);
+
+    return view('dev.stripe-webhook-status', [
+        'webhookSecretSet' => (bool) config('services.stripe.webhook_secret'),
+        'lastHitAt'        => Cache::get('stripe:last_webhook_hit_at'),
+        'appUrl'           => config('app.url'),
+    ]);
+})->name('dev.stripe.webhook-status');
 
 /*
 |--------------------------------------------------------------------------
@@ -40,6 +48,9 @@ Route::prefix('donations')->name('donations.')->group(function () {
     Route::post('complete', [DonationsController::class, 'complete'])
         ->name('complete');
 
+    // Stripe redirect always comes here
+    Route::get('return', [DonationsController::class, 'stripeReturn'])->name('return');
+
     Route::get('thank-you', [DonationsController::class, 'thankYou'])
         ->name('thankyou');
 
@@ -51,11 +62,14 @@ Route::prefix('donations')->name('donations.')->group(function () {
 |--------------------------------------------------------------------------
 | Stripe webhook (Stripe → your app)
 |--------------------------------------------------------------------------
-|
 | Protected by Stripe's signing secret, not by auth.
 */
 Route::post('/stripe/webhook', StripeWebhookController::class)
-    ->name('stripe.webhook');
+    ->name('stripe.webhook')
+    ->middleware(LogStripeWebhookHit::class)
+    ->withoutMiddleware([
+        Localization::class,
+    ]);
 
 /*
 |--------------------------------------------------------------------------
@@ -68,35 +82,21 @@ Route::middleware([
     config('jetstream.auth_session'),
     'verified',
 ])->group(function () {
-    Route::get('/dashboard', function () {
-        return view('dashboard');
-    })->name('dashboard');
+    Route::get('/dashboard', DashboardController::class)->name('dashboard');
 
     // Addresses
-    Route::get('/addresses', [AddressController::class, 'index'])
-        ->name('addresses.index');
-
-    Route::post('/addresses', [AddressController::class, 'store'])
-        ->name('addresses.store');
-
-    Route::get('/addresses/{address}/edit', [AddressController::class, 'edit'])
-        ->name('addresses.edit');
-
-    Route::put('/addresses/{address}', [AddressController::class, 'update'])
-        ->name('addresses.update');
-
-    Route::delete('/addresses/{address}', [AddressController::class, 'destroy'])
-        ->name('addresses.destroy');
-
-    Route::post('/addresses/{address}/primary', [AddressController::class, 'makePrimary'])
-        ->name('addresses.make-primary');
+    Route::get('/addresses', [AddressController::class, 'index'])->name('addresses.index');
+    Route::post('/addresses', [AddressController::class, 'store'])->name('addresses.store');
+    Route::get('/addresses/{address}/edit', [AddressController::class, 'edit'])->name('addresses.edit');
+    Route::put('/addresses/{address}', [AddressController::class, 'update'])->name('addresses.update');
+    Route::delete('/addresses/{address}', [AddressController::class, 'destroy'])->name('addresses.destroy');
+    Route::post('/addresses/{address}/primary', [AddressController::class, 'makePrimary'])->name('addresses.make-primary');
 
     /*
     |--------------------------------------------------------------------------
     | My Giving (user-facing giving dashboard)
     |--------------------------------------------------------------------------
     */
-
     Route::prefix('giving')->name('giving.')->group(function () {
         Route::get('/', [GivingController::class, 'index'])->name('index');
 
@@ -133,6 +133,5 @@ Route::middleware([
 | Public pages (Livewire)
 |--------------------------------------------------------------------------
 */
-
 Route::get('/pages/{slug}', ShowPage::class);
 Route::get('/pages', IndexPage::class);

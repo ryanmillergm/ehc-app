@@ -13,44 +13,62 @@ class HomeTest extends TestCase
     use RefreshDatabase;
 
     #[Test]
-    public function home_component_renders_successfully()
+    public function home_component_renders_successfully(): void
     {
         Livewire::test(Home::class)
-            ->assertStatus(200);
+            ->assertStatus(200)
+            ->assertSee('Bread of Grace Ministries')
+            ->assertSee('Give today');
     }
 
     #[Test]
-    public function home_route_renders_and_contains_expected_sections()
+    public function home_route_renders_and_contains_expected_sections(): void
     {
-        // If your home route isn't "/", change this to the correct URI.
         $response = $this->get('/');
 
         $response->assertOk()
             ->assertSeeLivewire(Home::class)
+
+            // HERO
             ->assertSee('Bread of Grace Ministries')
-            ->assertSee('Give now') // CTA appears multiple times
-            ->assertSee('Lives are changing')
-            ->assertSee('Frequently asked questions')
-            ->assertSee('Help us keep showing up every week');
+            ->assertSee('Help restore lives through')
+            ->assertSee('Give today')
+
+            // ABOUT
+            ->assertSee('A simple path to restoration.')
+            ->assertSee('3 phases to rehabilitation')
+
+            // SERVE
+            ->assertSee('Serve with Bread of Grace.')
+
+            // GIVE
+            ->assertSee('Make outreach possible this week.')
+            ->assertSee('Give now')
+
+            // VISIT
+            ->assertSee('Visit us');
     }
 
     #[Test]
-    public function home_page_has_story_and_donate_anchors_for_scroll_navigation()
+    public function home_page_has_expected_anchors_for_scroll_navigation(): void
     {
         $response = $this->get('/');
 
         // false = don't escape, so raw HTML is matched
         $response->assertOk()
-            ->assertSee('id="story"', false)
-            ->assertSee('id="donate"', false);
+            ->assertSee('id="hero"', false)
+            ->assertSee('id="about"', false)
+            ->assertSee('id="serve"', false)
+            ->assertSee('id="give"', false)
+            ->assertSee('id="give-form"', false)
+            ->assertSee('id="visit"', false);
     }
 
     #[Test]
-    public function home_layout_sets_custom_title()
+    public function home_layout_sets_custom_title(): void
     {
         $response = $this->get('/');
 
-        // Works if your app layout does: <title>{{ $title ?? config('app.name') }}</title>
         $response->assertOk()
             ->assertSee('<title>Bread of Grace Ministries</title>', false);
     }
