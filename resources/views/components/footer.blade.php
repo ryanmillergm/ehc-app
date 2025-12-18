@@ -36,13 +36,13 @@
 
                 {{-- socials --}}
                 <div class="flex items-center justify-center sm:justify-start gap-3 pt-1">
-                    <a href="#" class="group inline-flex items-center justify-center h-11 w-11 rounded-2xl bg-white/5 ring-1 ring-white/10 hover:bg-white/10 transition" aria-label="Facebook">
+                    <a href="https://www.facebook.com/breadofgraceministry1" class="group inline-flex items-center justify-center h-11 w-11 rounded-2xl bg-white/5 ring-1 ring-white/10 hover:bg-white/10 transition" aria-label="Facebook">
                         <img src="{{ asset('images/icon-facebook.svg') }}" alt="" class="h-6 w-6 opacity-85 group-hover:opacity-100 transition">
                     </a>
-                    <a href="#" class="group inline-flex items-center justify-center h-11 w-11 rounded-2xl bg-white/5 ring-1 ring-white/10 hover:bg-white/10 transition" aria-label="YouTube">
+                    {{-- <a href="#" class="group inline-flex items-center justify-center h-11 w-11 rounded-2xl bg-white/5 ring-1 ring-white/10 hover:bg-white/10 transition" aria-label="YouTube">
                         <img src="{{ asset('images/icon-youtube.svg') }}" alt="" class="h-6 w-6 opacity-85 group-hover:opacity-100 transition">
-                    </a>
-                    <a href="#" class="group inline-flex items-center justify-center h-11 w-11 rounded-2xl bg-white/5 ring-1 ring-white/10 hover:bg-white/10 transition" aria-label="Instagram">
+                    </a> --}}
+                    <a href="https://www.instagram.com/breadofgraceministry/" class="group inline-flex items-center justify-center h-11 w-11 rounded-2xl bg-white/5 ring-1 ring-white/10 hover:bg-white/10 transition" aria-label="Instagram">
                         <img src="{{ asset('images/icon-instagram.svg') }}" alt="" class="h-6 w-6 opacity-85 group-hover:opacity-100 transition">
                     </a>
                 </div>
