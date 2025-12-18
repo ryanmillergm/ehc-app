@@ -6,6 +6,7 @@ use App\Models\Pledge;
 use App\Models\Transaction;
 use App\Services\StripeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Stripe\PaymentIntent;
 use Stripe\SetupIntent;
 use Tests\TestCase;
@@ -87,31 +88,33 @@ class StartDonationTest extends TestCase
             $mock->shouldReceive('createOneTimePaymentIntent')->andReturn($pi);
         });
 
-        $attempt = 'attempt-123';
-
+        // 1) Start WITHOUT attempt_id (server creates it)
         $r1 = $this->postJson(route('donations.start'), [
-            'attempt_id' => $attempt,
             'amount'     => 25,
             'frequency'  => 'one_time',
         ])->assertOk()->json();
 
         $this->assertSame('payment', $r1['mode']);
-        $this->assertSame($attempt, $r1['attemptId']);
+        $this->assertNotEmpty($r1['attemptId']);
+
+        $attempt = $r1['attemptId'];
 
         $tx1 = Transaction::findOrFail($r1['transactionId']);
         $this->assertSame(2500, $tx1->amount_cents);
+        $this->assertSame($attempt, $tx1->attempt_id);
 
+        // 2) Same attempt comes back, but with a DIFFERENT amount => new attempt + new tx
         $r2 = $this->postJson(route('donations.start'), [
-            'attempt_id' => $attempt,  // same attempt coming back
-            'amount'     => 50,         // changed amount
+            'attempt_id' => $attempt,
+            'amount'     => 50,
             'frequency'  => 'one_time',
         ])->assertOk()->json();
 
-        // NEW attempt id returned
         $this->assertNotSame($attempt, $r2['attemptId']);
 
         $tx2 = Transaction::findOrFail($r2['transactionId']);
         $this->assertSame(5000, $tx2->amount_cents);
+        $this->assertSame($r2['attemptId'], $tx2->attempt_id);
 
         $this->assertNotSame($tx1->id, $tx2->id);
     }

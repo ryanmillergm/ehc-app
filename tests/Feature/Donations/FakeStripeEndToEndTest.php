@@ -434,12 +434,25 @@ class FakeStripeClient extends StripeClient
 
             public function retrieve(string $id, array $params = [])
             {
+                $latestCharge = match ($id) {
+                    'pi_FAKE_INITIAL'   => 'ch_FAKE_INITIAL',
+                    'pi_FAKE_RECUR_1'   => 'ch_FAKE_RECUR_1',
+                    default             => 'ch_FAKE_ONE_TIME',
+                };
+
+                $invoice = match ($id) {
+                    'pi_FAKE_INITIAL'   => 'in_FAKE_INITIAL',
+                    'pi_FAKE_RECUR_1'   => 'in_WEBHOOK_2',
+                    default             => null,
+                };
+
                 return PaymentIntent::constructFrom([
-                    'id' => $id,
-                    'status' => 'succeeded',
-                    'customer' => 'cus_FAKE_1',
+                    'id'             => $id,
+                    'status'         => 'succeeded',
+                    'customer'       => 'cus_FAKE_1',
                     'payment_method' => 'pm_FAKE_1',
-                    'latest_charge' => 'ch_FAKE_ONE_TIME',
+                    'latest_charge'  => $latestCharge,
+                    'invoice'        => $invoice,
                 ]);
             }
         };
@@ -456,15 +469,18 @@ class FakeStripeClient extends StripeClient
                     ],
                     'payment_method_details' => [
                         'card' => [
-                            'brand' => 'visa',
-                            'last4' => '4242',
-                            'country' => 'US',
-                            'funding' => 'credit',
+                            'brand'     => 'visa',
+                            'last4'     => '4242',
+                            'country'   => 'US',
+                            'funding'   => 'credit',
+                            'exp_month' => 12,
+                            'exp_year'  => 2030,
                         ],
                     ],
                 ]);
             }
         };
+
 
         $this->paymentMethods = new class {
             public function retrieve(string $id, array $params = [])

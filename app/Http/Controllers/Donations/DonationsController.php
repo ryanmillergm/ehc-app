@@ -26,6 +26,11 @@ class DonationsController extends Controller
 
     public function start(Request $request)
     {
+        // CANARY
+        Log::error('CANARY: DonationsController@start reached', [
+            'time' => now()->toDateTimeString(),
+        ]);
+
         $data = $request->validate([
             'attempt_id' => ['nullable', 'string', 'max:80'],
             'amount'     => ['required', 'numeric', 'min:1'],
@@ -42,13 +47,20 @@ class DonationsController extends Controller
             'name'  => $user ? trim((string) $user->name) : null,
         ];
 
+        $this->sdbg('start: validated', [
+            'frequency'         => $frequency,
+            'amount_cents'      => $amountCents,
+            'client_attempt_id' => $clientAttemptId,
+            'user_id'           => $user?->id,
+            'donor_email'       => $donor['email'] ?? null,
+        ]);
+
         // ---------------------------------------------------------------------
-        // One-time (idempotent by *server-issued* attempt_id)
+        // One-time
         // ---------------------------------------------------------------------
         if ($frequency === 'one_time') {
             $transaction = null;
 
-            // Only accept a client attempt id if it maps to an existing tx with SAME amount.
             if ($clientAttemptId) {
                 $transaction = Transaction::query()
                     ->where('attempt_id', $clientAttemptId)
@@ -58,12 +70,19 @@ class DonationsController extends Controller
                     ->first();
 
                 if ($transaction && (int) $transaction->amount_cents !== $amountCents) {
-                    // stale attempt id (amount changed) -> treat as new attempt
+                    $this->sdbg('start(one_time): client attempt id amount mismatch, ignoring', [
+                        'tx_id'             => $transaction->id,
+                        'tx_amount_cents'   => $transaction->amount_cents,
+                        'req_amount_cents'  => $amountCents,
+                        'client_attempt_id' => $clientAttemptId,
+                    ]);
                     $transaction = null;
                 }
 
                 if (! $transaction) {
-                    // client gave us an id we don't recognize -> rotate
+                    $this->sdbg('start(one_time): client attempt id not recognized, rotating', [
+                        'client_attempt_id' => $clientAttemptId,
+                    ]);
                     $clientAttemptId = null;
                 }
             }
@@ -83,12 +102,15 @@ class DonationsController extends Controller
                         'frequency' => 'one_time',
                     ],
                 ]);
+
+                $this->sdbg('start(one_time): created tx', $this->txSnap($transaction));
+            } else {
+                $this->sdbg('start(one_time): using existing tx', $this->txSnap($transaction));
             }
 
             try {
                 $pi = $this->stripe->createOneTimePaymentIntent($transaction, $donor);
             } catch (IdempotencyException $e) {
-                // Stripe says this idempotency key was used with different params -> rotate + retry once
                 Log::warning('Stripe idempotency collision on one-time start; rotating attempt_id', [
                     'transaction_id' => $transaction->id,
                     'attempt_id'     => $transaction->attempt_id,
@@ -102,16 +124,23 @@ class DonationsController extends Controller
                 $pi = $this->stripe->createOneTimePaymentIntent($transaction, $donor);
             }
 
+            $this->sdbg('start(one_time): PI ready', [
+                'tx_id'             => $transaction->id,
+                'attempt_id'        => $attemptId,
+                'payment_intent_id' => $pi->id ?? null,
+                'pi_status'         => $pi->status ?? null,
+            ]);
+
             return response()->json([
                 'mode'          => 'payment',
-                'attemptId'     => $attemptId, // server truth
+                'attemptId'     => $attemptId,
                 'transactionId' => $transaction->id,
                 'clientSecret'  => $pi->client_secret,
             ]);
         }
 
         // ---------------------------------------------------------------------
-        // Monthly pledge (idempotent by attempt_id)
+        // Monthly pledge
         // ---------------------------------------------------------------------
         $attemptId = $clientAttemptId ?: (string) Str::uuid();
 
@@ -122,6 +151,13 @@ class DonationsController extends Controller
             ->first();
 
         if ($pledge && (int) $pledge->amount_cents !== $amountCents) {
+            $this->sdbg('start(monthly): pledge exists but amount mismatch, rotating attempt', [
+                'pledge_id'           => $pledge->id,
+                'pledge_amount_cents' => $pledge->amount_cents,
+                'req_amount_cents'    => $amountCents,
+                'attempt_id'          => $attemptId,
+            ]);
+
             $attemptId = (string) Str::uuid();
             $pledge = null;
         }
@@ -140,9 +176,21 @@ class DonationsController extends Controller
                     'frequency' => 'monthly',
                 ],
             ]);
+
+            $this->sdbg('start(monthly): created pledge', $this->pledgeSnap($pledge));
+        } else {
+            $this->sdbg('start(monthly): using existing pledge', $this->pledgeSnap($pledge));
         }
 
         $setupIntent = $this->stripe->createSetupIntentForPledge($pledge, $donor);
+
+        $this->sdbg('start(monthly): setup intent ready', [
+            'pledge_id'       => $pledge->id,
+            'attempt_id'      => $attemptId,
+            'setup_intent_id' => $setupIntent->id ?? null,
+            'si_status'       => $setupIntent->status ?? null,
+            'customer'        => is_string($setupIntent->customer ?? null) ? $setupIntent->customer : ($setupIntent->customer->id ?? null),
+        ]);
 
         return response()->json([
             'mode'         => 'subscription',
@@ -154,6 +202,11 @@ class DonationsController extends Controller
 
     public function complete(Request $request)
     {
+        // CANARY
+        Log::error('CANARY: DonationsController@complete reached', [
+            'time' => now()->toDateTimeString(),
+        ]);
+
         $data = $request->validate([
             'attempt_id' => ['nullable', 'string', 'max:80'],
 
@@ -163,7 +216,8 @@ class DonationsController extends Controller
 
             'payment_intent_id' => ['nullable', 'string'],
             'charge_id'         => ['nullable', 'string'],
-            'payment_method_id' => ['nullable', 'string'],
+            // ✅ CHANGE: required for subscription completion
+            'payment_method_id' => ['nullable', 'string', 'required_if:mode,subscription'],
             'receipt_url'       => ['nullable', 'url'],
 
             'donor_first_name' => ['nullable', 'string', 'max:100'],
@@ -179,6 +233,16 @@ class DonationsController extends Controller
         ]);
 
         $attemptId = $data['attempt_id'] ?? null;
+
+        $this->sdbg('complete: validated', [
+            'mode'           => $data['mode'],
+            'attempt_id'     => $attemptId,
+            'transaction_id' => $data['transaction_id'] ?? null,
+            'pledge_id'      => $data['pledge_id'] ?? null,
+            'pi'             => $data['payment_intent_id'] ?? null,
+            'pm'             => $data['payment_method_id'] ?? null,
+            'charge'         => $data['charge_id'] ?? null,
+        ]);
 
         // Update authenticated user + primary address
         if ($user = Auth::user()) {
@@ -220,10 +284,12 @@ class DonationsController extends Controller
         $fullName = trim(($data['donor_first_name'] ?? '') . ' ' . ($data['donor_last_name'] ?? ''));
 
         // ---------------------------------------------------------------------
-        // One-time completion (server-enriched)
+        // One-time completion
         // ---------------------------------------------------------------------
         if ($data['mode'] === 'payment') {
             $transaction = Transaction::findOrFail($data['transaction_id']);
+
+            $this->sdbg('complete(payment): tx before', $this->txSnap($transaction));
 
             if ($attemptId && empty($transaction->attempt_id)) {
                 $transaction->attempt_id = $attemptId;
@@ -259,6 +325,14 @@ class DonationsController extends Controller
                     $chargeId ??= is_string($pi->latest_charge ?? null)
                         ? $pi->latest_charge
                         : ($pi->latest_charge->id ?? null);
+
+                    $this->sdbg('complete(payment): PI retrieved', [
+                        'pi'        => $piId,
+                        'pi_status' => $pi->status ?? null,
+                        'customer'  => $transaction->customer_id,
+                        'pm'        => $transaction->payment_method_id,
+                        'charge'    => $chargeId,
+                    ]);
                 }
 
                 if ($chargeId) {
@@ -266,7 +340,6 @@ class DonationsController extends Controller
 
                     $receiptUrl ??= $charge->receipt_url ?? null;
 
-                    // Fill payer info if missing (helps for 3DS / partial client payloads)
                     $transaction->payer_email ??= data_get($charge, 'billing_details.email');
                     $transaction->payer_name  ??= data_get($charge, 'billing_details.name');
 
@@ -277,21 +350,34 @@ class DonationsController extends Controller
                         : ((array) json_decode((string) $transaction->metadata, true) ?: []);
 
                     if ($card) {
+                        // include exp month/year
                         $meta = array_merge($meta, array_filter([
-                            'card_brand'   => $card->brand ?? null,
-                            'card_last4'   => $card->last4 ?? null,
-                            'card_country' => $card->country ?? null,
-                            'card_funding' => $card->funding ?? null,
+                            'card_brand'     => $card->brand ?? null,
+                            'card_last4'     => $card->last4 ?? null,
+                            'card_country'   => $card->country ?? null,
+                            'card_funding'   => $card->funding ?? null,
+                            'card_exp_month' => $card->exp_month ?? null,
+                            'card_exp_year'  => $card->exp_year ?? null,
                         ]));
                     }
 
                     $transaction->metadata = $meta;
+
+                    $this->sdbg('complete(payment): Charge retrieved', [
+                        'charge'      => $chargeId,
+                        'receipt_url' => $receiptUrl,
+                    ]);
                 }
             } catch (\Throwable $e) {
                 Log::warning('Donation complete: Stripe enrichment failed', [
                     'transaction_id' => $transaction->id,
                     'payment_intent' => $piId,
                     'error'          => $e->getMessage(),
+                ]);
+
+                $this->sdbg('complete(payment): enrichment failed', [
+                    'tx_id' => $transaction->id,
+                    'error' => $e->getMessage(),
                 ]);
             }
 
@@ -301,6 +387,8 @@ class DonationsController extends Controller
                 'status'      => 'succeeded',
                 'paid_at'     => $transaction->paid_at ?? now(),
             ])->save();
+
+            $this->sdbg('complete(payment): tx after', $this->txSnap($transaction));
 
             $request->session()->put('transaction_thankyou_id', $transaction->id);
 
@@ -316,7 +404,11 @@ class DonationsController extends Controller
         // ---------------------------------------------------------------------
         $pledge = Pledge::findOrFail($data['pledge_id']);
 
-        $attemptId ??= $pledge->attempt_id; // important fallback
+        $this->sdbg('complete(subscription): pledge before', $this->pledgeSnap($pledge));
+
+        $attemptId = $data['attempt_id']
+            ?? $pledge->attempt_id
+            ?? (string) Str::uuid();
 
         if ($attemptId && empty($pledge->attempt_id)) {
             $pledge->attempt_id = $attemptId;
@@ -339,7 +431,7 @@ class DonationsController extends Controller
             ->first();
 
         if (! $placeholder) {
-            Transaction::create([
+            $placeholder = Transaction::create([
                 'attempt_id'      => $attemptId,
                 'user_id'         => $pledge->user_id,
                 'pledge_id'       => $pledge->id,
@@ -355,9 +447,49 @@ class DonationsController extends Controller
                     'stage' => 'subscription_creation',
                 ],
             ]);
+
+            $this->sdbg('complete(subscription): placeholder created', $this->txSnap($placeholder));
+        } else {
+            $this->sdbg('complete(subscription): placeholder exists', $this->txSnap($placeholder));
         }
 
-        $this->stripe->createSubscriptionForPledge($pledge, (string) $data['payment_method_id']);
+        $pmId = (string) ($data['payment_method_id'] ?? '');
+        $this->sdbg('complete(subscription): calling createSubscriptionForPledge', [
+            'pledge_id' => $pledge->id,
+            'pm_id'     => $pmId,
+        ]);
+
+        $subscription = $this->stripe->createSubscriptionForPledge($pledge, $pmId);
+
+        $pledge->refresh();
+
+        if ((bool) config('services.stripe.debug_state', false)) {
+            try {
+                $itemPeriodStart = data_get($subscription, 'items.data.0.current_period_start');
+                $itemPeriodEnd   = data_get($subscription, 'items.data.0.current_period_end');
+
+                $latestInvoice   = data_get($subscription, 'latest_invoice');
+                $latestInvoiceId = is_string($latestInvoice)
+                    ? $latestInvoice
+                    : (is_object($latestInvoice) ? ($latestInvoice->id ?? null) : null);
+
+                $this->sdbg('complete(subscription): returned from StripeService', [
+                    'subscription_id'     => data_get($subscription, 'id'),
+                    'subscription_status' => data_get($subscription, 'status'),
+                    'item_period_start'   => $itemPeriodStart,
+                    'item_period_end'     => $itemPeriodEnd,
+                    'latest_invoice'      => $latestInvoiceId,
+                ]);
+
+                $this->sdbg('complete(subscription): pledge after StripeService', $this->pledgeSnap($pledge));
+            } catch (\Throwable $e) {
+                // Debug should never take down the request (or tests).
+                $this->sdbg('complete(subscription): debug extract failed', [
+                    'error'              => $e->getMessage(),
+                    'subscription_class' => is_object($subscription) ? get_class($subscription) : gettype($subscription),
+                ]);
+            }
+        }
 
         $request->session()->put('pledge_thankyou_id', $pledge->id);
 
@@ -370,12 +502,16 @@ class DonationsController extends Controller
 
     /**
      * Stripe redirect return
-     * Must finish the flow because the widget may not call /complete in redirect scenarios.
      */
     public function stripeReturn(Request $request)
     {
         $piId = $request->query('payment_intent');
         $siId = $request->query('setup_intent');
+
+        $this->sdbg('stripeReturn: hit', [
+            'payment_intent' => $piId,
+            'setup_intent'   => $siId,
+        ]);
 
         // One-time redirect completion
         if ($piId) {
@@ -419,6 +555,30 @@ class DonationsController extends Controller
                     $tx->receipt_url ??= $charge->receipt_url ?? null;
                     $tx->payer_email ??= data_get($charge, 'billing_details.email');
                     $tx->payer_name  ??= data_get($charge, 'billing_details.name');
+
+                    // write card metadata here too (including exp month/year)
+                    $card = data_get($charge, 'payment_method_details.card');
+
+                    $meta = is_array($tx->metadata)
+                        ? $tx->metadata
+                        : ((array) json_decode((string) $tx->metadata, true) ?: []);
+
+                    if (! isset($meta['frequency'])) {
+                        $meta['frequency'] = 'one_time';
+                    }
+
+                    if ($card) {
+                        $meta = array_merge($meta, array_filter([
+                            'card_brand'     => $card->brand ?? null,
+                            'card_last4'     => $card->last4 ?? null,
+                            'card_country'   => $card->country ?? null,
+                            'card_funding'   => $card->funding ?? null,
+                            'card_exp_month' => $card->exp_month ?? null,
+                            'card_exp_year'  => $card->exp_year ?? null,
+                        ]));
+                    }
+
+                    $tx->metadata = $meta;
                 }
 
                 $tx->save();
@@ -460,7 +620,6 @@ class DonationsController extends Controller
                     return redirect()->route('donations.show')->withErrors('Missing payment method. Please try again.');
                 }
 
-                // Pull billing details from the PaymentMethod
                 try {
                     $pm = $this->stripe->retrievePaymentMethod($pmId);
                     $pledge->donor_email ??= data_get($pm, 'billing_details.email');
@@ -524,5 +683,60 @@ class DonationsController extends Controller
             'pledge'                  => $pledge,
             'subscriptionTransaction' => $subscriptionTransaction,
         ]);
+    }
+
+    // -------------------------------------------------------------------------
+    // DEBUG HELPERS
+    // -------------------------------------------------------------------------
+
+    protected function sdbg(string $message, array $context = []): void
+    {
+        if (! (bool) config('services.stripe.debug_state', false)) {
+            return;
+        }
+
+        Log::error('[STRIPE-DBG] ' . $message, $context);
+    }
+
+    protected function pledgeSnap(Pledge $pledge): array
+    {
+        return [
+            'pledge_id'               => $pledge->id,
+            'attempt_id'              => $pledge->attempt_id,
+            'user_id'                 => $pledge->user_id,
+            'status'                  => $pledge->status,
+            'stripe_customer_id'      => $pledge->stripe_customer_id,
+            'stripe_subscription_id'  => $pledge->stripe_subscription_id,
+            'stripe_price_id'         => $pledge->stripe_price_id,
+            'setup_intent_id'         => $pledge->setup_intent_id,
+            'latest_invoice_id'       => $pledge->latest_invoice_id,
+            'latest_payment_intent_id'=> $pledge->latest_payment_intent_id,
+            'current_period_start'    => optional($pledge->current_period_start)->toDateTimeString(),
+            'current_period_end'      => optional($pledge->current_period_end)->toDateTimeString(),
+            'last_pledge_at'          => optional($pledge->last_pledge_at)->toDateTimeString(),
+            'next_pledge_at'          => optional($pledge->next_pledge_at)->toDateTimeString(),
+            'updated_at'              => optional($pledge->updated_at)->toDateTimeString(),
+        ];
+    }
+
+    protected function txSnap(Transaction $tx): array
+    {
+        return [
+            'tx_id'             => $tx->id,
+            'attempt_id'        => $tx->attempt_id,
+            'user_id'           => $tx->user_id,
+            'pledge_id'         => $tx->pledge_id,
+            'type'              => $tx->type,
+            'status'            => $tx->status,
+            'payment_intent_id' => $tx->payment_intent_id,
+            'subscription_id'   => $tx->subscription_id,
+            'charge_id'         => $tx->charge_id,
+            'customer_id'       => $tx->customer_id,
+            'payment_method_id' => $tx->payment_method_id,
+            'amount_cents'      => $tx->amount_cents,
+            'currency'          => $tx->currency,
+            'paid_at'           => optional($tx->paid_at)->toDateTimeString(),
+            'updated_at'        => optional($tx->updated_at)->toDateTimeString(),
+        ];
     }
 }

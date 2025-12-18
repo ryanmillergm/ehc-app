@@ -26,17 +26,18 @@ return [
 
     'slack' => [
         'notifications' => [
-            'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
-            'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
+            'bot_user_oauth_token'  => env('SLACK_BOT_USER_OAUTH_TOKEN'),
+            'channel'               => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
 
     'stripe' => [
-        'secret' => env('STRIPE_SECRET'),
-        'key'    => env('STRIPE_KEY'),
-        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
-        'recurring_product_id' => env('STRIPE_RECURRING_PRODUCT_ID'),
-        'log_webhook_payload' => env('STRIPE_LOG_WEBHOOK_PAYLOAD', false),
+        'secret'                => env('STRIPE_SECRET'),
+        'key'                   => env('STRIPE_KEY'),
+        'webhook_secret'        => env('STRIPE_WEBHOOK_SECRET'),
+        'recurring_product_id'  => env('STRIPE_RECURRING_PRODUCT_ID'),
+        'log_webhook_payload'   => env('STRIPE_LOG_WEBHOOK_PAYLOAD', false),
+        'debug_state'           => env('STRIPE_DEBUG_STATE', true),
     ],
 
 ];
