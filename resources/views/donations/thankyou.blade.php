@@ -226,11 +226,7 @@
                 @media print {
                     @page { margin: 12mm; }
 
-                    /* hide site chrome only */
-                    header, nav, footer { display: none !important; }
-
-                    /* IMPORTANT: allow previously "no-print" content to print (your pills + hero text) */
-                    .no-print { display: block !important; }
+                    nav, footer, .no-print { display: none !important; }
 
                     body, main { background: #fff !important; }
 
@@ -243,17 +239,23 @@
                         max-width: none !important;
                     }
 
-                    .receipt-body { padding: 18px !important; }
+                    .receipt-body {
+                        padding: 18px !important;
+                    }
 
                     .print-only { display: inline-flex !important; }
 
-                    /* ensure badges/gradients can print (user must enable Background graphics too) */
-                    * {
+                    .receipt-paper * {
                         -webkit-print-color-adjust: exact;
                         print-color-adjust: exact;
                     }
                 }
+
+                .print-only { display: none; }
             </style>
+            <script>
+                sessionStorage.removeItem('donation_widget_attempt_id');
+            </script>
         @endonce
     </main>
 </x-layouts.app>

@@ -266,6 +266,9 @@
                     }
                 }
             </style>
+            <script>
+                sessionStorage.removeItem('donation_widget_attempt_id');
+            </script>
         @endonce
     </main>
 </x-layouts.app>

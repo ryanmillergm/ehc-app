@@ -20,12 +20,14 @@ return new class extends Migration {
                 ->constrained('pledges')
                 ->nullOnDelete();
 
+            $table->string('attempt_id')->nullable()->index();
+
             // Stripe identifiers
             $table->string('payment_intent_id')->nullable()->unique();   // pi_...
             $table->string('subscription_id')->nullable()->index();      // sub_...
-            $table->string('charge_id')->nullable()->index();            // ch_...
+            $table->string('charge_id')->nullable()->unique();           // ch_...
             $table->string('customer_id')->nullable()->index();          // cus_...
-            $table->string('payment_method_id')->nullable();             // pm_...
+            $table->string('payment_method_id')->nullable()->index();    // pm_...
 
             // Money
             $table->unsignedInteger('amount_cents');
@@ -39,18 +41,21 @@ return new class extends Migration {
             $table->string('status')->index();
 
             // Payer / receipt
-            $table->string('payer_email')->nullable();
+            $table->string('payer_email')->nullable()->index();
             $table->string('payer_name')->nullable();
             $table->string('receipt_url')->nullable();
 
             // Optional extras
-            $table->string('source')->nullable(); // 'donation_widget', 'admin', etc.
+            $table->string('source')->nullable()->index();
             $table->json('metadata')->nullable();
 
-            $table->timestamp('paid_at')->nullable();
+            $table->timestamp('paid_at')->nullable()->index();
             $table->timestamps();
 
             $table->index(['created_at']);
+
+            $table->index(['pledge_id', 'type', 'created_at']);
+            $table->index(['subscription_id', 'type', 'created_at']);
         });
     }
 

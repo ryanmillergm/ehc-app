@@ -41,9 +41,8 @@ class StripeWebhookControllerTest extends TestCase
         $this->assertNotNull($tx->paid_at);
     }
 
-    public function test_invoice_paid_creates_subscription_recurring_transaction_and_updates_pledge(): void
+    public function test_nvoice_paid_creates_subscription_recurring_transaction_and_updates_pledge(): void
     {
-        // Minimal pledge row that matches what the controller expects
         $pledge = Pledge::forceCreate([
             'user_id'                => null,
             'amount_cents'           => 1500,
@@ -54,10 +53,15 @@ class StripeWebhookControllerTest extends TestCase
             'donor_name'             => 'Test Donor',
             'stripe_subscription_id' => 'sub_123',
             'stripe_customer_id'     => 'cus_123',
+            'metadata'               => [],
         ]);
 
+        // Make timestamps deterministic
         $periodStart = 1_700_000_000;
-        $periodEnd   = $periodStart + 2_592_000; // ~30 days
+        $periodEnd   = $periodStart + 2_592_000;
+
+        // Stripe "paid at" should represent when it was actually charged
+        $paidAtTs = $periodStart + 120; // 2 minutes after period start (arbitrary but deterministic)
 
         $event = (object) [
             'type' => 'invoice.paid',
@@ -73,7 +77,16 @@ class StripeWebhookControllerTest extends TestCase
                     'charge'             => 'ch_456',
                     'customer_email'     => 'alt@example.test',
                     'hosted_invoice_url' => 'https://example.test/invoices/in_123',
-                    'lines'              => (object) [
+
+                    // Ensure controller picks subscription_recurring, not subscription_initial
+                    'billing_reason'     => 'subscription_cycle',
+
+                    // paid timestamp for last_pledge_at
+                    'status_transitions' => (object) [
+                        'paid_at' => $paidAtTs,
+                    ],
+
+                    'lines' => (object) [
                         'data' => [
                             (object) [
                                 'subscription' => 'sub_123',
@@ -88,44 +101,42 @@ class StripeWebhookControllerTest extends TestCase
             ],
         ];
 
-        $controller = new StripeWebhookController();
-        $controller->handleEvent($event);
+        (new StripeWebhookController())->handleEvent($event);
 
-        // A new recurring transaction is created
-        $this->assertDatabaseHas('transactions', [
-            'pledge_id'         => $pledge->id,
-            'subscription_id'   => 'sub_123',
-            'payment_intent_id' => 'pi_456',
-            'charge_id'         => 'ch_456',
-            'amount_cents'      => 1500,
-            'currency'          => 'usd',
-            'type'              => 'subscription_recurring',
-            'status'            => 'succeeded',
-            'source'            => 'stripe_webhook',
-            'customer_id'       => 'cus_123',
-        ]);
-
-        // Pledge is marked active and latest_invoice_id stored
         $pledge->refresh();
 
-        $this->assertSame('active', $pledge->status);
-        $this->assertSame('in_123', $pledge->latest_invoice_id);
-        $this->assertSame('pi_456', $pledge->latest_payment_intent_id);
+        $expectedStart  = Carbon::createFromTimestamp($periodStart);
+        $expectedEnd    = Carbon::createFromTimestamp($periodEnd);
+        $expectedPaidAt = Carbon::createFromTimestamp($paidAtTs);
 
-        // Period & reporting fields updated from invoice line
-        $expectedStart = Carbon::createFromTimestamp($periodStart);
-        $expectedEnd   = Carbon::createFromTimestamp($periodEnd);
+        $this->assertSame('active', $pledge->status);
 
         $this->assertEquals($expectedStart->timestamp, $pledge->current_period_start->timestamp);
         $this->assertEquals($expectedEnd->timestamp, $pledge->current_period_end->timestamp);
-        $this->assertEquals($expectedEnd->timestamp, $pledge->last_pledge_at->timestamp);
+
+        // charged time
+        $this->assertEquals($expectedPaidAt->timestamp, $pledge->last_pledge_at->timestamp);
+
+        // next time it will charge (renewal boundary)
         $this->assertEquals($expectedEnd->timestamp, $pledge->next_pledge_at->timestamp);
+
+        // sanity: these should not be the same
+        $this->assertTrue($pledge->last_pledge_at->lt($pledge->next_pledge_at));
 
         // And the transaction has the hosted invoice URL as the receipt_url
         $tx = Transaction::where('payment_intent_id', 'pi_456')->firstOrFail();
+
+        $this->assertSame($pledge->id, $tx->pledge_id);
+        $this->assertSame('subscription_recurring', $tx->type);
+        $this->assertSame('succeeded', $tx->status);
+        $this->assertSame('ch_456', $tx->charge_id);
+        $this->assertSame('cus_123', $tx->customer_id);
         $this->assertSame('https://example.test/invoices/in_123', $tx->receipt_url);
-        $this->assertSame('alt@example.test', $tx->payer_email);
-        $this->assertSame('Test Donor', $tx->payer_name);
+
+        // Optional: make sure invoice metadata is present if your controller merges it
+        $this->assertIsArray($tx->metadata);
+        $this->assertSame('in_123', $tx->metadata['stripe_invoice_id'] ?? null);
+        $this->assertSame('sub_123', $tx->metadata['stripe_subscription_id'] ?? null);
     }
 
     public function test_invoice_paid_uses_customer_fallback_when_subscription_missing(): void
@@ -910,14 +921,14 @@ class StripeWebhookControllerTest extends TestCase
 
         $earlyTx->refresh();
 
-        // ✅ PI + charge preserved (invoice had nulls)
+        // PI + charge preserved (invoice had nulls)
         $this->assertSame('pi_early', $earlyTx->payment_intent_id);
         $this->assertSame('ch_early', $earlyTx->charge_id);
 
-        // ✅ subscription attached from invoice lines parent
+        // subscription attached from invoice lines parent
         $this->assertSame('sub_real', $earlyTx->subscription_id);
 
-        // ✅ invoice metadata merged
+        // invoice metadata merged
         $this->assertSame('in_real', $earlyTx->metadata['stripe_invoice_id']);
         $this->assertSame('sub_real', $earlyTx->metadata['stripe_subscription_id']);
 

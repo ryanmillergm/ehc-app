@@ -19,6 +19,7 @@ class Transaction extends Model
         'charge_id',
         'customer_id',
         'payment_method_id',
+        'attempt_id',
         'amount_cents',
         'currency',
         'type',

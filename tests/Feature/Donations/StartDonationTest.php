@@ -73,4 +73,46 @@ class StartDonationTest extends TestCase
             'status'       => 'incomplete',
         ]);
     }
+
+    public function test_one_time_same_attempt_different_amount_creates_new_attempt_and_new_transaction(): void
+    {
+        // Mock Stripe so we don't hit the network.
+        $this->mock(StripeService::class, function ($mock) {
+            $pi = \Stripe\PaymentIntent::constructFrom([
+                'id'            => 'pi_test',
+                'client_secret' => 'cs_test',
+                'status'        => 'requires_payment_method',
+            ]);
+
+            $mock->shouldReceive('createOneTimePaymentIntent')->andReturn($pi);
+        });
+
+        $attempt = 'attempt-123';
+
+        $r1 = $this->postJson(route('donations.start'), [
+            'attempt_id' => $attempt,
+            'amount'     => 25,
+            'frequency'  => 'one_time',
+        ])->assertOk()->json();
+
+        $this->assertSame('payment', $r1['mode']);
+        $this->assertSame($attempt, $r1['attemptId']);
+
+        $tx1 = Transaction::findOrFail($r1['transactionId']);
+        $this->assertSame(2500, $tx1->amount_cents);
+
+        $r2 = $this->postJson(route('donations.start'), [
+            'attempt_id' => $attempt,  // same attempt coming back
+            'amount'     => 50,         // changed amount
+            'frequency'  => 'one_time',
+        ])->assertOk()->json();
+
+        // NEW attempt id returned
+        $this->assertNotSame($attempt, $r2['attemptId']);
+
+        $tx2 = Transaction::findOrFail($r2['transactionId']);
+        $this->assertSame(5000, $tx2->amount_cents);
+
+        $this->assertNotSame($tx1->id, $tx2->id);
+    }
 }
