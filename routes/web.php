@@ -17,10 +17,15 @@ use App\Http\Controllers\StripeWebhookController;
 use App\Http\Controllers\PageTranslationController;
 use App\Http\Controllers\Donations\DonationsController;
 use App\Http\Middleware\LogStripeWebhookHit;
+use App\Http\Controllers\EmailUnsubscribeController;
 
 Route::get('lang/{lang}', LanguageSwitch::class)->name('lang');
 
 Route::get('/', Home::class)->name('home');
+
+Route::get('/unsubscribe/{token}', EmailUnsubscribeController::class)
+    ->name('emails.unsubscribe');
+
 
 Route::get('/dev/stripe/webhook-status', function () {
     abort_unless(app()->environment('local'), 404);
