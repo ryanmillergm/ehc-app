@@ -22,8 +22,8 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 class PageTranslationResource extends Resource
 {
     protected static ?string $model = PageTranslation::class;
-
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationGroup = 'Pages';
 
     public static function form(Form $form): Form
     {

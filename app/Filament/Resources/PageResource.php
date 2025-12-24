@@ -29,8 +29,8 @@ use Filament\Tables\Actions\ViewAction;
 class PageResource extends Resource
 {
     protected static ?string $model = Page::class;
-
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationGroup = 'Pages';
 
     protected static SubNavigationPosition $subNavigationPosition = SubNavigationPosition::Top;
 

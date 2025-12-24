@@ -49,7 +49,11 @@ This has pages by language translations. A page has many translations and a tran
  - `$ php artisan serve`
  - Access local endpoints at `http://127.0.0.1:8000`
  
+ ## Setup stripe
+ - `stripe login`
+ - `stripe listen --forward-to http://bread-of-grace-ministries.test/stripe/webhook`
  or
+ - `stripe listen --forward-to http://127.0.0.1:8000/stripe/webhook`
 
  ## All in one command - Run Vite Build, php server and stripe listen --forward-to,
  - `$ composer dev` 
