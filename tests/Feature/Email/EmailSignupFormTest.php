@@ -177,4 +177,81 @@ class EmailSignupFormTest extends TestCase
         $this->assertNull($subscriber->first_name);
         $this->assertNull($subscriber->last_name);
     }
+
+    #[Test]
+    public function it_auto_subscribes_to_default_marketing_lists_on_signup(): void
+    {
+        EmailList::create([
+            'key' => 'newsletter',
+            'label' => 'Newsletter',
+            'purpose' => 'marketing',
+            'is_default' => true,
+            'is_opt_outable' => true,
+        ]);
+
+        EmailList::create([
+            'key' => 'events',
+            'label' => 'Events',
+            'purpose' => 'marketing',
+            'is_default' => true,
+            'is_opt_outable' => true,
+        ]);
+
+        \Livewire\Livewire::test(\App\Livewire\EmailSignupForm::class, ['variant' => 'footer'])
+            ->set('email', 'test@example.com')
+            ->call('submit')
+            ->assertHasNoErrors();
+
+        $subscriber = EmailSubscriber::where('email', 'test@example.com')->firstOrFail();
+
+        $this->assertDatabaseHas('email_list_subscriber', [
+            'email_subscriber_id' => $subscriber->id,
+            'email_list_id' => EmailList::where('key', 'newsletter')->value('id'),
+        ]);
+
+        $this->assertDatabaseHas('email_list_subscriber', [
+            'email_subscriber_id' => $subscriber->id,
+            'email_list_id' => EmailList::where('key', 'events')->value('id'),
+        ]);
+    }
+
+    #[Test]
+    public function page_variant_requires_first_and_last_name(): void
+    {
+        EmailList::create([
+            'key' => 'newsletter',
+            'label' => 'Newsletter',
+            'purpose' => 'marketing',
+            'is_default' => true,
+            'is_opt_outable' => true,
+        ]);
+
+        \Livewire\Livewire::test(\App\Livewire\EmailSignupForm::class, ['variant' => 'page'])
+            ->set('email', 'test@example.com')
+            ->set('first_name', '')
+            ->set('last_name', '')
+            ->call('submit')
+            ->assertHasErrors(['first_name' => 'required', 'last_name' => 'required']);
+    }
+
+    #[Test]
+    public function it_strips_plus_tags_for_non_gmail_too(): void
+    {
+        EmailList::create([
+            'key' => 'newsletter',
+            'label' => 'Newsletter',
+            'purpose' => 'marketing',
+            'is_default' => true,
+            'is_opt_outable' => true,
+        ]);
+
+        \Livewire\Livewire::test(\App\Livewire\EmailSignupForm::class, ['variant' => 'footer'])
+            ->set('email', 'me+tag@yahoo.com')
+            ->call('submit')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('email_subscribers', [
+            'email' => 'me@yahoo.com',
+        ]);
+    }
 }
