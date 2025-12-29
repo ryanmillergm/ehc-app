@@ -4,19 +4,23 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         Schema::create('email_subscribers', function (Blueprint $table) {
             $table->id();
 
+            // Order matters here; no "after()" needed in CREATE TABLE
             $table->string('email')->unique();
-            $table->string('name')->nullable();
+            $table->string('first_name')->nullable();
+            $table->string('last_name')->nullable();
 
-            // future-friendly: connect a subscriber to a real user later (optional)
-            $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('user_id')
+                ->nullable()
+                ->constrained()
+                ->nullOnDelete();
 
-            // future-friendly: what checkbox list they want later (newsletter/updates/events/etc.)
             $table->json('preferences')->nullable();
 
             $table->string('unsubscribe_token', 64)->unique();
