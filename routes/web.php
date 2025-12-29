@@ -23,9 +23,11 @@ Route::get('lang/{lang}', LanguageSwitch::class)->name('lang');
 
 Route::get('/', Home::class)->name('home');
 
+Route::view('/emails/subscribe', 'emails.subscribe')
+    ->name('emails.subscribe');
+
 Route::get('/unsubscribe/{token}', EmailUnsubscribeController::class)
     ->name('emails.unsubscribe');
-
 
 Route::get('/dev/stripe/webhook-status', function () {
     abort_unless(app()->environment('local'), 404);
