@@ -15,6 +15,7 @@ class EmailUnsubscribeController extends Controller
             ->firstOrFail();
 
         $listKey = trim((string) $request->query('list', ''));
+        $now = now();
 
         // List-specific unsubscribe
         if ($listKey !== '') {
@@ -28,8 +29,6 @@ class EmailUnsubscribeController extends Controller
                     'message' => "That email type can't be unsubscribed from.",
                 ]);
             }
-
-            $now = now();
 
             // IMPORTANT:
             // syncWithoutDetaching will:
@@ -48,23 +47,24 @@ class EmailUnsubscribeController extends Controller
         }
 
         // Global unsubscribe
-        $now = now();
-
         $subscriber->update([
             'unsubscribed_at' => $now,
         ]);
 
-        // Mark all *existing* marketing list subscriptions as unsubscribed for cleanliness
-        // (uses rename: purpose = marketing|transactional)
-        $subscriber->lists()
+        // Mark all marketing lists unsubscribed (creates pivot rows if missing)
+        $marketingListIds = EmailList::query()
             ->where('purpose', 'marketing')
-            ->each(function (EmailList $list) use ($subscriber, $now) {
-                $subscriber->lists()->syncWithoutDetaching([
-                    $list->id => [
-                        'unsubscribed_at' => $now,
-                    ],
-                ]);
-            });
+            ->pluck('id')
+            ->all();
+
+        if (! empty($marketingListIds)) {
+            $pivotData = [];
+            foreach ($marketingListIds as $id) {
+                $pivotData[$id] = ['unsubscribed_at' => $now];
+            }
+
+            $subscriber->lists()->syncWithoutDetaching($pivotData);
+        }
 
         return response()->view('emails.unsubscribe', [
             'email' => $subscriber->email,
