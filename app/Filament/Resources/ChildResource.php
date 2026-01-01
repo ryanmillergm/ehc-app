@@ -31,7 +31,8 @@ class ChildResource extends Resource
     protected static ?string $model = Child::class;
 
     protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-user-group';
-    protected static string | \UnitEnum | null $navigationGroup = 'Program Settings';
+    // protected static string | \UnitEnum | null $navigationGroup = 'Program Settings';
+    protected static bool $shouldRegisterNavigation = false;
 
     public static function form(Schema $schema): Schema
     {
