@@ -14,11 +14,9 @@ class EmailUnsubscribeController extends Controller
             ->where('unsubscribe_token', $token)
             ->firstOrFail();
 
-        $now = now();
+        $listKey = trim((string) $request->query('list', ''));
 
-        // Optional list-specific unsubscribe via: /unsubscribe/{token}?list=newsletter
-        $listKey = $request->string('list')->toString();
-
+        // List-specific unsubscribe
         if ($listKey !== '') {
             $list = EmailList::query()
                 ->where('key', $listKey)
@@ -26,12 +24,17 @@ class EmailUnsubscribeController extends Controller
 
             if (! $list->is_opt_outable) {
                 return response()->view('emails.unsubscribe', [
-                    'email'   => $subscriber->email,
-                    'message' => 'That email type can’t be unsubscribed from.',
+                    'email' => $subscriber->email,
+                    'message' => "That email type can't be unsubscribed from.",
                 ]);
             }
 
-            // Idempotent: if pivot exists, updates it; if not, attaches it.
+            $now = now();
+
+            // IMPORTANT:
+            // syncWithoutDetaching will:
+            // - update the pivot if it exists
+            // - create the pivot row if it does NOT exist
             $subscriber->lists()->syncWithoutDetaching([
                 $list->id => [
                     'unsubscribed_at' => $now,
@@ -39,29 +42,32 @@ class EmailUnsubscribeController extends Controller
             ]);
 
             return response()->view('emails.unsubscribe', [
-                'email'   => $subscriber->email,
-                'message' => "You’ve been unsubscribed from {$list->label}.",
+                'email' => $subscriber->email,
+                'message' => "You've been unsubscribed from {$list->label}.",
             ]);
         }
 
-        // Global unsubscribe (marketing)
+        // Global unsubscribe
+        $now = now();
+
         $subscriber->update([
             'unsubscribed_at' => $now,
         ]);
 
-        // Keep pivots tidy: mark any currently-attached opt-outable marketing lists unsubscribed too.
+        // Mark all *existing* marketing list subscriptions as unsubscribed for cleanliness
+        // (uses rename: purpose = marketing|transactional)
         $subscriber->lists()
             ->where('purpose', 'marketing')
-            ->where('is_opt_outable', true)
-            ->get(['email_lists.id'])
             ->each(function (EmailList $list) use ($subscriber, $now) {
-                $subscriber->lists()->updateExistingPivot($list->id, [
-                    'unsubscribed_at' => $now,
+                $subscriber->lists()->syncWithoutDetaching([
+                    $list->id => [
+                        'unsubscribed_at' => $now,
+                    ],
                 ]);
             });
 
         return response()->view('emails.unsubscribe', [
-            'email'   => $subscriber->email,
+            'email' => $subscriber->email,
             'message' => 'You have been unsubscribed.',
         ]);
     }

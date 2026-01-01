@@ -2,11 +2,12 @@
 
 namespace Tests\Feature\Email;
 
-use App\Models\EmailList;
-use App\Models\EmailSubscriber;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
+use App\Models\EmailList;
+use Illuminate\Support\Carbon;
+use App\Models\EmailSubscriber;
+use PHPUnit\Framework\Attributes\Test;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
 class EmailUnsubscribeControllerTest extends TestCase
 {
@@ -121,5 +122,186 @@ class EmailUnsubscribeControllerTest extends TestCase
             'token' => $subscriber->unsubscribe_token,
             'list' => 'does_not_exist',
         ]))->assertNotFound();
+    }
+
+    #[Test]
+    public function it_unsubscribes_from_a_specific_list_when_list_key_is_provided(): void
+    {
+        $now = Carbon::parse('2026-01-01 12:00:00');
+        Carbon::setTestNow($now);
+
+        $list = EmailList::create([
+            'key' => 'newsletter',
+            'label' => 'Newsletter',
+            'purpose' => 'marketing',
+            'is_default' => true,
+            'is_opt_outable' => true,
+        ]);
+
+        $subscriber = EmailSubscriber::create([
+            'email' => 'a@b.com',
+            'unsubscribe_token' => str_repeat('a', 64),
+            'subscribed_at' => $now,
+        ]);
+
+        $subscriber->lists()->attach($list->id, [
+            'subscribed_at' => $now,
+            'unsubscribed_at' => null,
+        ]);
+
+        $this->get(route('emails.unsubscribe', [
+            'token' => $subscriber->unsubscribe_token,
+            'list' => $list->key,
+        ]))
+            ->assertOk()
+            ->assertSee('unsubscribed', false);
+
+        $this->assertDatabaseHas('email_list_subscriber', [
+            'email_subscriber_id' => $subscriber->id,
+            'email_list_id' => $list->id,
+            'unsubscribed_at' => $now->toDateTimeString(),
+        ]);
+
+        $subscriber->refresh();
+        $this->assertNull($subscriber->unsubscribed_at); // list-only, not global
+    }
+
+    #[Test]
+    public function it_blocks_unsubscribe_for_non_opt_outable_lists(): void
+    {
+        $list = EmailList::create([
+            'key' => 'receipt',
+            'label' => 'Receipts',
+            'purpose' => 'transactional',
+            'is_default' => false,
+            'is_opt_outable' => false,
+        ]);
+
+        $subscriber = EmailSubscriber::create([
+            'email' => 'a@b.com',
+            'unsubscribe_token' => str_repeat('b', 64),
+            'subscribed_at' => now(),
+        ]);
+
+        $subscriber->lists()->attach($list->id, [
+            'subscribed_at' => now(),
+            'unsubscribed_at' => null,
+        ]);
+
+        $this->get(route('emails.unsubscribe', [
+            'token' => $subscriber->unsubscribe_token,
+            'list' => $list->key,
+        ]))
+            ->assertOk()
+            ->assertSee("can't be unsubscribed");
+
+        $this->assertDatabaseHas('email_list_subscriber', [
+            'email_subscriber_id' => $subscriber->id,
+            'email_list_id' => $list->id,
+            'unsubscribed_at' => null,
+        ]);
+    }
+
+    #[Test]
+    public function it_globally_unsubscribes_and_marks_marketing_lists_unsubscribed(): void
+    {
+        $now = Carbon::parse('2026-01-02 09:30:00');
+        Carbon::setTestNow($now);
+
+        $marketing = EmailList::create([
+            'key' => 'updates',
+            'label' => 'Updates',
+            'purpose' => 'marketing',
+            'is_default' => true,
+            'is_opt_outable' => true,
+        ]);
+
+        $transactional = EmailList::create([
+            'key' => 'receipt',
+            'label' => 'Receipts',
+            'purpose' => 'transactional',
+            'is_default' => false,
+            'is_opt_outable' => false,
+        ]);
+
+        $subscriber = EmailSubscriber::create([
+            'email' => 'a@b.com',
+            'unsubscribe_token' => str_repeat('c', 64),
+            'subscribed_at' => $now,
+            'unsubscribed_at' => null,
+        ]);
+
+        $subscriber->lists()->attach($marketing->id, [
+            'subscribed_at' => $now,
+            'unsubscribed_at' => null,
+        ]);
+
+        $subscriber->lists()->attach($transactional->id, [
+            'subscribed_at' => $now,
+            'unsubscribed_at' => null,
+        ]);
+
+        $this->get(route('emails.unsubscribe', [
+            'token' => $subscriber->unsubscribe_token,
+        ]))
+            ->assertOk()
+            ->assertSee('unsubscribed', false);
+
+        $subscriber->refresh();
+        $this->assertSame($now->toDateTimeString(), $subscriber->unsubscribed_at?->toDateTimeString());
+
+        $this->assertDatabaseHas('email_list_subscriber', [
+            'email_subscriber_id' => $subscriber->id,
+            'email_list_id' => $marketing->id,
+            'unsubscribed_at' => $now->toDateTimeString(),
+        ]);
+
+        // transactional untouched
+        $this->assertDatabaseHas('email_list_subscriber', [
+            'email_subscriber_id' => $subscriber->id,
+            'email_list_id' => $transactional->id,
+            'unsubscribed_at' => null,
+        ]);
+    }
+
+    #[Test]
+    public function it_creates_a_pivot_row_if_unsubscribing_from_a_list_without_an_existing_subscription_row(): void
+    {
+        $now = Carbon::parse('2026-01-03 10:00:00');
+        Carbon::setTestNow($now);
+
+        $list = EmailList::create([
+            'key' => 'newsletter',
+            'label' => 'Newsletter',
+            'purpose' => 'marketing',
+            'is_default' => true,
+            'is_opt_outable' => true,
+        ]);
+
+        $subscriber = EmailSubscriber::create([
+            'email' => 'a@b.com',
+            'unsubscribe_token' => str_repeat('d', 64),
+            'subscribed_at' => $now,
+            'unsubscribed_at' => null,
+        ]);
+
+        // IMPORTANT: we do NOT attach the list first
+
+        $this->get(route('emails.unsubscribe', [
+            'token' => $subscriber->unsubscribe_token,
+            'list' => $list->key,
+        ]))
+            ->assertOk()
+            ->assertSee('unsubscribed', false);
+
+        $this->assertDatabaseHas('email_list_subscriber', [
+            'email_subscriber_id' => $subscriber->id,
+            'email_list_id' => $list->id,
+            'unsubscribed_at' => $now->toDateTimeString(),
+        ]);
+
+        // list-only unsubscribe should NOT globally unsubscribe them
+        $subscriber->refresh();
+        $this->assertNull($subscriber->unsubscribed_at);
     }
 }
