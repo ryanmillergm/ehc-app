@@ -2,6 +2,16 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Pages\Enums\SubNavigationPosition;
+use Filament\Schemas\Schema;
+use Filament\Actions\ViewAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\PageResource\Pages\Viewpage;
+use App\Filament\Resources\PageResource\Pages\Editpage;
+use App\Filament\Resources\PageResource\Pages\ListPages;
+use App\Filament\Resources\PageResource\Pages\CreatePage;
 use App\Filament\Resources\PageResource\Pages;
 use App\Filament\Resources\PageResource\RelationManagers;
 use App\Filament\Resources\PageResource\RelationManagers\PageTranslationsRelationManager;
@@ -14,30 +24,24 @@ use Filament\Forms\Components\TextInput;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Forms\Components\Checkbox;
 use Filament\Tables\Columns\CheckboxColumn;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Filament\Pages\SubNavigationPosition;
-use Filament\Tables\Actions\BulkActionGroup;
-use Filament\Tables\Actions\DeleteBulkAction;
-use Filament\Tables\Actions\EditAction;
-use Filament\Tables\Actions\ViewAction;
 
 class PageResource extends Resource
 {
     protected static ?string $model = Page::class;
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
-    protected static ?string $navigationGroup = 'Pages';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static string | \UnitEnum | null $navigationGroup = 'Pages';
 
-    protected static SubNavigationPosition $subNavigationPosition = SubNavigationPosition::Top;
+    protected static ?\Filament\Pages\Enums\SubNavigationPosition $subNavigationPosition = SubNavigationPosition::Top;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 TextInput::make('title')
                     ->required()
                     ->maxLength(255),
@@ -56,11 +60,11 @@ class PageResource extends Resource
             ->filters([
                 //
             ])
-            ->actions([
+            ->recordActions([
                 ViewAction::make(),
                 EditAction::make(),
             ])
-            ->bulkActions([
+            ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
@@ -70,8 +74,8 @@ class PageResource extends Resource
     public static function getRecordSubNavigation(PageFilament $page): array
     {
         return $page->generateNavigationItems([
-            Pages\Viewpage::class,
-            Pages\Editpage::class,
+            Viewpage::class,
+            Editpage::class,
             ViewPageTranslation::class,
             ListPageTranslations::class,
         ]);
@@ -87,8 +91,8 @@ class PageResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListPages::route('/'),
-            'create' => Pages\CreatePage::route('/create'),
+            'index' => ListPages::route('/'),
+            'create' => CreatePage::route('/create'),
             'view' => Pages\ViewPage::route('/{record}'),
             'edit' => Pages\EditPage::route('/{record}/edit'),
         ];

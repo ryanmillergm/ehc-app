@@ -2,9 +2,19 @@
 
 namespace App\Filament\Resources\UserResource\RelationManagers;
 
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Actions\CreateAction;
+use Filament\Actions\AttachAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\DetachAction;
+use Filament\Actions\ViewAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\DetachBulkAction;
 use App\Filament\Resources\TeamResource;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -15,9 +25,9 @@ class AssignedTeamsRelationManager extends RelationManager
 {
     protected static string $relationship = 'assignedTeams';
 
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
-        return TeamResource::form($form);
+        return TeamResource::form($schema);
     }
 
     public function table(Table $table): Table
@@ -25,17 +35,17 @@ class AssignedTeamsRelationManager extends RelationManager
         return $table
             ->recordTitleAttribute('name')
             ->columns([
-                Tables\Columns\TextColumn::make('name')
+                TextColumn::make('name')
                     ->label('Team Name'),
-                Tables\Columns\TextColumn::make('user.id')
+                TextColumn::make('user.id')
                     ->label('Team Owner User Id'),
             ])
             ->filters([
                 //
             ])
             ->headerActions([
-                Tables\Actions\CreateAction::make(),
-                Tables\Actions\AttachAction::make()
+                CreateAction::make(),
+                AttachAction::make()
                     ->recordSelectOptionsQuery(function (Builder $query, $livewire) {
                         $query->whereDoesntHave('user', function($query) use($livewire) {
                             $query->where('id', $livewire->ownerRecord->id);
@@ -44,16 +54,16 @@ class AssignedTeamsRelationManager extends RelationManager
                     ->preloadRecordSelect()
                     ->multiple(),
             ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
-                Tables\Actions\DetachAction::make(),
-                Tables\Actions\ViewAction::make(),
+            ->recordActions([
+                EditAction::make(),
+                DeleteAction::make(),
+                DetachAction::make(),
+                ViewAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                    Tables\Actions\DetachBulkAction::make(),
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
+                    DetachBulkAction::make(),
                 ]),
             ]);
     }

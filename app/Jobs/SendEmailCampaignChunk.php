@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use Throwable;
 use App\Mail\EmailCampaignMail;
 use App\Models\EmailCampaign;
 use App\Models\EmailSubscriber;
@@ -72,7 +73,7 @@ class SendEmailCampaignChunk implements ShouldQueue
             ]);
     }
 
-    public function failed(\Throwable $e): void
+    public function failed(Throwable $e): void
     {
         EmailCampaign::whereKey($this->campaignId)->update([
             'status' => EmailCampaign::STATUS_FAILED,

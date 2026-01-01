@@ -2,11 +2,16 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Actions\EditAction;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\PledgeResource\Pages\ManagePledges;
 use App\Filament\Resources\PledgeResource\Pages;
 use App\Filament\Resources\PledgeResource\RelationManagers;
 use App\Models\Pledge;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -16,13 +21,13 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 class PledgeResource extends Resource
 {
     protected static ?string $model = Pledge::class;
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
-    protected static ?string $navigationGroup = 'Donations';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static string | \UnitEnum | null $navigationGroup = 'Donations';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 //
             ]);
     }
@@ -36,13 +41,13 @@ class PledgeResource extends Resource
             ->filters([
                 //
             ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+            ->recordActions([
+                EditAction::make(),
+                DeleteAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }
@@ -50,7 +55,7 @@ class PledgeResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ManagePledges::route('/'),
+            'index' => ManagePledges::route('/'),
         ];
     }
 }

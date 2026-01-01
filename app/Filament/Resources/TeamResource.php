@@ -2,6 +2,13 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Actions\ViewAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\TeamResource\RelationManagers\UsersRelationManager;
 use App\Filament\Resources\TeamResource\Pages;
 use App\Filament\Resources\TeamResource\Pages\CreateTeam;
 use App\Filament\Resources\TeamResource\Pages\EditTeam;
@@ -12,14 +19,8 @@ use App\Models\Team;
 use Filament\Forms;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
-use Filament\Tables\Actions\BulkActionGroup;
-use Filament\Tables\Actions\DeleteAction;
-use Filament\Tables\Actions\DeleteBulkAction;
-use Filament\Tables\Actions\EditAction;
-use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -30,15 +31,15 @@ class TeamResource extends Resource
 {
     protected static ?string $model = Team::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-rectangle-stack';
     protected static ?int $navigationSort = 4;
-    protected static ?string $navigationGroup = 'User Settings';
+    protected static string | \UnitEnum | null $navigationGroup = 'User Settings';
     protected static ?string $tenantOwnershipRelationshipName = 'assignedTeams';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 TextInput::make('name')
                     ->required()
                     ->maxLength(255)
@@ -84,12 +85,12 @@ class TeamResource extends Resource
             ->filters([
                 //
             ])
-            ->actions([
+            ->recordActions([
                 ViewAction::make(),
                 EditAction::make(),
                 DeleteAction::make(),
             ])
-            ->bulkActions([
+            ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
@@ -99,7 +100,7 @@ class TeamResource extends Resource
     public static function getRelations(): array
     {
         return [
-            RelationManagers\UsersRelationManager::class,
+            UsersRelationManager::class,
         ];
     }
 

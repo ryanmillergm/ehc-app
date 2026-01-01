@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Throwable;
 use App\Models\Pledge;
 use App\Models\Refund;
 use App\Models\Transaction;
@@ -69,7 +70,7 @@ class StripeWebhookController extends Controller
 
         try {
             $this->handleEvent($event);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('Stripe webhook handler crashed', [
                 'event_id'   => $event->id ?? null,
                 'event_type' => $event->type ?? null,
@@ -336,7 +337,7 @@ class StripeWebhookController extends Controller
             if ($tx) {
                 return $tx;
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // ignore and fallback to LIKE
         }
 

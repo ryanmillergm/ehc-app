@@ -2,6 +2,13 @@
 
 namespace App\Services;
 
+use RuntimeException;
+use Stripe\PaymentIntent;
+use Stripe\SetupIntent;
+use Stripe\Charge;
+use Stripe\PaymentMethod;
+use Stripe\Subscription;
+use Throwable;
 use App\Models\Pledge;
 use App\Models\Refund;
 use App\Models\Transaction;
@@ -25,7 +32,7 @@ class StripeService
 
         throw_if(
             $secret === '',
-            \RuntimeException::class,
+            RuntimeException::class,
             'Stripe secret is missing. Set STRIPE_SECRET in .env and map it in config/services.php.'
         );
 
@@ -59,7 +66,7 @@ class StripeService
 
         throw_if(
             $productId === '',
-            \RuntimeException::class,
+            RuntimeException::class,
             'Stripe recurring product id is missing. Set STRIPE_RECURRING_PRODUCT_ID in .env and map it in config/services.php.'
         );
 
@@ -70,22 +77,22 @@ class StripeService
     // Retrieve helpers
     // -------------------------------------------------------------------------
 
-    public function retrievePaymentIntent(string $paymentIntentId): \Stripe\PaymentIntent
+    public function retrievePaymentIntent(string $paymentIntentId): PaymentIntent
     {
         return $this->stripe->paymentIntents->retrieve($paymentIntentId);
     }
 
-    public function retrieveSetupIntent(string $setupIntentId): \Stripe\SetupIntent
+    public function retrieveSetupIntent(string $setupIntentId): SetupIntent
     {
         return $this->stripe->setupIntents->retrieve($setupIntentId);
     }
 
-    public function retrieveCharge(string $chargeId): \Stripe\Charge
+    public function retrieveCharge(string $chargeId): Charge
     {
         return $this->stripe->charges->retrieve($chargeId);
     }
 
-    public function retrievePaymentMethod(string $paymentMethodId): \Stripe\PaymentMethod
+    public function retrievePaymentMethod(string $paymentMethodId): PaymentMethod
     {
         return $this->stripe->paymentMethods->retrieve($paymentMethodId);
     }
@@ -171,7 +178,7 @@ class StripeService
     // One-time PaymentIntent
     // -------------------------------------------------------------------------
 
-    public function createOneTimePaymentIntent(Transaction $transaction, array $donor = []): \Stripe\PaymentIntent
+    public function createOneTimePaymentIntent(Transaction $transaction, array $donor = []): PaymentIntent
     {
         if (! empty($transaction->payment_intent_id)) {
             $pi = $this->stripe->paymentIntents->retrieve($transaction->payment_intent_id);
@@ -222,7 +229,7 @@ class StripeService
     // Monthly SetupIntent
     // -------------------------------------------------------------------------
 
-    public function createSetupIntentForPledge(Pledge $pledge, array $donor = []): \Stripe\SetupIntent
+    public function createSetupIntentForPledge(Pledge $pledge, array $donor = []): SetupIntent
     {
         if (! empty($pledge->setup_intent_id)) {
             return $this->stripe->setupIntents->retrieve($pledge->setup_intent_id);
@@ -269,7 +276,7 @@ class StripeService
     // Subscription creation
     // -------------------------------------------------------------------------
 
-    public function createSubscriptionForPledge(Pledge $pledge, string $paymentMethodId): \Stripe\Subscription
+    public function createSubscriptionForPledge(Pledge $pledge, string $paymentMethodId): Subscription
     {
         $attemptId = $pledge->attempt_id ?: null;
 
@@ -285,7 +292,7 @@ class StripeService
             'interval' => $pledge->interval,
         ]);
 
-        $syncFromSubscription = function (\Stripe\Subscription $subscription) use ($pledge, $paymentMethodId, $attemptId): void {
+        $syncFromSubscription = function (Subscription $subscription) use ($pledge, $paymentMethodId, $attemptId): void {
 
             // Period fields can be on subscription top-level; some payloads mirror onto items.
             $itemStart = data_get($subscription, 'items.data.0.current_period_start');
@@ -322,7 +329,7 @@ class StripeService
                             'payments.data.payment',
                         ],
                     ]);
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                     $this->dbg('syncFromSubscription: invoice retrieve failed (expanded)', [
                         'invoice_id' => $latestInvoiceId,
                         'error' => $e->getMessage(),
@@ -333,7 +340,7 @@ class StripeService
                         $expandedInvoice = $this->stripe->invoices->retrieve($latestInvoiceId, [
                             'expand' => ['payment_intent', 'charge', 'payments'],
                         ]);
-                    } catch (\Throwable $e2) {
+                    } catch (Throwable $e2) {
                         $this->dbg('syncFromSubscription: invoice retrieve failed (minimal)', [
                             'invoice_id' => $latestInvoiceId,
                             'error' => $e2->getMessage(),
@@ -342,7 +349,7 @@ class StripeService
                         // 3) Final fallback: no expand
                         try {
                             $expandedInvoice = $this->stripe->invoices->retrieve($latestInvoiceId, []);
-                        } catch (\Throwable $e3) {
+                        } catch (Throwable $e3) {
                             $this->dbg('syncFromSubscription: invoice retrieve failed (plain)', [
                                 'invoice_id' => $latestInvoiceId,
                                 'error' => $e3->getMessage(),
@@ -395,7 +402,7 @@ class StripeService
                         'pi_id' => $latestPiId,
                         'charge_id' => $chargeId,
                     ], 'info');
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                     $this->dbg('syncFromSubscription: PI retrieve failed for charge fallback', [
                         'pi_id' => $latestPiId,
                         'error' => $e->getMessage(),
@@ -878,7 +885,7 @@ class StripeService
             $invoice = $this->stripe->invoices->retrieve($invoiceId, [
                 'expand' => ['payments', 'payments.data.payment', 'payment_intent'],
             ]);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->dbg('resolvePaymentIntentIdFromInvoice: invoice retrieve failed (expanded)', [
                 'invoice_id' => $invoiceId,
                 'error' => $e->getMessage(),
@@ -888,7 +895,7 @@ class StripeService
                 $invoice = $this->stripe->invoices->retrieve($invoiceId, [
                     'expand' => ['payments', 'payment_intent'],
                 ]);
-            } catch (\Throwable $e2) {
+            } catch (Throwable $e2) {
                 $this->dbg('resolvePaymentIntentIdFromInvoice: invoice retrieve failed (minimal)', [
                     'invoice_id' => $invoiceId,
                     'error' => $e2->getMessage(),
@@ -896,7 +903,7 @@ class StripeService
 
                 try {
                     $invoice = $this->stripe->invoices->retrieve($invoiceId, []);
-                } catch (\Throwable $e3) {
+                } catch (Throwable $e3) {
                     $this->dbg('resolvePaymentIntentIdFromInvoice: invoice retrieve failed (plain)', [
                         'invoice_id' => $invoiceId,
                         'error' => $e3->getMessage(),

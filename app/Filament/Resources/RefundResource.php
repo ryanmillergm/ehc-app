@@ -2,11 +2,16 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Actions\EditAction;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\RefundResource\Pages\ManageRefunds;
 use App\Filament\Resources\RefundResource\Pages;
 use App\Filament\Resources\RefundResource\RelationManagers;
 use App\Models\Refund;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -16,13 +21,13 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 class RefundResource extends Resource
 {
     protected static ?string $model = Refund::class;
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
-    protected static ?string $navigationGroup = 'Donations';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static string | \UnitEnum | null $navigationGroup = 'Donations';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 //
             ]);
     }
@@ -36,13 +41,13 @@ class RefundResource extends Resource
             ->filters([
                 //
             ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+            ->recordActions([
+                EditAction::make(),
+                DeleteAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }
@@ -50,7 +55,7 @@ class RefundResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ManageRefunds::route('/'),
+            'index' => ManageRefunds::route('/'),
         ];
     }
 }
