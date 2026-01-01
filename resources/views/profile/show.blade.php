@@ -21,7 +21,7 @@
             <x-section-border />
 
             {{-- Email preferences --}}
-            <div class="mt-10 sm:mt-0">
+            <div id="email-preferences" class="mt-10 sm:mt-0">
                 @livewire('profile.email-preferences-form')
             </div>
 

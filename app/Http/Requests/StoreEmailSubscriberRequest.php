@@ -11,7 +11,7 @@ class StoreEmailSubscriberRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return false;
+        return true;
     }
 
     /**
@@ -21,8 +21,16 @@ class StoreEmailSubscriberRequest extends FormRequest
      */
     public function rules(): array
     {
+        $emailRule = app()->environment('production') ? 'email:rfc,dns' : 'email:rfc';
+
         return [
-            //
+            'email' => ['required', 'string', 'max:255', $emailRule],
+            'first_name' => ['nullable', 'string', 'max:255'],
+            'last_name'  => ['nullable', 'string', 'max:255'],
+
+            // Optional: allow posting specific list keys (otherwise defaults only)
+            'lists' => ['sometimes', 'array'],
+            'lists.*' => ['string', 'max:50', 'exists:email_lists,key'],
         ];
     }
 }

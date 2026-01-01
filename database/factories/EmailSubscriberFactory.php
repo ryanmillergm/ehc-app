@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -17,7 +18,19 @@ class EmailSubscriberFactory extends Factory
     public function definition(): array
     {
         return [
-            //
+            'email' => $this->faker->unique()->safeEmail(),
+            'first_name' => $this->faker->firstName(),
+            'last_name' => $this->faker->lastName(),
+            'user_id' => null,
+            'preferences' => null,
+            'unsubscribe_token' => Str::random(64),
+            'subscribed_at' => now(),
+            'unsubscribed_at' => null,
         ];
+    }
+
+    public function unsubscribed(): self
+    {
+        return $this->state(fn () => ['unsubscribed_at' => now()]);
     }
 }
