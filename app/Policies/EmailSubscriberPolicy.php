@@ -13,7 +13,7 @@ class EmailSubscriberPolicy
      */
     public function viewAny(User $user): bool
     {
-        //
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('email.read');
     }
 
     /**
@@ -21,7 +21,7 @@ class EmailSubscriberPolicy
      */
     public function view(User $user, EmailSubscriber $emailSubscriber): bool
     {
-        //
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('email.read');
     }
 
     /**
@@ -29,7 +29,7 @@ class EmailSubscriberPolicy
      */
     public function create(User $user): bool
     {
-        //
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('email.create');
     }
 
     /**
@@ -37,7 +37,7 @@ class EmailSubscriberPolicy
      */
     public function update(User $user, EmailSubscriber $emailSubscriber): bool
     {
-        //
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('email.update');
     }
 
     /**
@@ -45,7 +45,7 @@ class EmailSubscriberPolicy
      */
     public function delete(User $user, EmailSubscriber $emailSubscriber): bool
     {
-        //
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('email.delete');
     }
 
     /**
@@ -53,7 +53,7 @@ class EmailSubscriberPolicy
      */
     public function restore(User $user, EmailSubscriber $emailSubscriber): bool
     {
-        //
+        return $user->hasRole(['Super Admin']);
     }
 
     /**
@@ -61,6 +61,6 @@ class EmailSubscriberPolicy
      */
     public function forceDelete(User $user, EmailSubscriber $emailSubscriber): bool
     {
-        //
+        return $user->hasRole(['Super Admin']);
     }
 }
