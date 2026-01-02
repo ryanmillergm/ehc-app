@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\EmailList;
 use App\Models\EmailSubscriber;
+use App\Support\EmailCanonicalizer;
 use Illuminate\Support\Str;
 use Livewire\Component;
 
@@ -36,16 +37,18 @@ class EmailSignupForm extends Component
 
     public function submit(): void
     {
-        $this->email = Str::lower(trim($this->email));
+        $this->email = trim($this->email);
         $this->first_name = trim($this->first_name);
         $this->last_name  = trim($this->last_name);
 
         $this->validate();
 
-        $canonicalEmail = $this->canonicalizeEmail($this->email);
+        $canonicalEmail = EmailCanonicalizer::canonicalize($this->email) ?? Str::lower($this->email);
 
+        // Prefer canonical lookup (future-proof), but keep OR email for backwards compat
         $subscriber = EmailSubscriber::query()
-            ->where('email', $canonicalEmail)
+            ->where('email_canonical', $canonicalEmail)
+            ->orWhere('email', $canonicalEmail)
             ->first();
 
         if (! $subscriber) {
@@ -82,6 +85,10 @@ class EmailSignupForm extends Component
                 $update['user_id'] = auth()->id();
             }
 
+            if ($subscriber->email !== $canonicalEmail) {
+                $update['email'] = $canonicalEmail; // keeps email + email_canonical aligned
+            }
+
             $subscriber->update($update);
         }
 
@@ -91,10 +98,12 @@ class EmailSignupForm extends Component
             ->where('is_default', true)
             ->get();
 
+        $now = now();
+
         foreach ($defaultLists as $list) {
             $subscriber->lists()->syncWithoutDetaching([
                 $list->id => [
-                    'subscribed_at' => now(),
+                    'subscribed_at' => $now,
                     'unsubscribed_at' => null,
                 ],
             ]);
@@ -102,30 +111,6 @@ class EmailSignupForm extends Component
 
         $this->reset('email', 'first_name', 'last_name');
         session()->flash('email_signup_success', 'Thanks! You’re signed up.');
-    }
-
-    private function canonicalizeEmail(string $email): string
-    {
-        $email = Str::lower(trim($email));
-
-        if (! str_contains($email, '@')) {
-            return $email;
-        }
-
-        [$local, $domain] = explode('@', $email, 2);
-
-        // Strip +tag for ALL domains (your requirement)
-        if (str_contains($local, '+')) {
-            $local = strstr($local, '+', true);
-        }
-
-        // Gmail dot-ignoring + googlemail normalization
-        if (in_array($domain, ['gmail.com', 'googlemail.com'], true)) {
-            $domain = 'gmail.com';
-            $local = str_replace('.', '', $local);
-        }
-
-        return $local.'@'.$domain;
     }
 
     public function render()

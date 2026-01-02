@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\EmailCampaignDeliveries;
 
+use App\Filament\Navigation\NavigationGroup;
 use App\Filament\Resources\EmailCampaignDeliveries\Pages\ListEmailCampaignDeliveries;
 use App\Filament\Resources\EmailCampaignDeliveries\Pages\ViewEmailCampaignDelivery;
 use App\Filament\Resources\EmailCampaignDeliveries\Tables\EmailCampaignDeliveriesTable;
@@ -18,7 +19,7 @@ class EmailCampaignDeliveryResource extends Resource
 {
     protected static ?string $model = EmailCampaignDelivery::class;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Email';
+    protected static string|\UnitEnum|null $navigationGroup = NavigationGroup::Email;
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedInboxArrowDown;
     protected static ?string $navigationLabel = 'Email Deliveries';
     protected static ?string $recordTitleAttribute = 'subject';
@@ -28,7 +29,6 @@ class EmailCampaignDeliveryResource extends Resource
         return EmailCampaignDeliveriesTable::configure($table);
     }
 
-    // Filament v4 uses Schema here
     public static function infolist(Schema $schema): Schema
     {
         return $schema->components([

@@ -100,7 +100,9 @@ class SendEmailCampaignChunk implements ShouldQueue
             EmailCampaign::whereKey($campaign->id)->increment('sent_count', $sentThisChunk);
         }
 
-        EmailCampaign::whereKey($campaign->id)->decrement('pending_chunks');
+        EmailCampaign::whereKey($campaign->id)
+            ->where('pending_chunks', '>', 0)
+            ->decrement('pending_chunks');
 
         // If campaign finished, decide final status
         $fresh = EmailCampaign::find($campaign->id);

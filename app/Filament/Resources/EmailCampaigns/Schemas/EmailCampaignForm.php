@@ -7,6 +7,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Validation\Rule;
 
 class EmailCampaignForm
 {
@@ -16,10 +17,21 @@ class EmailCampaignForm
             Select::make('email_list_id')
                 ->label('Email List')
                 ->relationship(
-                    name: 'list',
+                    name: 'emailList',
                     titleAttribute: 'label',
-                    modifyQueryUsing: fn (Builder $q) => $q->where('purpose', 'marketing'),
+                    modifyQueryUsing: function (Builder $query, mixed $state): Builder {
+                        return $query->where(function (Builder $q) use ($state) {
+                            $q->where('purpose', 'marketing');
+
+                            if (filled($state)) {
+                                $q->orWhere('id', $state);
+                            }
+                        });
+                    },
                 )
+                ->rules([
+                    Rule::exists('email_lists', 'id')->where('purpose', 'marketing'),
+                ])
                 ->searchable()
                 ->preload()
                 ->required(),
@@ -33,7 +45,6 @@ class EmailCampaignForm
                 ->columnSpanFull()
                 ->required(),
 
-            // Read-only meta (instead of Placeholder)
             TextInput::make('status')
                 ->disabled()
                 ->dehydrated(false),

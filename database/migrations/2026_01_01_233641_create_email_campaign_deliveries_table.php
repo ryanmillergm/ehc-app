@@ -19,8 +19,8 @@ return new class extends Migration
                 ->constrained('email_subscribers')
                 ->cascadeOnDelete();
 
-            // pending|sent|failed
-            $table->string('status')->default('pending');
+            // queued|sent|failed
+            $table->string('status')->default('queued');
 
             $table->string('to_email');
             $table->string('to_name')->nullable();
@@ -41,7 +41,6 @@ return new class extends Migration
 
             $table->timestamps();
 
-            // ✅ short, explicit name to avoid MySQL 64-char limit
             $table->unique(
                 ['email_campaign_id', 'email_subscriber_id'],
                 'email_campaign_subscriber'

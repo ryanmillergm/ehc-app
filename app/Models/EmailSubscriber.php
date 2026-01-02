@@ -3,13 +3,17 @@
 namespace App\Models;
 
 use App\Models\User;
-use Illuminate\Database\Eloquent\Builder;
+use App\Support\EmailCanonicalizer;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class EmailSubscriber extends Model
 {
+    use HasFactory;
+    
     protected $fillable = [
         'email',
         'first_name',
@@ -106,5 +110,14 @@ class EmailSubscriber extends Model
         }
 
         return is_null($list->pivot->unsubscribed_at);
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $subscriber) {
+            if ($subscriber->isDirty('email')) {
+                $subscriber->email_canonical = EmailCanonicalizer::canonicalize($subscriber->email);
+            }
+        });
     }
 }

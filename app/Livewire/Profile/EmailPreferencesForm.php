@@ -2,11 +2,12 @@
 
 namespace App\Livewire\Profile;
 
+use Livewire\Component;
 use App\Models\EmailList;
+use Illuminate\Support\Str;
 use App\Models\EmailSubscriber;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
-use Livewire\Component;
+use App\Support\EmailCanonicalizer;
 
 class EmailPreferencesForm extends Component
 {
@@ -245,10 +246,11 @@ class EmailPreferencesForm extends Component
         $user = auth()->user();
         abort_unless($user, 403);
 
-        $canonicalEmail = $this->canonicalizeEmail((string) $user->email);
+        $canonicalEmail = EmailCanonicalizer::canonicalize((string) $user->email) ?? Str::lower(trim((string) $user->email));
 
         $subscriber = EmailSubscriber::query()
             ->where('user_id', $user->id)
+            ->orWhere('email_canonical', $canonicalEmail)
             ->orWhere('email', $canonicalEmail)
             ->first();
 
@@ -289,30 +291,6 @@ class EmailPreferencesForm extends Component
         }
 
         return $subscriber->refresh();
-    }
-
-    private function canonicalizeEmail(string $email): string
-    {
-        $email = Str::lower(trim($email));
-
-        if (! str_contains($email, '@')) {
-            return $email;
-        }
-
-        [$local, $domain] = explode('@', $email, 2);
-
-        // Strip +tag for ALL domains
-        if (str_contains($local, '+')) {
-            $local = strstr($local, '+', true);
-        }
-
-        // Gmail dot-ignoring + googlemail normalization
-        if (in_array($domain, ['gmail.com', 'googlemail.com'], true)) {
-            $domain = 'gmail.com';
-            $local = str_replace('.', '', $local);
-        }
-
-        return $local.'@'.$domain;
     }
 
     private function normalizeSelections(): void

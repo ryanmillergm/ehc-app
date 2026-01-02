@@ -28,6 +28,8 @@ return new class extends Migration
             $table->timestamp('subscribed_at')->nullable();
             $table->timestamp('unsubscribed_at')->nullable();
 
+            $table->string('email_canonical')->nullable()->unique();
+
             $table->timestamps();
         });
     }

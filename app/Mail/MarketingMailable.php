@@ -2,10 +2,11 @@
 
 namespace App\Mail;
 
-use App\Models\EmailSubscriber;
-use App\Support\EmailPreferenceUrls;
-use Illuminate\Mail\Mailable;
 use Illuminate\Support\Str;
+use Illuminate\Mail\Mailable;
+use App\Models\EmailSubscriber;
+use App\Support\EmailCanonicalizer;
+use App\Support\EmailPreferenceUrls;
 
 abstract class MarketingMailable extends Mailable
 {
@@ -26,16 +27,24 @@ abstract class MarketingMailable extends Mailable
             return $data;
         }
 
-        $canonical = $this->canonicalizeEmail($toEmail);
+        $canonical = EmailCanonicalizer::canonicalize($toEmail) ?? strtolower(trim($toEmail));
 
-        $subscriber = EmailSubscriber::query()->firstOrCreate(
-            ['email' => $canonical],
-            [
+        $subscriber = EmailSubscriber::query()
+            ->where('email_canonical', $canonical)
+            ->orWhere('email', $canonical)
+            ->first();
+
+        if (! $subscriber) {
+            $subscriber = EmailSubscriber::create([
+                'email' => $canonical,
                 'unsubscribe_token' => Str::random(64),
                 'subscribed_at' => now(),
                 'preferences' => [],
-            ],
-        );
+            ]);
+        } elseif ($subscriber->email !== $canonical) {
+            // keeps canonical fields aligned; safe because email_canonical is unique
+            $subscriber->update(['email' => $canonical]);
+        }
 
         $data['unsubscribeAllUrl'] = EmailPreferenceUrls::unsubscribeAll($subscriber);
 
@@ -68,27 +77,5 @@ abstract class MarketingMailable extends Mailable
         }
 
         return (string) $first;
-    }
-
-    protected function canonicalizeEmail(string $email): string
-    {
-        $email = strtolower(trim($email));
-
-        if (! str_contains($email, '@')) {
-            return $email;
-        }
-
-        [$local, $domain] = explode('@', $email, 2);
-
-        if ($domain === 'googlemail.com') {
-            $domain = 'gmail.com';
-        }
-
-        if ($domain === 'gmail.com') {
-            $local = explode('+', $local, 2)[0];   // strip plus tag
-            $local = str_replace('.', '', $local); // strip dots
-        }
-
-        return $local . '@' . $domain;
     }
 }

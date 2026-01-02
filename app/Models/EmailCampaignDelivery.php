@@ -4,12 +4,16 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class EmailCampaignDelivery extends Model
 {
-    public const STATUS_PENDING = 'pending';
+    use HasFactory;
+    
+    public const STATUS_QUEUED  = 'queued';
     public const STATUS_SENT    = 'sent';
     public const STATUS_FAILED  = 'failed';
+    public const STATUS_SKIPPED = 'skipped';
 
     protected $fillable = [
         'email_campaign_id',
