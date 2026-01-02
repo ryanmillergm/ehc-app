@@ -49,13 +49,10 @@ abstract class MarketingMailable extends Mailable
         $data['unsubscribeAllUrl'] = EmailPreferenceUrls::unsubscribeAll($subscriber);
 
         if ($this->emailListKey) {
-            $data['unsubscribeThisUrl'] = route('emails.unsubscribe', [
-                'token' => $subscriber->unsubscribe_token,
-                'list'  => $this->emailListKey,
-            ]);
+            $data['unsubscribeThisUrl'] = EmailPreferenceUrls::unsubscribeList($subscriber, $this->emailListKey);
         }
 
-        $data['managePreferencesUrl'] = EmailPreferenceUrls::managePreferences();
+        $data['managePreferencesUrl'] = EmailPreferenceUrls::managePreferences($subscriber);
 
         return $data;
     }

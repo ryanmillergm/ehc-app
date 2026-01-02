@@ -90,4 +90,17 @@ class EmailPreferenceUrlsTest extends TestCase
             EmailPreferenceUrls::managePreferences(),
         );
     }
+
+    #[Test]
+    public function it_builds_the_public_manage_preferences_url_when_given_a_subscriber(): void
+    {
+        $subscriber = $this->makeSubscriber([
+            'unsubscribe_token' => str_repeat('p', 64),
+        ]);
+
+        $this->assertSame(
+            route('emails.preferences', ['token' => $subscriber->unsubscribe_token]),
+            EmailPreferenceUrls::managePreferences($subscriber),
+        );
+    }
 }

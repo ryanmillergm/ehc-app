@@ -40,7 +40,7 @@ class EmailCampaignMail extends Mailable
 
                 'unsubscribeAllUrl' => EmailPreferenceUrls::unsubscribeAll($this->subscriber),
                 'unsubscribeThisUrl' => EmailPreferenceUrls::unsubscribeList($this->subscriber, $this->list),
-                'managePreferencesUrl' => EmailPreferenceUrls::managePreferences(),
+                'managePreferencesUrl' => EmailPreferenceUrls::managePreferences($this->subscriber),
             ],
         );
     }

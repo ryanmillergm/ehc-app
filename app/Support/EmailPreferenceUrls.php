@@ -22,9 +22,16 @@ class EmailPreferenceUrls
         ]);
     }
 
-    public static function managePreferences(): string
+    /**
+     * If a subscriber is provided, return the public (token-based) page.
+     * Otherwise fall back to the logged-in profile page (useful inside the app).
+     */
+    public static function managePreferences(?EmailSubscriber $subscriber = null): string
     {
-        // Jetstream Livewire profile page
+        if ($subscriber) {
+            return route('emails.preferences', ['token' => $subscriber->unsubscribe_token]);
+        }
+
         return route('profile.show') . '#email-preferences';
     }
 }
