@@ -2,6 +2,15 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Actions\ViewAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\ChildResource\Pages\ListChildren;
+use App\Filament\Resources\ChildResource\Pages\CreateChild;
+use App\Filament\Resources\ChildResource\Pages\ViewChild;
+use App\Filament\Resources\ChildResource\Pages\EditChild;
 use App\Filament\Resources\ChildResource\Pages;
 use App\Filament\Resources\ChildResource\RelationManagers;
 use App\Models\Child;
@@ -10,13 +19,8 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
-use Filament\Tables\Actions\BulkActionGroup;
-use Filament\Tables\Actions\DeleteBulkAction;
-use Filament\Tables\Actions\EditAction;
-use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -26,13 +30,14 @@ class ChildResource extends Resource
 {
     protected static ?string $model = Child::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-user-group';
-    protected static ?string $navigationGroup = 'Program Settings';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-user-group';
+    // protected static string | \UnitEnum | null $navigationGroup = 'Program Settings';
+    protected static bool $shouldRegisterNavigation = false;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 TextInput::make('first_name')
                     ->required()
                     ->maxLength(255),
@@ -91,11 +96,11 @@ class ChildResource extends Resource
             ->filters([
                 //
             ])
-            ->actions([
+            ->recordActions([
                 ViewAction::make(),
                 EditAction::make(),
             ])
-            ->bulkActions([
+            ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
@@ -112,10 +117,10 @@ class ChildResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListChildren::route('/'),
-            'create' => Pages\CreateChild::route('/create'),
-            'view' => Pages\ViewChild::route('/{record}'),
-            'edit' => Pages\EditChild::route('/{record}/edit'),
+            'index' => ListChildren::route('/'),
+            'create' => CreateChild::route('/create'),
+            'view' => ViewChild::route('/{record}'),
+            'edit' => EditChild::route('/{record}/edit'),
         ];
     }
 }

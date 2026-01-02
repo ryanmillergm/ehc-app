@@ -2,6 +2,16 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Navigation\NavigationGroup;
+use Filament\Schemas\Schema;
+use Filament\Actions\ViewAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\PageTranslationResource\Pages\ListPageTranslations;
+use App\Filament\Resources\PageTranslationResource\Pages\CreatePageTranslation;
+use App\Filament\Resources\PageTranslationResource\Pages\ViewPageTranslation;
+use App\Filament\Resources\PageTranslationResource\Pages\EditPageTranslation;
 use App\Filament\Resources\PageTranslationResource\Pages;
 use App\Filament\Resources\PageTranslationResource\RelationManagers;
 use App\Models\PageTranslation;
@@ -10,7 +20,6 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Columns\IconColumn;
@@ -18,17 +27,19 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use BackedEnum;
+use Filament\Support\Icons\Heroicon;
 
 class PageTranslationResource extends Resource
 {
     protected static ?string $model = PageTranslation::class;
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
-    protected static ?string $navigationGroup = 'Pages';
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::Language;
+    protected static string|\UnitEnum|null $navigationGroup = NavigationGroup::Pages;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema(PageTranslation::getForm());
+        return $schema
+            ->components(PageTranslation::getForm());
     }
 
     public static function table(Table $table): Table
@@ -60,13 +71,13 @@ class PageTranslationResource extends Resource
             ->filters([
                 //
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
+            ->recordActions([
+                ViewAction::make(),
+                EditAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }
@@ -81,10 +92,10 @@ class PageTranslationResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListPageTranslations::route('/'),
-            'create' => Pages\CreatePageTranslation::route('/create'),
-            'view' => Pages\ViewPageTranslation::route('/{record}'),
-            'edit' => Pages\EditPageTranslation::route('/{record}/edit'),
+            'index' => ListPageTranslations::route('/'),
+            'create' => CreatePageTranslation::route('/create'),
+            'view' => ViewPageTranslation::route('/{record}'),
+            'edit' => EditPageTranslation::route('/{record}/edit'),
         ];
     }
 }

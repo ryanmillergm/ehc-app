@@ -2,59 +2,72 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Navigation\NavigationGroup;
+use Filament\Schemas\Schema;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Actions\EditAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\AddressResource\Pages\ListAddresses;
+use App\Filament\Resources\AddressResource\Pages\CreateAddress;
+use App\Filament\Resources\AddressResource\Pages\EditAddress;
 use App\Filament\Resources\AddressResource\Pages;
 use App\Filament\Resources\AddressResource\RelationManagers;
 use App\Models\Address;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use BackedEnum;
+use Filament\Support\Icons\Heroicon;
 
 class AddressResource extends Resource
 {
     protected static ?string $model = Address::class;
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::MapPin;
     protected static ?int $navigationSort = 2;
-    protected static ?string $navigationGroup = 'User Settings';
+    protected static string|\UnitEnum|null $navigationGroup = NavigationGroup::UserSettings;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\TextInput::make('user_id')
+        return $schema
+            ->components([
+                TextInput::make('user_id')
                     ->numeric(),
-                Forms\Components\TextInput::make('label')
+                TextInput::make('label')
                     ->maxLength(255),
-                Forms\Components\TextInput::make('first_name')
+                TextInput::make('first_name')
                     ->maxLength(255),
-                Forms\Components\TextInput::make('last_name')
+                TextInput::make('last_name')
                     ->maxLength(255),
-                Forms\Components\TextInput::make('company')
+                TextInput::make('company')
                     ->maxLength(255),
-                Forms\Components\TextInput::make('line1')
+                TextInput::make('line1')
                     ->required()
                     ->maxLength(255),
-                Forms\Components\TextInput::make('line2')
+                TextInput::make('line2')
                     ->maxLength(255),
-                Forms\Components\TextInput::make('city')
+                TextInput::make('city')
                     ->required()
                     ->maxLength(255),
-                Forms\Components\TextInput::make('state')
+                TextInput::make('state')
                     ->maxLength(255),
-                Forms\Components\TextInput::make('postal_code')
+                TextInput::make('postal_code')
                     ->required()
                     ->maxLength(255),
-                Forms\Components\TextInput::make('country')
+                TextInput::make('country')
                     ->required()
                     ->maxLength(2)
                     ->default('US'),
-                Forms\Components\TextInput::make('phone')
+                TextInput::make('phone')
                     ->tel()
                     ->maxLength(255),
-                Forms\Components\Toggle::make('is_primary')
+                Toggle::make('is_primary')
                     ->required(),
             ]);
     }
@@ -63,38 +76,38 @@ class AddressResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('user_id')
+                TextColumn::make('user_id')
                     ->numeric()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('label')
+                TextColumn::make('label')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('first_name')
+                TextColumn::make('first_name')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('last_name')
+                TextColumn::make('last_name')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('company')
+                TextColumn::make('company')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('line1')
+                TextColumn::make('line1')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('line2')
+                TextColumn::make('line2')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('city')
+                TextColumn::make('city')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('state')
+                TextColumn::make('state')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('postal_code')
+                TextColumn::make('postal_code')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('country')
+                TextColumn::make('country')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('phone')
+                TextColumn::make('phone')
                     ->searchable(),
-                Tables\Columns\IconColumn::make('is_primary')
+                IconColumn::make('is_primary')
                     ->boolean(),
-                Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('updated_at')
+                TextColumn::make('updated_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -102,12 +115,12 @@ class AddressResource extends Resource
             ->filters([
                 //
             ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
+            ->recordActions([
+                EditAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }
@@ -122,9 +135,9 @@ class AddressResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListAddresses::route('/'),
-            'create' => Pages\CreateAddress::route('/create'),
-            'edit' => Pages\EditAddress::route('/{record}/edit'),
+            'index' => ListAddresses::route('/'),
+            'create' => CreateAddress::route('/create'),
+            'edit' => EditAddress::route('/{record}/edit'),
         ];
     }
 }

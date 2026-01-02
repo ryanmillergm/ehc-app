@@ -2,35 +2,44 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Navigation\NavigationGroup;
+use Filament\Schemas\Schema;
+use Filament\Actions\ViewAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\PermissionResource\Pages\ListPermissions;
+use App\Filament\Resources\PermissionResource\Pages\CreatePermission;
+use App\Filament\Resources\PermissionResource\Pages\ViewPermission;
+use App\Filament\Resources\PermissionResource\Pages\EditPermission;
 use App\Filament\Resources\PermissionResource\Pages;
 use App\Filament\Resources\PermissionResource\RelationManagers;
 use App\Models\Permission;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Forms\Components\TextInput;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables;
-use Filament\Tables\Actions\DeleteAction;
-use Filament\Tables\Actions\EditAction;
-use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use BackedEnum;
+use Filament\Support\Icons\Heroicon;
 
 
 class PermissionResource extends Resource
 {
     protected static ?string $model = Permission::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::LockClosed;
     protected static ?int $navigationSort = 2;
-    protected static ?string $navigationGroup = 'User Settings';
+    protected static string|\UnitEnum|null $navigationGroup = NavigationGroup::UserSettings;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 TextInput::make('name')
                     ->rules(['required', 'min:2', 'max:255'])
                     ->unique(ignoreRecord: true),
@@ -51,14 +60,14 @@ class PermissionResource extends Resource
             ->filters([
                 //
             ])
-            ->actions([
+            ->recordActions([
                 ViewAction::make(),
                 EditAction::make(),
                 DeleteAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }
@@ -73,10 +82,10 @@ class PermissionResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListPermissions::route('/'),
-            'create' => Pages\CreatePermission::route('/create'),
-            'view' => Pages\ViewPermission::route('/{record}'),
-            'edit' => Pages\EditPermission::route('/{record}/edit'),
+            'index' => ListPermissions::route('/'),
+            'create' => CreatePermission::route('/create'),
+            'view' => ViewPermission::route('/{record}'),
+            'edit' => EditPermission::route('/{record}/edit'),
         ];
     }
 }

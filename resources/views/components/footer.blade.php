@@ -68,22 +68,11 @@
                         Monthly updates: outreach stories, needs, and ways to help.
                     </p>
 
-                    <form action="#" class="mt-5 space-y-3">
-                        <div class="flex flex-col sm:flex-row gap-3">
-                            <input
-                                type="email"
-                                class="w-full rounded-full px-4 py-3 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-400"
-                                placeholder="Email address"
-                            />
-                            <button class="shrink-0 rounded-full bg-rose-600 px-6 py-3 font-semibold hover:bg-rose-500 transition">
-                                Subscribe
-                            </button>
-                        </div>
+                    {{-- Email Subscribe Form --}}
+                    <div class="mt-5">
+                        <livewire:email-signup-form variant="footer" />
+                    </div>
 
-                        <div class="text-xs text-white/55 text-center sm:text-left">
-                            By subscribing, you agree to receive email updates.
-                        </div>
-                    </form>
                 </div>
             </div>
         </div>

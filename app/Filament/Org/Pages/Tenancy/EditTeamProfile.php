@@ -2,8 +2,8 @@
 
 namespace App\Filament\Org\Pages\Tenancy;
 
+use Filament\Schemas\Schema;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Form;
 use Filament\Pages\Tenancy\EditTenantProfile;
 
 class EditTeamProfile extends EditTenantProfile
@@ -13,10 +13,10 @@ class EditTeamProfile extends EditTenantProfile
         return 'Team profile';
     }
 
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 TextInput::make('name'),
                 TextInput::make('slug'),
             ]);

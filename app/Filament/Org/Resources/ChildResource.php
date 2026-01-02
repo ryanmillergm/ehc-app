@@ -2,11 +2,24 @@
 
 namespace App\Filament\Org\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Textarea;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Actions\ViewAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Org\Resources\ChildResource\Pages\ListChildren;
+use App\Filament\Org\Resources\ChildResource\Pages\CreateChild;
+use App\Filament\Org\Resources\ChildResource\Pages\ViewChild;
+use App\Filament\Org\Resources\ChildResource\Pages\EditChild;
 use App\Filament\Org\Resources\ChildResource\Pages;
 use App\Filament\Org\Resources\ChildResource\RelationManagers;
 use App\Models\Child;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -17,31 +30,31 @@ class ChildResource extends Resource
 {
     protected static ?string $model = Child::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-user-group';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-user-group';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\TextInput::make('first_name')
+        return $schema
+            ->components([
+                TextInput::make('first_name')
                     ->required()
                     ->maxLength(255),
-                Forms\Components\TextInput::make('last_name')
+                TextInput::make('last_name')
                     ->required()
                     ->maxLength(255),
-                Forms\Components\DatePicker::make('date_of_birth')
+                DatePicker::make('date_of_birth')
                     ->live(onBlur: true)
                     ->native(false)
                     ->displayFormat('d/m/Y')
                     ->format('Y/m/d')
                     ->required(),
-                Forms\Components\TextInput::make('country')
+                TextInput::make('country')
                     ->required()
                     ->maxLength(255),
-                Forms\Components\TextInput::make('city')
+                TextInput::make('city')
                     ->required()
                     ->maxLength(255),
-                Forms\Components\Textarea::make('description')
+                Textarea::make('description')
                     ->required()
                     ->columnSpanFull(),
             ]);
@@ -51,25 +64,25 @@ class ChildResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('first_name')
+                TextColumn::make('first_name')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('last_name')
+                TextColumn::make('last_name')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('date_of_birth')
+                TextColumn::make('date_of_birth')
                     ->date()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('country')
+                TextColumn::make('country')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('city')
+                TextColumn::make('city')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('team.name')
+                TextColumn::make('team.name')
                     ->numeric()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('updated_at')
+                TextColumn::make('updated_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -77,14 +90,14 @@ class ChildResource extends Resource
             ->filters([
                 //
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+            ->recordActions([
+                ViewAction::make(),
+                EditAction::make(),
+                DeleteAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }
@@ -99,10 +112,10 @@ class ChildResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListChildren::route('/'),
-            'create' => Pages\CreateChild::route('/create'),
-            'view' => Pages\ViewChild::route('/{record}'),
-            'edit' => Pages\EditChild::route('/{record}/edit'),
+            'index' => ListChildren::route('/'),
+            'create' => CreateChild::route('/create'),
+            'view' => ViewChild::route('/{record}'),
+            'edit' => EditChild::route('/{record}/edit'),
         ];
     }
 }

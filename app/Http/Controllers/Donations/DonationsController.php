@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Donations;
 
+use Throwable;
 use App\Http\Controllers\Controller;
 use App\Models\Address;
 use App\Models\Pledge;
@@ -368,7 +369,7 @@ class DonationsController extends Controller
                         'receipt_url' => $receiptUrl,
                     ]);
                 }
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 Log::warning('Donation complete: Stripe enrichment failed', [
                     'transaction_id' => $transaction->id,
                     'payment_intent' => $piId,
@@ -482,7 +483,7 @@ class DonationsController extends Controller
                 ]);
 
                 $this->sdbg('complete(subscription): pledge after StripeService', $this->pledgeSnap($pledge));
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 // Debug should never take down the request (or tests).
                 $this->sdbg('complete(subscription): debug extract failed', [
                     'error'              => $e->getMessage(),
@@ -586,7 +587,7 @@ class DonationsController extends Controller
                 $request->session()->put('transaction_thankyou_id', $tx->id);
 
                 return redirect()->route('donations.thankyou');
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 Log::warning('stripeReturn: PI finalize failed', [
                     'payment_intent' => $piId,
                     'error' => $e->getMessage(),
@@ -625,7 +626,7 @@ class DonationsController extends Controller
                     $pledge->donor_email ??= data_get($pm, 'billing_details.email');
                     $pledge->donor_name  ??= data_get($pm, 'billing_details.name');
                     $pledge->save();
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                     Log::info('stripeReturn: could not read payment method billing details', [
                         'setup_intent' => $siId,
                         'payment_method' => $pmId,
@@ -638,7 +639,7 @@ class DonationsController extends Controller
                 $request->session()->put('pledge_thankyou_id', $pledge->id);
 
                 return redirect()->route('donations.thankyou-subscription');
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 Log::warning('stripeReturn: subscription finalize failed', [
                     'setup_intent' => $siId,
                     'pledge_id' => $pledge->id,

@@ -20,6 +20,13 @@
 
             <x-section-border />
 
+            {{-- Email preferences --}}
+            <div id="email-preferences" class="mt-10 sm:mt-0">
+                @livewire('profile.email-preferences-form')
+            </div>
+
+            <x-section-border />
+
             @if (Laravel\Fortify\Features::enabled(Laravel\Fortify\Features::updatePasswords()))
                 <div class="mt-10 sm:mt-0">
                     @livewire('profile.update-password-form')

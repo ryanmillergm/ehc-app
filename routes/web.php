@@ -16,11 +16,22 @@ use App\Http\Controllers\LanguagesController;
 use App\Http\Controllers\StripeWebhookController;
 use App\Http\Controllers\PageTranslationController;
 use App\Http\Controllers\Donations\DonationsController;
+use App\Http\Controllers\EmailPreferencesController;
 use App\Http\Middleware\LogStripeWebhookHit;
+use App\Http\Controllers\EmailUnsubscribeController;
 
 Route::get('lang/{lang}', LanguageSwitch::class)->name('lang');
 
 Route::get('/', Home::class)->name('home');
+
+Route::view('/emails/subscribe', 'emails.subscribe')
+    ->name('emails.subscribe');
+
+Route::get('/unsubscribe/{token}', EmailUnsubscribeController::class)
+    ->name('emails.unsubscribe');
+
+Route::get('/email-preferences/{token}', EmailPreferencesController::class)
+    ->name('emails.preferences');
 
 Route::get('/dev/stripe/webhook-status', function () {
     abort_unless(app()->environment('local'), 404);

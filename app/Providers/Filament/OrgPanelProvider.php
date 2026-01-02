@@ -2,6 +2,10 @@
 
 namespace App\Providers\Filament;
 
+use Filament\Pages\Dashboard;
+use Filament\Widgets\AccountWidget;
+use Filament\Widgets\FilamentInfoWidget;
+use Filament\Support\Enums\Width;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -21,7 +25,6 @@ use App\Filament\Org\Pages\Tenancy\EditTeamProfile;
 use App\Filament\Org\Pages\Tenancy\RegisterTeam;
 use App\Filament\Org\Resources\ChildResource;
 use App\Models\Team;
-use Filament\Support\Enums\MaxWidth;
 
 class OrgPanelProvider extends PanelProvider
 {
@@ -45,12 +48,12 @@ class OrgPanelProvider extends PanelProvider
             ->discoverResources(in: app_path('Filament/Org/Resources'), for: 'App\\Filament\\Org\\Resources')
             ->discoverPages(in: app_path('Filament/Org/Pages'), for: 'App\\Filament\\Org\\Pages')
             ->pages([
-                Pages\Dashboard::class,
+                Dashboard::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Org/Widgets'), for: 'App\\Filament\\Org\\Widgets')
             ->widgets([
-                Widgets\AccountWidget::class,
-                Widgets\FilamentInfoWidget::class,
+                AccountWidget::class,
+                FilamentInfoWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,
@@ -66,7 +69,7 @@ class OrgPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
             ])
-            ->maxContentWidth(MaxWidth::Full)
+            ->maxContentWidth(Width::Full)
             ->sidebarFullyCollapsibleOnDesktop()
             ->tenant(Team::class, ownershipRelationship: 'team', slugAttribute: 'slug')
             ->tenantRegistration(RegisterTeam::class)
