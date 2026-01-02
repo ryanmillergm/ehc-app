@@ -13,7 +13,8 @@
         "laravel/tinker": "^2.9",
         "livewire/livewire": "^3.0",
         "spatie/laravel-permission": "^6.7",
-        "stripe/stripe-php": "^18.2"
+        "stripe/stripe-php": "^18.2",
+        "tijsverkoyen/css-to-inline-styles": "^2.4"
     },
     "require-dev": {
         "barryvdh/laravel-debugbar": "^3.13",

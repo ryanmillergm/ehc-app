@@ -20,7 +20,15 @@ class EmailCampaign extends Model
     protected $fillable = [
         'email_list_id',
         'subject',
+
+        'editor',
+        'design_json',
+        'design_html',
+        'design_css',
+
         'body_html',
+        'body_text',
+
         'status',
         'queued_at',
         'sent_at',
@@ -31,8 +39,9 @@ class EmailCampaign extends Model
     ];
 
     protected $casts = [
-        'queued_at' => 'datetime',
-        'sent_at'   => 'datetime',
+        'design_json' => 'array',
+        'queued_at'   => 'datetime',
+        'sent_at'     => 'datetime',
     ];
 
     public function emailList(): BelongsTo

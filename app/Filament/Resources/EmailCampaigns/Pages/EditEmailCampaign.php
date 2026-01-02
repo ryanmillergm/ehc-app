@@ -15,6 +15,7 @@ use Filament\Resources\Pages\EditRecord;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
+use TijsVerkoyen\CssToInlineStyles\CssToInlineStyles;
 
 class EditEmailCampaign extends EditRecord
 {
@@ -133,5 +134,31 @@ class EditEmailCampaign extends EditRecord
 
             DeleteAction::make(),
         ];
+    }
+
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        if (($data['editor'] ?? 'html') === 'grapesjs') {
+            // Fallback to record values to avoid wiping if the builder didn’t mount
+            $html = $data['design_html'] ?? $this->getRecord()->design_html ?? '';
+            $css  = $data['design_css']  ?? $this->getRecord()->design_css  ?? '';
+
+            if (filled($html)) {
+                $inliner = new CssToInlineStyles();
+                $data['body_html'] = $inliner->convert($html, $css);
+                $data['body_text'] = $this->toText($data['body_html']);
+            }
+        }
+
+        return $data;
+    }
+
+    private function toText(?string $html): ?string
+    {
+        if (! filled($html)) return null;
+
+        $text = strip_tags($html);
+        $text = preg_replace('/\s+/', ' ', $text);
+        return Str::limit(trim($text), 10000, '');
     }
 }
