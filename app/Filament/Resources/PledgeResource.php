@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Navigation\NavigationGroup;
 use Filament\Schemas\Schema;
 use Filament\Actions\EditAction;
 use Filament\Actions\DeleteAction;
@@ -17,12 +18,15 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use BackedEnum;
+use Filament\Support\Icons\Heroicon;
 
 class PledgeResource extends Resource
 {
     protected static ?string $model = Pledge::class;
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-rectangle-stack';
-    protected static string | \UnitEnum | null $navigationGroup = 'Donations';
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::CurrencyDollar;
+    protected static string|\UnitEnum|null $navigationGroup = NavigationGroup::Donations;
+    protected static ?int $navigationSort = 1;
 
     public static function form(Schema $schema): Schema
     {

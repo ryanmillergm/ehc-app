@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Navigation\NavigationGroup;
 use Filament\Pages\Enums\SubNavigationPosition;
 use Filament\Schemas\Schema;
 use Filament\Actions\ViewAction;
@@ -29,13 +30,15 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use BackedEnum;
+use Filament\Support\Icons\Heroicon;
 
 class PageResource extends Resource
 {
     protected static ?string $model = Page::class;
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-rectangle-stack';
-    protected static string | \UnitEnum | null $navigationGroup = 'Pages';
-
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::DocumentDuplicate;
+    protected static string|\UnitEnum|null $navigationGroup = NavigationGroup::Pages;
+    
     protected static ?\Filament\Pages\Enums\SubNavigationPosition $subNavigationPosition = SubNavigationPosition::Top;
 
     public static function form(Schema $schema): Schema

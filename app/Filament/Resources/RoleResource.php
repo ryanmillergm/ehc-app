@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Navigation\NavigationGroup;
 use Filament\Schemas\Schema;
 use Filament\Actions\ViewAction;
 use Filament\Actions\EditAction;
@@ -24,14 +25,16 @@ use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use BackedEnum;
+use Filament\Support\Icons\Heroicon;
 
 class RoleResource extends Resource
 {
     protected static ?string $model = Role::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::Briefcase;
     protected static ?int $navigationSort = 3;
-    protected static string | \UnitEnum | null $navigationGroup = 'User Settings';
+    protected static string|\UnitEnum|null $navigationGroup = NavigationGroup::UserSettings;
 
     public static function form(Schema $schema): Schema
     {

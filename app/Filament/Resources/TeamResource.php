@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Navigation\NavigationGroup;
 use Filament\Schemas\Schema;
 use Filament\Actions\ViewAction;
 use Filament\Actions\EditAction;
@@ -26,14 +27,16 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use BackedEnum;
+use Filament\Support\Icons\Heroicon;
 
 class TeamResource extends Resource
 {
     protected static ?string $model = Team::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::UserGroup;
     protected static ?int $navigationSort = 4;
-    protected static string | \UnitEnum | null $navigationGroup = 'User Settings';
+    protected static string|\UnitEnum|null $navigationGroup = NavigationGroup::UserSettings;
     protected static ?string $tenantOwnershipRelationshipName = 'assignedTeams';
 
     public static function form(Schema $schema): Schema

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Navigation\NavigationGroup;
 use App\Filament\Resources\UserResource\Pages\CreateUser;
 use App\Filament\Resources\UserResource\Pages\EditUser;
 use App\Filament\Resources\UserResource\Pages\ListUsers;
@@ -31,7 +32,7 @@ class UserResource extends Resource
 
     protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-users';
     protected static ?int $navigationSort = 1;
-    protected static string | \UnitEnum | null $navigationGroup = 'User Settings';
+    protected static string|\UnitEnum|null $navigationGroup = NavigationGroup::UserSettings;
 
     public static function form(Schema $schema): Schema
     {

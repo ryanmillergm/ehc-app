@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Navigation\NavigationGroup;
 use Filament\Schemas\Schema;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\DateTimePicker;
@@ -26,7 +27,7 @@ class TransactionResource extends Resource
 {
     protected static ?string $model = Transaction::class;
     protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-receipt-percent';
-    protected static string | \UnitEnum | null $navigationGroup = 'Donations';
+    protected static string|\UnitEnum|null $navigationGroup = NavigationGroup::Donations;
 
     public static function form(Schema $schema): Schema
     {
