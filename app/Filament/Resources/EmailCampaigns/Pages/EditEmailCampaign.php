@@ -13,6 +13,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 
 class EditEmailCampaign extends EditRecord
@@ -24,6 +25,7 @@ class EditEmailCampaign extends EditRecord
         return [
             Action::make('sendTest')
                 ->label('Send test')
+                ->icon('heroicon-o-envelope')
                 ->schema([
                     TextInput::make('email')
                         ->label('Send test to')
@@ -31,18 +33,20 @@ class EditEmailCampaign extends EditRecord
                         ->required(),
                 ])
                 ->action(function (array $data): void {
-                    $campaign = $this->record->loadMissing('list');
+                    $campaign = $this->getRecord();
+                    $list = $campaign->list; // your EmailCampaign has list()
 
-                    if (! $campaign->list) {
+                    if (! $list) {
                         Notification::make()
-                            ->title('No email list selected')
+                            ->title('No list selected')
                             ->danger()
                             ->send();
+
                         return;
                     }
 
-                    $rawEmail = trim(strtolower($data['email']));
-                    $canonical = EmailCanonicalizer::canonicalize($rawEmail) ?? $rawEmail;
+                    $email = trim(strtolower($data['email']));
+                    $canonical = EmailCanonicalizer::canonicalize($email) ?? $email;
 
                     $subscriber = EmailSubscriber::query()
                         ->where('email_canonical', $canonical)
@@ -57,30 +61,27 @@ class EditEmailCampaign extends EditRecord
                             'preferences' => [],
                         ]);
                     } else {
-                        // ensure they are globally opted-in for marketing (for realistic testing)
+                        // ensure globally opted-in so links + behavior match real sends
                         $subscriber->update([
-                            'email' => $canonical,
                             'unsubscribed_at' => null,
                             'subscribed_at' => $subscriber->subscribed_at ?? now(),
                         ]);
                     }
 
-                    // ensure list pivot is active (so unsubscribeThisUrl + “real send rules” match)
-                    $campaign->list->subscribers()->syncWithoutDetaching([
+                    // ensure they’re subscribed to THIS list for accurate “unsubscribe this list” behavior
+                    $list->subscribers()->syncWithoutDetaching([
                         $subscriber->id => [
                             'subscribed_at' => now(),
                             'unsubscribed_at' => null,
                         ],
                     ]);
 
-                    Mail::to($subscriber->email, $subscriber->name)->send(
-                        new EmailCampaignMail(
-                            subscriber: $subscriber,
-                            list: $campaign->list,
-                            subjectLine: $campaign->subject,
-                            bodyHtml: $campaign->body_html,
-                        )
-                    );
+                    Mail::to($subscriber->email)->send(new EmailCampaignMail(
+                        subscriber: $subscriber,
+                        list: $list,
+                        subjectLine: $campaign->subject,
+                        bodyHtml: $campaign->body_html,
+                    ));
 
                     Notification::make()
                         ->title('Test email sent')
@@ -88,18 +89,47 @@ class EditEmailCampaign extends EditRecord
                         ->send();
                 }),
 
-            Action::make('sendCampaign')
-                ->label('Send campaign')
-                ->requiresConfirmation()
-                ->visible(fn () => $this->record->isSendable())
-                ->action(function (): void {
-                    QueueEmailCampaignSend::dispatch($this->record->id);
+                Action::make('sendCampaign')
+                    ->label('Send (LIVE)')
+                    ->icon('heroicon-o-paper-airplane')
+                    ->color('danger')
+                    ->disabled(fn () => ! $this->getRecord()->isSendable())
+                    ->requiresConfirmation()
+                    ->modalHeading('⚠️ Send this campaign to the LIVE email list?')
+                    ->modalDescription(function (): HtmlString {
+                        $campaign = $this->getRecord()->loadMissing('list');
 
-                    Notification::make()
-                        ->title('Campaign queued for sending')
-                        ->success()
-                        ->send();
-                }),
+                        if (! $campaign->list) {
+                            return new HtmlString('<div class="whitespace-pre-line">No list is selected. Pick an Email List first.</div>');
+                        }
+
+                        $active = $campaign->list->subscribers()
+                            ->whereNull('email_list_subscriber.unsubscribed_at')
+                            ->count();
+
+                        $text = implode("\n", [
+                            'You are about to send a LIVE email blast.',
+                            "List: {$campaign->list->label} ({$campaign->list->key})",
+                            "Active recipients: {$active}",
+                            "Subject: {$campaign->subject}",
+                            'Tip: Send a TEST email first to verify formatting/links.',
+                            'This action queues emails immediately and cannot be undone.',
+                        ]);
+
+                        return new HtmlString('<div class="whitespace-pre-line">' . e($text) . '</div>');
+                    })
+                    ->modalSubmitActionLabel('Yes — send it')
+                    ->extraModalWindowAttributes(['class' => 'send-campaign-modal'])
+                    ->action(function (): void {
+                        $campaign = $this->getRecord();
+
+                        QueueEmailCampaignSend::dispatch($campaign->id);
+
+                        Notification::make()
+                            ->title('Campaign queued for sending')
+                            ->success()
+                            ->send();
+                    }),
 
             DeleteAction::make(),
         ];
