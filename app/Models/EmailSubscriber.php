@@ -62,6 +62,14 @@ class EmailSubscriber extends Model
         });
     }
 
+    public function scopeSubscribedToListId(Builder $q, int $listId): Builder
+    {
+        return $q->whereHas('lists', function ($lists) use ($listId) {
+            $lists->where('email_lists.id', $listId)
+                  ->whereNull('email_list_subscriber.unsubscribed_at');
+        });
+    }
+
     public function getNameAttribute(): ?string
     {
         $first = trim((string) $this->first_name);
