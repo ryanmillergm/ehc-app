@@ -47,7 +47,12 @@ class EmailBodyCompiler
 
         $text = strip_tags($html);
         $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $text = preg_replace('/\s+/', ' ', $text);
+
+        // Normalize non-breaking spaces to regular spaces
+        $text = preg_replace('/\x{00A0}/u', ' ', $text);
+
+        // Collapse any kind of whitespace (Unicode-aware)
+        $text = preg_replace('/\s+/u', ' ', $text);
 
         return Str::limit(trim((string) $text), 10000, '');
     }
