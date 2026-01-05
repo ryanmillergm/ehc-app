@@ -4,6 +4,7 @@ namespace Tests\Feature\Mail;
 
 use App\Mail\MarketingMailable;
 use App\Models\EmailSubscriber;
+use App\Support\EmailPreferenceUrls;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -49,7 +50,7 @@ class MarketingMailableTest extends TestCase
         );
 
         $this->assertSame(
-            route('profile.show') . '#email-preferences',
+            EmailPreferenceUrls::managePreferences($subscriber),
             $data['managePreferencesUrl'],
         );
     }
