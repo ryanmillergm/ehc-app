@@ -1,52 +1,62 @@
 @php
-    $statePath = $getStatePath();
-    $htmlPath  = str_replace('design_json', 'design_html', $statePath);
-    $cssPath   = str_replace('design_json', 'design_css', $statePath);
+    $recordKey = optional($getRecord())->getKey() ?? 'create';
+    $lwId = method_exists($getLivewire(), 'getId') ? $getLivewire()->getId() : 'lw';
+    $instanceKey = "gjs-{$recordKey}-{$lwId}";
+
+    $initialHtml = $getRecord()?->design_html ?? '';
+    $initialCss  = $getRecord()?->design_css ?? '';
+
+    $initialJson = $getRecord()?->design_json ?? '';
+    if (is_array($initialJson)) {
+        $initialJson = json_encode($initialJson);
+    }
 @endphp
+
 
 <x-dynamic-component :component="$getFieldWrapperView()" :field="$field">
     <div
         wire:ignore
-        x-data="grapesEmailBuilder({
-            height: '700px',
-            project: $wire.entangle('{{ $statePath }}'),
-
-            // ✅ IMPORTANT: third param false = don't talk to server
-            setProject: (v) => $wire.set('{{ $statePath }}', v, false),
-            setHtml:    (v) => $wire.set('{{ $htmlPath }}', v, false),
-            setCss:     (v) => $wire.set('{{ $cssPath }}', v, false),
-        })"
-        x-init="init()"
-        class="rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden"
-        :class="{ 'fixed inset-4 z-9999 bg-white dark:bg-gray-950 shadow-2xl': fullscreen }"
+        wire:key="gjs-root-{{ $instanceKey }}"
+        data-gjs-email-builder="1"
+        data-gjs-key="{{ $instanceKey }}"
+        data-gjs-html-key="design_html"
+        data-gjs-css-key="design_css"
+        data-gjs-json-key="design_json"
+        class="rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden bg-white dark:bg-gray-950"
+        style="height: 700px;"
     >
-        <div class="flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-800">
-            <div class="text-xs text-gray-500">
-                Drag blocks → double-click text to edit
-            </div>
+        {{-- Initial payload --}}
+        <textarea data-gjs-initial-html class="hidden">{{ $initialHtml }}</textarea>
+        <textarea data-gjs-initial-css class="hidden">{{ $initialCss }}</textarea>
+        <textarea data-gjs-initial-json class="hidden">{{ $initialJson }}</textarea>
 
-            <button type="button"
-                class="px-2 py-1 text-xs rounded-md border border-gray-200 dark:border-gray-800"
-                @click="toggleFullscreen()"
+        {{-- Toolbar --}}
+        <div class="flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-800">
+            <div class="text-xs text-gray-500">Email Designer</div>
+
+            <button
+                type="button"
+                data-gjs-fullscreen-toggle
+                class="text-xs px-3 py-1 rounded-lg border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900"
             >
-                <span x-text="fullscreen ? 'Exit fullscreen' : 'Fullscreen'"></span>
+                Fullscreen
             </button>
         </div>
 
-        <div class="flex" style="height: 700px" :style="fullscreen ? 'height: calc(100vh - 4rem)' : ''">
-            <div class="w-56 border-r border-gray-200 dark:border-gray-800 overflow-auto" x-ref="blocks"></div>
-
-            <div class="flex-1 min-w-0" x-ref="canvas"></div>
+        {{-- Layout --}}
+        <div class="flex" data-gjs-layout style="height: calc(700px - 41px);">
+            <div class="w-56 border-r border-gray-200 dark:border-gray-800 overflow-auto" data-gjs-blocks></div>
+            <div class="flex-1 min-w-0" data-gjs-canvas></div>
 
             <div class="w-72 border-l border-gray-200 dark:border-gray-800 overflow-auto">
                 <div class="p-2 text-xs text-gray-500 border-b border-gray-200 dark:border-gray-800">Layers</div>
-                <div x-ref="layers"></div>
+                <div data-gjs-layers></div>
 
                 <div class="p-2 text-xs text-gray-500 border-b border-gray-200 dark:border-gray-800">Styles</div>
-                <div x-ref="styles"></div>
+                <div data-gjs-styles></div>
 
                 <div class="p-2 text-xs text-gray-500 border-b border-gray-200 dark:border-gray-800">Settings</div>
-                <div x-ref="traits"></div>
+                <div data-gjs-traits></div>
             </div>
         </div>
     </div>

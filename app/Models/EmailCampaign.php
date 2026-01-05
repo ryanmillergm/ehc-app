@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\HtmlFragments;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,7 +13,7 @@ use Illuminate\Validation\ValidationException;
 class EmailCampaign extends Model
 {
     use HasFactory;
-    
+
     public const STATUS_DRAFT   = 'draft';
     public const STATUS_SENDING = 'sending';
     public const STATUS_SENT    = 'sent';
@@ -40,9 +42,21 @@ class EmailCampaign extends Model
 
     protected $casts = [
         'design_json' => 'array',
-        'queued_at'   => 'datetime',
-        'sent_at'     => 'datetime',
+        'queued_at' => 'datetime',
+        'sent_at'   => 'datetime',
     ];
+
+    /**
+     * Always store ONLY the body inner HTML in design_html.
+     * This prevents GrapesJS parsing/perf issues caused by saving <body>...</body>
+     * (or full documents) into the design fragment field.
+     */
+    protected function designHtml(): Attribute
+    {
+        return Attribute::make(
+            set: fn ($value) => HtmlFragments::bodyInner($value),
+        );
+    }
 
     public function emailList(): BelongsTo
     {

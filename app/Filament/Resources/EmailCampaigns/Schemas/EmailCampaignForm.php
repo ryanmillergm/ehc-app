@@ -6,45 +6,42 @@ use App\Filament\Forms\Components\GrapesEmailBuilder;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
-use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Grid;
-use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Validation\Rule;
+use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Schema;
 
 class EmailCampaignForm
 {
+    /**
+     * Keep DOM mounted; hide by moving off-screen.
+     * (This avoids ProseMirror teardown weirdness.)
+     */
+    protected static function offscreenStyle(string $mode): string
+    {
+        // NOTE: avoid height:0 here; tiny size tends to be friendlier to RichEditor internals
+        return "editor === '{$mode}' ? '' : 'position:absolute;left:-10000px;top:0;width:1px;height:1px;overflow:hidden;pointer-events:none;opacity:0;'";
+    }
+
+    protected static function xData(): string
+    {
+        return "{ editor: \$wire.entangle('data.editor') }";
+    }
+
     public static function configure(Schema $schema): Schema
     {
         return $schema->components([
-            Grid::make([
-                'default' => 1,
-                'lg' => 12,
-            ])->schema([
+            
                 Section::make('Campaign')
                     ->columnSpan(['default' => 1, 'lg' => 12])
-                    ->columns(2)
+                    ->columns(['default' => 1, 'lg' => 2])
                     ->components([
                         Select::make('email_list_id')
                             ->label('Email List')
-                            ->relationship(
-                                name: 'emailList',
-                                titleAttribute: 'label',
-                                modifyQueryUsing: function (Builder $query, mixed $state): Builder {
-                                    return $query->where(function (Builder $q) use ($state) {
-                                        $q->where('purpose', 'marketing');
-
-                                        if (filled($state)) {
-                                            $q->orWhere('id', $state);
-                                        }
-                                    });
-                                },
-                            )
-                            ->rules([
-                                Rule::exists('email_lists', 'id')->where('purpose', 'marketing'),
-                            ])
+                            ->relationship(name: 'emailList', titleAttribute: 'label')
                             ->searchable()
                             ->preload()
                             ->required(),
@@ -54,46 +51,83 @@ class EmailCampaignForm
                             ->maxLength(255),
 
                         Select::make('editor')
+                            ->label('Editor')
                             ->options([
                                 'grapesjs' => 'Designer (GrapesJS)',
-                                'html'     => 'HTML',
+                                'rich'     => 'WYSIWYG (Rich Editor)',
+                                'html'     => 'Raw HTML (paste full document)',
                             ])
                             ->default('grapesjs')
                             ->live()
-                            ->required(),
+                            ->required()
+                            ->columnSpanFull(),
                     ]),
 
+                // --- GrapesJS ---
                 Section::make('Email Designer')
                     ->columnSpan(['default' => 1, 'lg' => 12])
-                    ->visible(fn (Get $get) => $get('editor') === 'grapesjs')
+                    ->extraAttributes([
+                        'x-data' => self::xData(),
+                        'x-bind:style' => self::offscreenStyle('grapesjs'),
+                    ])
                     ->components([
-                        GrapesEmailBuilder::make('design_json')
-                            ->label('') // cleaner
-                            ->columnSpanFull(),
+                        GrapesEmailBuilder::make('designer')
+                            ->dehydrated(false),
 
                         Hidden::make('design_html'),
                         Hidden::make('design_css'),
+                        Hidden::make('design_json'),
                     ]),
 
-                Section::make('HTML')
+                // --- RichEditor ---
+                Section::make('WYSIWYG Editor')
                     ->columnSpan(['default' => 1, 'lg' => 12])
-                    ->visible(fn (Get $get) => $get('editor') === 'html')
+                    ->extraAttributes([
+                        'x-data' => self::xData(),
+                        'x-bind:style' => self::offscreenStyle('rich'),
+                    ])
                     ->components([
                         RichEditor::make('body_html')
                             ->label('Body')
                             ->columnSpanFull()
-                            ->required(fn (Get $get) => $get('editor') === 'html'),
+                            ->toolbarButtons([
+                                'bold', 'italic', 'underline', 'strike',
+                                'h2', 'h3',
+                                'bulletList', 'orderedList',
+                                'blockquote',
+                                'link',
+                                'undo', 'redo',
+                            ])
+                            ->required(fn (Get $get) => ($get('editor') ?? 'grapesjs') === 'rich')
+                            ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                                if (($get('editor') ?? null) === 'rich') {
+                                    $set('body_html_source', (string) $state);
+                                }
+                            }),
                     ]),
 
-                Section::make('Status')
-                    ->columnSpan(12)
-                    ->collapsed()
-                    ->columns(2)
+                // --- Raw HTML ---
+                Section::make('Raw HTML')
+                    ->columnSpan(['default' => 1, 'lg' => 12])
+                    ->extraAttributes([
+                        'x-data' => self::xData(),
+                        'x-bind:style' => self::offscreenStyle('html'),
+                    ])
                     ->components([
-                        TextInput::make('status')->disabled()->dehydrated(false),
-                        TextInput::make('sent_count')->numeric()->disabled()->dehydrated(false),
+                        Textarea::make('body_html_source')
+                            ->label('Body HTML (paste full document OK)')
+                            ->rows(20)
+                            ->columnSpanFull()
+                            ->helperText('Paste full HTML if you want. On save, we will extract <body> and inline any <style> blocks we can find.')
+                            ->extraInputAttributes(['class' => 'font-mono text-xs'])
+                            ->formatStateUsing(fn ($state, $record) => filled($state) ? $state : ($record?->body_html ?? ''))
+                            ->required(fn (Get $get) => ($get('editor') ?? 'grapesjs') === 'html')
+                            ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                                if (($get('editor') ?? null) === 'html') {
+                                    $set('body_html', (string) $state);
+                                }
+                            }),
                     ]),
-            ]),
         ]);
     }
 }
