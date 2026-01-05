@@ -88,6 +88,12 @@ class EmailCampaignSendingPipelineTest extends TestCase
         });
     }
 
+    private function runJob(object $job): void
+    {
+        // Run the job the same way the queue worker does: container resolves handle() args.
+        app()->call([$job, 'handle']);
+    }
+
     #[Test]
     public function queue_job_creates_delivery_rows_and_dispatches_chunk_jobs(): void
     {
@@ -173,7 +179,7 @@ class EmailCampaignSendingPipelineTest extends TestCase
             'unsubscribed_at' => now(),
         ]);
 
-        (new SendEmailCampaignChunk($campaign->id, [$delivery->id]))->handle();
+        $this->runJob(new SendEmailCampaignChunk($campaign->id, [$delivery->id]));
 
         $delivery->refresh();
 
@@ -197,7 +203,7 @@ class EmailCampaignSendingPipelineTest extends TestCase
 
         $delivery = EmailCampaignDelivery::query()->firstOrFail();
 
-        (new SendEmailCampaignChunk($campaign->id, [$delivery->id]))->handle();
+        $this->runJob(new SendEmailCampaignChunk($campaign->id, [$delivery->id]));
 
         $delivery->refresh();
 
@@ -237,7 +243,7 @@ class EmailCampaignSendingPipelineTest extends TestCase
         $this->swapMailToThrowFor($badEmail, 'Kaboom');
 
         try {
-            (new SendEmailCampaignChunk($campaign->id, [$delivery->id]))->handle();
+            $this->runJob(new SendEmailCampaignChunk($campaign->id, [$delivery->id]));
         } finally {
             $this->restoreMail();
         }
@@ -266,7 +272,7 @@ class EmailCampaignSendingPipelineTest extends TestCase
             ->pluck('id')
             ->all();
 
-        (new SendEmailCampaignChunk($campaign->id, $deliveryIds))->handle();
+        $this->runJob(new SendEmailCampaignChunk($campaign->id, $deliveryIds));
 
         $campaign->refresh();
 
@@ -317,7 +323,7 @@ class EmailCampaignSendingPipelineTest extends TestCase
         $this->swapMailToThrowFor($badEmail, 'Kaboom');
 
         try {
-            (new SendEmailCampaignChunk($campaign->id, $deliveries->pluck('id')->all()))->handle();
+            $this->runJob(new SendEmailCampaignChunk($campaign->id, $deliveries->pluck('id')->all()));
         } finally {
             $this->restoreMail();
         }
