@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Mail\EmailCampaignMail;
 use App\Models\EmailCampaign;
 use App\Models\EmailCampaignDelivery;
+use App\Support\Email\EmailBodyCompiler;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -25,9 +26,19 @@ class SendEmailCampaignChunk implements ShouldQueue
         public array $deliveryIds,
     ) {}
 
-    public function handle(): void
+    public function handle(EmailBodyCompiler $compiler): void
     {
         $campaign = EmailCampaign::with('list')->findOrFail($this->campaignId);
+
+        // Safety net: ensure body_html exists
+        if ($campaign->editor === 'grapesjs' && blank($campaign->body_html) && filled($campaign->design_html)) {
+            $compiled = $compiler->compile($campaign->design_html, $campaign->design_css);
+
+            $campaign->forceFill([
+                'body_html' => $compiled['html'],
+                'body_text' => $compiled['text'],
+            ])->save();
+        }
 
         $deliveries = EmailCampaignDelivery::query()
             ->with('subscriber')
@@ -40,14 +51,12 @@ class SendEmailCampaignChunk implements ShouldQueue
         $failedThisChunk = 0;
 
         foreach ($deliveries as $delivery) {
-            // Don’t re-send already completed deliveries
             if (in_array($delivery->status, [EmailCampaignDelivery::STATUS_SENT], true)) {
                 continue;
             }
 
             $subscriber = $delivery->subscriber;
 
-            // If subscriber got unsubscribed between queueing and sending:
             if (! $subscriber || ! $subscriber->canReceiveMarketingList($campaign->list->key)) {
                 $delivery->update([
                     'status' => EmailCampaignDelivery::STATUS_SKIPPED,
@@ -70,7 +79,7 @@ class SendEmailCampaignChunk implements ShouldQueue
                     $mailable->from($delivery->from_email, $delivery->from_name);
                 }
 
-                // Render final HTML snapshot for Filament viewing
+                // Snapshot for Filament viewing
                 $renderedHtml = $mailable->render();
 
                 Mail::to($delivery->to_email, $delivery->to_name)->send($mailable);
@@ -104,7 +113,6 @@ class SendEmailCampaignChunk implements ShouldQueue
             ->where('pending_chunks', '>', 0)
             ->decrement('pending_chunks');
 
-        // If campaign finished, decide final status
         $fresh = EmailCampaign::find($campaign->id);
 
         if ($fresh && (int) $fresh->pending_chunks === 0 && is_null($fresh->sent_at)) {

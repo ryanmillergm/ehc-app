@@ -10,6 +10,7 @@ use App\Http\Controllers\PageController;
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\GivingController;
 use App\Http\Controllers\AddressController;
+use App\Http\Controllers\Admin\EmailAssetController;
 use App\Http\Controllers\ChildrenController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LanguagesController;
@@ -102,6 +103,11 @@ Route::middleware([
     Route::put('/addresses/{address}', [AddressController::class, 'update'])->name('addresses.update');
     Route::delete('/addresses/{address}', [AddressController::class, 'destroy'])->name('addresses.destroy');
     Route::post('/addresses/{address}/primary', [AddressController::class, 'makePrimary'])->name('addresses.make-primary');
+
+    Route::prefix('admin')->group(function () {
+        Route::get('/email-assets', [EmailAssetController::class, 'index'])->name('email-assets.index');
+        Route::post('/email-assets', [EmailAssetController::class, 'store'])->name('email-assets.store');
+    });
 
     /*
     |--------------------------------------------------------------------------

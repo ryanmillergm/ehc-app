@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\EmailCampaign;
 use App\Models\EmailCampaignDelivery;
 use App\Models\EmailSubscriber;
+use App\Support\Email\EmailBodyCompiler;
 use Throwable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -31,6 +32,27 @@ class QueueEmailCampaignSend implements ShouldQueue
             $campaign->update([
                 'status' => EmailCampaign::STATUS_FAILED,
                 'last_error' => 'Campaign can only send to marketing lists.',
+            ]);
+            return;
+        }
+
+        // safety compile for GrapesJS (or any mode) if body_html is missing
+        if ($campaign->editor === 'grapesjs' && blank($campaign->body_html)) {
+            $compiled = app(EmailBodyCompiler::class)->compile(
+                (string) ($campaign->design_html ?? ''),
+                (string) ($campaign->design_css ?? ''),
+            );
+
+            $campaign->forceFill([
+                'body_html' => $compiled['html'],
+                'body_text' => $compiled['text'],
+            ])->save();
+        }
+
+        if (blank($campaign->body_html)) {
+            $campaign->update([
+                'status' => EmailCampaign::STATUS_FAILED,
+                'last_error' => 'Campaign body is empty. Save the campaign before sending.',
             ]);
             return;
         }
@@ -93,7 +115,6 @@ class QueueEmailCampaignSend implements ShouldQueue
                 ];
             })->all();
 
-            // Idempotent insert
             EmailCampaignDelivery::upsert(
                 $rows,
                 ['email_campaign_id', 'email_subscriber_id'],

@@ -2,6 +2,31 @@
 @source '../../../../app/Filament/**/*';
 @source '../../../../resources/views/filament/**/*';
 
+
 .send-campaign-modal .fi-modal-description {
     white-space: pre-line;
+}
+
+[data-gjs-root] .gjs-editor {
+  min-height: 100%;
+}
+
+/* Fullscreen mode for GrapesJS wrapper */
+html.gjs-no-scroll,
+body.gjs-no-scroll {
+  overflow: hidden !important;
+}
+
+[data-gjs-email-builder="1"].gjs-fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 9999 !important;
+  height: 100vh !important;
+  width: 100vw !important;
+
+  border-radius: 0 !important;
+}
+
+[data-gjs-email-builder="1"].gjs-fullscreen [data-gjs-layout] {
+  height: calc(100vh - 41px) !important; /* toolbar height */
 }

@@ -20,7 +20,9 @@ class EmailCampaignMail extends Mailable
         public EmailList $list,
         public string $subjectLine,
         public string $bodyHtml,
-    ) {}
+    ) {
+        $this->bodyHtml = (string) $this->bodyHtml;
+    }
 
     public function envelope(): Envelope
     {

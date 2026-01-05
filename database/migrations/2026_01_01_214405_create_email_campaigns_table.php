@@ -16,7 +16,16 @@ return new class extends Migration
                 ->cascadeOnDelete();
 
             $table->string('subject');
-            $table->longText('body_html');
+
+            // Source-of-truth for "designer" mode
+            $table->string('editor')->default('html'); // html|grapesjs
+            $table->json('design_json')->nullable();
+            $table->longText('design_html')->nullable();
+            $table->longText('design_css')->nullable();
+
+            // What you actually send (email-safe, CSS inlined)
+            $table->longText('body_html')->nullable();
+            $table->longText('body_text')->nullable();
 
             // draft|sending|sent|failed
             $table->string('status')->default('draft');
