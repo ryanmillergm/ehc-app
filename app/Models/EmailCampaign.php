@@ -85,21 +85,29 @@ class EmailCampaign extends Model
 
     protected static function booted(): void
     {
-        static::saving(function (EmailCampaign $campaign) {
-            // avoid queries if not set yet
-            if (! filled($campaign->email_list_id)) {
-                return;
-            }
+        static::creating(fn (EmailCampaign $campaign) => $campaign->assertMarketingList());
 
-            $purpose = EmailList::query()
-                ->whereKey($campaign->email_list_id)
-                ->value('purpose');
-
-            if ($purpose !== 'marketing') {
-                throw ValidationException::withMessages([
-                    'email_list_id' => 'Email campaigns must be attached to a marketing list.',
-                ]);
+        static::updating(function (EmailCampaign $campaign) {
+            if ($campaign->isDirty('email_list_id')) {
+                $campaign->assertMarketingList();
             }
         });
+    }
+
+    protected function assertMarketingList(): void
+    {
+        if (! filled($this->email_list_id)) {
+            return;
+        }
+
+        $purpose = EmailList::query()
+            ->whereKey($this->email_list_id)
+            ->value('purpose');
+
+        if ($purpose !== 'marketing') {
+            throw ValidationException::withMessages([
+                'email_list_id' => 'Email campaigns must be attached to a marketing list.',
+            ]);
+        }
     }
 }

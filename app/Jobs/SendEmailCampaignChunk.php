@@ -31,8 +31,15 @@ class SendEmailCampaignChunk implements ShouldQueue
         $campaign = EmailCampaign::with('list')->findOrFail($this->campaignId);
 
         // Safety net: ensure body_html exists
-        if ($campaign->editor === 'grapesjs' && blank($campaign->body_html) && filled($campaign->design_html)) {
-            $compiled = $compiler->compile($campaign->design_html, $campaign->design_css);
+        if (
+            $campaign->editor === 'grapesjs'
+            && blank($campaign->body_html)
+            && filled($campaign->design_html)
+        ) {
+            $compiled = $compiler->compile(
+                (string) $campaign->design_html,
+                (string) ($campaign->design_css ?? '')
+            );
 
             $campaign->forceFill([
                 'body_html' => $compiled['html'],
@@ -48,10 +55,9 @@ class SendEmailCampaignChunk implements ShouldQueue
             ->get();
 
         $sentThisChunk = 0;
-        $failedThisChunk = 0;
 
         foreach ($deliveries as $delivery) {
-            if (in_array($delivery->status, [EmailCampaignDelivery::STATUS_SENT], true)) {
+            if ($delivery->status === EmailCampaignDelivery::STATUS_SENT) {
                 continue;
             }
 
@@ -62,6 +68,7 @@ class SendEmailCampaignChunk implements ShouldQueue
                     'status' => EmailCampaignDelivery::STATUS_SKIPPED,
                     'last_error' => null,
                 ]);
+
                 continue;
             }
 
@@ -71,21 +78,26 @@ class SendEmailCampaignChunk implements ShouldQueue
                 $mailable = new EmailCampaignMail(
                     subscriber: $subscriber,
                     list: $campaign->list,
-                    subjectLine: $campaign->subject,
-                    bodyHtml: $campaign->body_html,
+                    subjectLine: (string) $campaign->subject,
+                    bodyHtml: (string) $campaign->body_html,
                 );
 
+                // Make recipient deterministic BEFORE render()
+                $mailable->to($delivery->to_email, $delivery->to_name);
+
+                // Delivery-level sender override (safe for envelope())
                 if ($delivery->from_email) {
-                    $mailable->from($delivery->from_email, $delivery->from_name);
+                    $mailable->usingFrom($delivery->from_email, $delivery->from_name);
                 }
 
                 // Snapshot for Filament viewing
                 $renderedHtml = $mailable->render();
 
-                Mail::to($delivery->to_email, $delivery->to_name)->send($mailable);
+                // Send the already-addressed mailable
+                Mail::send($mailable);
 
                 $delivery->update([
-                    'subject' => $campaign->subject,
+                    'subject' => (string) $campaign->subject,
                     'body_html' => $renderedHtml,
                     'status' => EmailCampaignDelivery::STATUS_SENT,
                     'sent_at' => now(),
@@ -100,8 +112,6 @@ class SendEmailCampaignChunk implements ShouldQueue
                     'failed_at' => now(),
                     'last_error' => $e->getMessage(),
                 ]);
-
-                $failedThisChunk++;
             }
         }
 
@@ -109,6 +119,7 @@ class SendEmailCampaignChunk implements ShouldQueue
             EmailCampaign::whereKey($campaign->id)->increment('sent_count', $sentThisChunk);
         }
 
+        // Always decrement one chunk completion per job run
         EmailCampaign::whereKey($campaign->id)
             ->where('pending_chunks', '>', 0)
             ->decrement('pending_chunks');
