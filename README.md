@@ -1,140 +1,289 @@
-# The EHC App
+# EHC App
 
-This app was developed to allow an organization to showcase their website with the ability for administrators to manage everything through an intuitive Content Management System (cms). Administrators are able to manage things such as Events, donors/sponsors, with the ability to  separate out manageable resource into departments using Filament's Multi-Tenancy. All resources are managed policies that only allow access by users with assigned roles with given permissions from the super admin.
+A Laravel + Filament application for managing an organization’s public website and admin operations, including:
 
-## Roles and permissions
-A role can have many permissions. A role or individual permissions can be assigned to a user. Permissions give users access to resources in the admin panels. A user can have many permissions through a role.
-The access to different models is controlled through each models policy. Ex/ `app\Policies\ChildPolicy.php`
+- CMS pages with translations
+- Events and organizational resources (multi-tenant)
+- Email marketing (lists, subscribers, campaigns, queued “live” sends)
+- Donations (Stripe) including one-time payments, pledges/recurring flows, and refunds (as supported by your implementation)
 
-# Access Admin Panel
-The Admin Panel has access to all resources. A user must have the permission or a role with the permission `admin.panel` in order to have access. A user must also have permissions or a role with permissions for the resources they can access.
-`/admin`
+This repo is built to be **admin-friendly** in Filament, with access controlled by **Spatie Roles & Permissions**.
 
-# Access Teams Admin Panel
-The Teams Admin Panel has access to limited resources only. A user must have the permission or a role with the permission `org.panel` in order to have access. A user must also have permissions or a role with permissions for the resources they can access.
-`/org/{team_name}` 
+---
 
-# Pages with Translations
-This has pages by language translations. A page has many translations and a translation belongs to a page. Defaults to english and finds translation by selected language.
+## Tech stack
 
+- **Laravel**: v11.x
+- **PHP**: 8.2.x
+- **Database**: MySQL 8.x (recommended)
+- **Filament**: v3.x
+- **Livewire**: v3.x
+- **Jetstream**: v5.x
+- **Testing**: PHPUnit 11.x (plus Laravel testing helpers)
+- **Node**: use an LTS version compatible with your Vite toolchain
 
-## Tech Stack
- - Framework: Laravel v11.5.0
- - Language: PHP v8.2.18
- - Database: MySQL v8.0.23
- - Livewire v3.4.11
- - Jetstream v5.0.4 
- - ORM: Eloquent
- - Testing: PHPUnit v11.1.3
- - Testing: Laravel Dusk v8.2.0 
- - Node v16.20.2
+> Tip: run `composer show` to see the exact package versions installed in this repo.
 
- ## Other Packages
- - CMS: Filament v3.2.71
- - Spatie laravel-permission v6.7.0
- - `$ composer show` to view all installed packages and their current version
+---
 
-## Local Setup
- - `$ git clone https://github.com/ryanmillergm/ehc-app.git`
- - `$ cd ehc-app`
- - `$ composer install`
- - `$ npm install && npm run dev`
- - Create your local database
- - Copy env.testing to .env and fill in your environment
- - `$ php artisan migrate`
- - `$ php artisan db:seed`
- - `$ npx sequelize db:migrate`
+## Panels & routes
 
- ## Running the Server Locally
- - `$ php artisan serve`
- - Access local endpoints at `http://127.0.0.1:8000`
- 
- ## Setup stripe
- - `stripe login`
- - `stripe listen --forward-to http://bread-of-grace-ministries.test/stripe/webhook`
- or
- - `stripe listen --forward-to http://127.0.0.1:8000/stripe/webhook`
+You have (at least) two Filament panels:
 
- ## All in one command - Run Vite Build, php server and stripe listen --forward-to,
- - `$ composer dev` 
+- **Admin panel** (full access): `/admin`
+- **Org panel** (tenant-scoped): `/org/{team_name}` (or similar, depending on your tenancy configuration)
 
-## Running the Test Suite
- - `php artisan test`
+Access is gated by Spatie permissions:
 
- ## Core Contributors
- - Ryan Miller, [@ryanmillergm](https://github.com/ryanmillergm)
+- `admin.panel` → can access admin panel
+- `org.panel` → can access org panel
 
-## Current Iterations
+Resource-level access is then controlled by policies / additional permissions.
 
-## Future Iterations
+---
 
-## Known Issues
- - None
+## Roles & permissions
 
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+Spatie Roles & Permissions is used to control access.
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+### Seeders
 
-## About Laravel
+You have seeders similar to:
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- `Database\Seeders\PermissionSeeder` — creates permissions like `admin.panel`, `org.panel`, `email.*`, etc.
+- `Database\Seeders\RoleSeeder` — creates roles like `Super Admin`, `Admin`, `Director`, `Editor`, and assigns permissions (e.g., Super Admin gets all permissions).
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+### Policies
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Model access is enforced via policies (example mentioned: `app/Policies/ChildPolicy.php`).
 
-## Learning Laravel
+---
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Multi-tenancy (Filament)
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+This app uses Filament multi-tenancy to “separate out manageable resources into departments.”
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+General rules of thumb:
 
-## Laravel Sponsors
+- The **admin panel** typically has global visibility.
+- The **org panel** is typically scoped to the active tenant.
+- “I can’t see it” problems are usually one of:
+  - wrong panel
+  - wrong tenant selected
+  - missing permission
+  - policy denying access
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+---
 
-### Premium Partners
+## Email system
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+The email system is designed for **marketing lists** and supports:
 
-## Contributing
+- Email Lists (`EmailList`) — segment/audience with a stable `key` like `newsletter`
+- Email Subscribers (`EmailSubscriber`) — recipient records with opt-in/out state
+- Email Campaigns (`EmailCampaign`) — subject + HTML body + list + status
+- Deliveries (`EmailCampaignDelivery`) — per-recipient delivery records for live sends
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### Test vs Live sends
 
-## Code of Conduct
+- **Test send**: sends a single email immediately (recommended for verifying rendering and configuration).
+- **Live send**: queues a batch send to the campaign list, chunked into jobs.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### Queue pipeline (high level)
 
-## Security Vulnerabilities
+1. “Send (LIVE)” action validates and ensures the campaign is compiled/saved.
+2. `QueueEmailCampaignSend` creates `EmailCampaignDelivery` rows in chunks and dispatches `SendEmailCampaignChunk` jobs.
+3. `SendEmailCampaignChunk` sends each delivery via `EmailCampaignMail` and snapshots rendered HTML for Filament viewing.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+### MailTrap (local/dev)
+
+For local/dev you indicated you are using **MailTrap**.
+
+Common setup approach:
+
+- Configure `.env` mail settings to point at MailTrap SMTP.
+- Keep `MAIL_FROM_ADDRESS` and `MAIL_FROM_NAME` set.
+
+Example:
+
+```env
+MAIL_MAILER=smtp
+MAIL_HOST=sandbox.smtp.mailtrap.io
+MAIL_PORT=2525
+MAIL_USERNAME=...
+MAIL_PASSWORD=...
+MAIL_ENCRYPTION=tls
+
+MAIL_FROM_ADDRESS="info@breadofgraceministries.com"
+MAIL_FROM_NAME="${APP_NAME}"
+```
+
+> In testing, you’re using `MAIL_MAILER=array` in `phpunit.xml`, which is great: it prevents real network mail sends.
+
+### Queue worker
+
+Live sends require a queue worker. Locally you can use:
+
+```bash
+php artisan queue:work
+```
+
+In local testing/dev, you can also temporarily force synchronous queue execution (do **not** leave this on in production):
+
+```env
+QUEUE_CONNECTION=sync
+```
+
+---
+
+## Donations & Stripe
+
+Stripe powers donations / transactions. Typical components you’ll encounter:
+
+- **Transactions**: a local record representing a Stripe PaymentIntent/Charge lifecycle.
+- **Pledges / recurring**: if implemented, local records representing recurring commitments.
+- **Refunds**: Stripe refunds linked back to local transactions.
+
+### Stripe CLI (local webhook testing)
+
+Authenticate and forward webhook events locally:
+
+```bash
+stripe login
+stripe listen --forward-to http://127.0.0.1:8000/stripe/webhook
+```
+
+If you use a custom local domain:
+
+```bash
+stripe listen --forward-to http://bread-of-grace-ministries.test/stripe/webhook
+```
+
+### Webhook keys
+
+Make sure your `.env` includes:
+
+- Stripe secret key (server-side)
+- Stripe publishable key (front-end)
+- Stripe webhook signing secret (for verification)
+
+Example:
+
+```env
+STRIPE_SECRET=sk_test_...
+STRIPE_KEY=pk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+```
+
+### Troubleshooting Stripe
+
+- Verify the event arrived: Stripe Dashboard → Developers → Events
+- Verify your endpoint was called: your app logs + Stripe CLI output
+- Verify signature: webhook secret matches and middleware/handler verifies it
+- Verify your DB records: transaction status, amounts, refund state
+
+---
+
+## Local setup
+
+```bash
+git clone https://github.com/ryanmillergm/ehc-app.git
+cd ehc-app
+composer install
+npm install
+npm run dev
+```
+
+Create a local database, copy your env file, and run migrations/seeders:
+
+```bash
+cp .env.example .env
+php artisan key:generate
+php artisan migrate
+php artisan db:seed
+```
+
+> If you maintain a dedicated `.env.testing`, ensure it uses an isolated database and safe mail/queue drivers.
+
+### Run the app
+
+```bash
+php artisan serve
+```
+
+App will be available at `http://127.0.0.1:8000`.
+
+### “All-in-one” dev command
+
+If you have a `composer dev` script set up (Vite + server + Stripe listen), use:
+
+```bash
+composer dev
+```
+
+---
+
+## Testing
+
+Run the full suite:
+
+```bash
+php artisan test
+```
+
+Run a single test file:
+
+```bash
+vendor/bin/phpunit tests/Feature/Mail/SendEmailCampaignChunkExtraTest.php
+```
+
+### Notes about your `phpunit.xml`
+
+Your `phpunit.xml` includes:
+
+- `MAIL_MAILER=array` (prevents real emails)
+- `QUEUE_CONNECTION=sync` (jobs run immediately during tests)
+- `SESSION_DRIVER=array`, `CACHE_STORE=array` (fast + isolated)
+
+These are good defaults for deterministic tests.
+
+---
+
+## Filament documentation pages
+
+This repo includes in-panel documentation pages for admins, for example:
+
+- `resources/views/filament/pages/email-system-help.blade.php`
+- `resources/views/filament/pages/admin-documentation.blade.php`
+
+These are intended to keep operational knowledge **inside the admin panel** so staff can self-serve answers.
+
+---
+
+## Common commands
+
+```bash
+# Clear caches
+php artisan optimize:clear
+
+# Rebuild autoload
+composer dump-autoload
+
+# Queue worker
+php artisan queue:work
+
+# Run migrations fresh (local only)
+php artisan migrate:fresh --seed
+```
+
+---
+
+## Contributors
+
+- Ryan Miller — [@ryanmillergm](https://github.com/ryanmillergm)
+
+---
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
-# ehc-app
+This project is private/internal unless otherwise stated.
