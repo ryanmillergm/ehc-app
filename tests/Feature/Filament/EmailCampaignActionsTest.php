@@ -29,7 +29,6 @@ class EmailCampaignActionsTest extends TestCase
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-        // ✅ Include email.delete so policy checks don't explode during action rendering
         foreach (['email.read', 'email.create', 'email.update', 'email.delete'] as $perm) {
             Permission::findOrCreate($perm, 'web');
         }

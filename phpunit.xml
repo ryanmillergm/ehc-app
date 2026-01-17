@@ -12,11 +12,29 @@
             <directory>tests/Feature</directory>
         </testsuite>
     </testsuites>
+
     <source>
         <include>
-            <directory>app</directory>
+            <directory suffix=".php">app</directory>
         </include>
+
+        <!-- Optional: excludes -->
+        <exclude>
+            <directory>app/Console</directory>
+            <directory>app/Providers</directory>
+            <directory>app/Exceptions</directory>
+            <!-- <directory>app/Http/Middleware</directory> -->
+        </exclude>
     </source>
+
+    <coverage includeUncoveredFiles="true" pathCoverage="false">
+        <report>
+            <html outputDirectory="storage/coverage" lowUpperBound="50" highLowerBound="90"/>
+            <text outputFile="php://stdout" showUncoveredFiles="true" showOnlySummary="false"/>
+            <clover outputFile="storage/coverage/clover.xml"/>
+        </report>
+    </coverage>
+
     <php>
         <env name="APP_ENV" value="testing"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
@@ -29,5 +47,6 @@
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
+        <env name="XDEBUG_MODE" value="coverage"/>
     </php>
 </phpunit>
