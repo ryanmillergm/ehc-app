@@ -1,4 +1,3 @@
-{{-- resources/views/navigation-menu.blade.php --}}
 @php
     use Illuminate\Support\Facades\Auth;
     use Laravel\Jetstream\Jetstream;
@@ -155,7 +154,7 @@
                 </div>
             </div>
 
-            <!-- CENTER: nav links (desktop only, truly centered) -->
+            <!-- CENTER: nav links (desktop only) -->
             <div class="pointer-events-none absolute inset-x-0 flex justify-center">
                 <div class="hidden md:flex items-center gap-2 pointer-events-auto">
                     <a href="{{ route('dashboard') }}"

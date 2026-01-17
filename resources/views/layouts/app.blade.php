@@ -58,7 +58,6 @@
 
             <!-- Page Content -->
             <main>
-                {{-- <p>resources\views\layouts\app.blade.php for Jetstream</p> --}}
                 {{ $slot }}
             </main>
         </div>

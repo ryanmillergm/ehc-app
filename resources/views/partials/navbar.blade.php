@@ -32,11 +32,12 @@
             {{-- Center: Nav links (desktop) --}}
             <div class="hidden md:flex flex-1 justify-center">
                 <div class="flex items-center gap-6 text-sm font-medium text-slate-700">
-                    <a href="{{ url('/') }}"
+                    {{-- <a href="{{ url('/') }}"
                        class="hover:text-indigo-600 transition-colors {{ request()->routeIs('home') ? 'text-indigo-600' : '' }}">
                         Home
-                    </a>
-                    <a href="{{ url('/pages') }}"
+                    </a> --}}
+                    {{-- Commenting out until pages is complete --}}
+                    {{-- <a href="{{ url('/pages') }}"
                        class="hover:text-indigo-600 transition-colors {{ request()->is('pages*') ? 'text-indigo-600' : '' }}">
                         Pages
                     </a>
@@ -47,7 +48,7 @@
                     <a href="{{ url('/teams') }}"
                        class="hover:text-indigo-600 transition-colors {{ request()->is('teams*') ? 'text-indigo-600' : '' }}">
                         Teams
-                    </a>
+                    </a> --}}
                 </div>
             </div>
 
@@ -59,6 +60,7 @@
                     <select
                         id="lang-select"
                         data-lang-select
+                        data-lang-toast="{{ __('flash-messages.language_updated') }}"
                         class="appearance-none rounded-full border border-slate-200 bg-white
                                px-3 py-1.5 pr-12 text-xs font-medium text-slate-700
                                hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -306,6 +308,7 @@
                     <select
                         id="lang-select-mobile"
                         data-lang-select
+                        data-lang-toast="{{ __('flash-messages.language_updated') }}"
                         class="w-full appearance-none rounded-lg border border-slate-700 bg-slate-800
                                px-3 py-2 pr-10 text-sm text-white
                                focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -355,7 +358,8 @@
                    class="block py-2 border-b border-slate-800/60 hover:text-indigo-300">
                     Home
                 </a>
-                <a href="{{ url('/pages') }}"
+                {{-- Commenting out until pages are done --}}
+                {{-- <a href="{{ url('/pages') }}"
                    class="block py-2 border-b border-slate-800/60 hover:text-indigo-300">
                     Pages
                 </a>
@@ -366,7 +370,7 @@
                 <a href="{{ url('/teams') }}"
                    class="block py-2 border-b border-slate-800/60 hover:text-indigo-300">
                     Teams
-                </a>
+                </a> --}}
             </nav>
 
             <div class="pt-4 border-t border-slate-800/60">
@@ -442,21 +446,39 @@
             if (!select) return;
 
             const code = select.value;
-            const url = `/lang/${code}`;
+            const url  = `/lang/${code}`;
 
-            // If Livewire is present, do slick swap-without-reload
             if (window.Livewire && typeof window.Livewire.dispatch === 'function') {
                 fetch(url, {
                     method: 'GET',
                     credentials: 'same-origin',
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
-                }).then(() => {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                })
+                .then(async (res) => {
+                    let payload = null;
+                    try { payload = await res.json(); } catch (_) {}
+
+                    const message = payload?.message ?? 'Language updated.';
+                    const style   = payload?.style ?? 'success';
+
+                    // Jetstream banner
+                    window.dispatchEvent(new CustomEvent('banner-message', {
+                        detail: { style, message }
+                    }));
+
                     window.Livewire.dispatch('language-switched', { code });
+                })
+                .catch(() => {
+                    window.dispatchEvent(new CustomEvent('banner-message', {
+                        detail: { style: 'danger', message: 'Could not switch language. Please try again.' }
+                    }));
                 });
-            } else {
-                // Non-Livewire pages (guest/auth): normal redirect
-                window.location.href = url;
+
+                return;
             }
+
+            // Non-Livewire pages: normal redirect (banner comes from session)
+            window.location.href = url;
         });
 
         // ---- Navbar (mobile menu + user dropdown) ----
