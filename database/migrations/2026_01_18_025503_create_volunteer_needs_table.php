@@ -21,6 +21,12 @@ return new class extends Migration {
 
             $table->unsignedInteger('capacity')->nullable();
 
+            $table->foreignId('application_form_id')
+                ->nullable()
+                ->after('id')
+                ->constrained('application_forms')
+                ->nullOnDelete();
+
             $table->timestamps();
         });
     }

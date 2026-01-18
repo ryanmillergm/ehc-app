@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class VolunteerNeed extends Model
@@ -18,6 +19,7 @@ class VolunteerNeed extends Model
         'is_active',
         'event_id',
         'capacity',
+        'application_form_id',
     ];
 
     protected $casts = [
@@ -27,6 +29,11 @@ class VolunteerNeed extends Model
     public function applications(): HasMany
     {
         return $this->hasMany(VolunteerApplication::class);
+    }
+
+    public function applicationForm(): BelongsTo
+    {
+        return $this->belongsTo(ApplicationForm::class, 'application_form_id');
     }
 
     public function getRouteKeyName(): string
