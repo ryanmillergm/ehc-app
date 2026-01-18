@@ -33,6 +33,10 @@ class VolunteerApplication extends Model
         'interests'     => 'array',
         'availability'  => 'array',
         'reviewed_at'   => 'datetime',
+        'interests'     => 'array',
+        'availability'  => 'array',
+        'reviewed_at'   => 'datetime',
+        'answers'       => 'array',
     ];
 
     public function user(): BelongsTo
