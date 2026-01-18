@@ -18,6 +18,7 @@ return new class extends Migration {
             $table->text('message');
 
             $table->json('interests')->nullable();
+            $table->json('answers')->nullable();
             $table->json('availability')->nullable();
 
             $table->foreignId('reviewed_by')->nullable()->constrained('users')->nullOnDelete();
