@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
             PageSeeder::class,
             PageTranslationSeeder::class,
             EmailListSeeder::class,
+            VolunteerNeedSeeder::class,
         ]);
     }
 }
