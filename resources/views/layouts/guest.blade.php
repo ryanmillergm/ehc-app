@@ -16,7 +16,6 @@
             @vite(['resources/css/app.css', 'resources/js/app.js'])
         @endif
 
-
         <!-- Styles -->
         @livewireStyles
     </head>
@@ -24,8 +23,8 @@
         <livewire:navbar />
 
         <div class="pt-16">
-            {{-- <p>Layout for Auth Users in General App</p>
-            <p>resources\views\layouts\guest.blade.php</p> --}}
+            <x-banner />
+
             {{ $slot }}
         </div>
 

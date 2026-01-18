@@ -1,4 +1,3 @@
-{{-- resources/views/navigation-menu.blade.php --}}
 @php
     use Illuminate\Support\Facades\Auth;
     use Laravel\Jetstream\Jetstream;
@@ -155,7 +154,7 @@
                 </div>
             </div>
 
-            <!-- CENTER: nav links (desktop only, truly centered) -->
+            <!-- CENTER: nav links (desktop only) -->
             <div class="pointer-events-none absolute inset-x-0 flex justify-center">
                 <div class="hidden md:flex items-center gap-2 pointer-events-auto">
                     <a href="{{ route('dashboard') }}"
@@ -176,6 +175,11 @@
                     <a href="{{ route('addresses.index') }}"
                        class="{{ $linkBase }} {{ request()->routeIs('addresses.*') ? 'text-slate-900 border-slate-900' : '' }}">
                         Addresses
+                    </a>
+
+                    <a href="{{ route('home') }}"
+                       class="{{ $linkBase }} {{ request()->routeIs('home.*') ? 'text-slate-900 border-slate-900' : '' }}">
+                        Home
                     </a>
                 </div>
             </div>
@@ -241,6 +245,10 @@
 
             <x-responsive-nav-link href="{{ route('addresses.index') }}" :active="request()->routeIs('addresses.*')">
                 {{ __('Addresses') }}
+            </x-responsive-nav-link>
+
+            <x-responsive-nav-link href="{{ route('home') }}" :active="request()->routeIs('home.*')">
+                {{ __('Home') }}
             </x-responsive-nav-link>
 
             @if (Jetstream::hasApiFeatures())

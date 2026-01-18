@@ -5,55 +5,88 @@ namespace Tests\Feature\Languages;
 use App\Models\Language;
 use Database\Seeders\LanguageSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Foundation\Testing\WithFaker;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class LanguageSwitchTest extends TestCase
 {
-    use WithFaker, RefreshDatabase;
+    use RefreshDatabase;
 
-    /**
-     * Test the locale/language can be switched
-     */
-    public function test_the_locale_language_can_be_switched(): void
+    #[Test]
+    public function it_switches_locale_and_language_id_and_sets_flash_banner_on_redirect(): void
     {
-        $this->withoutExceptionHandling();
-
         $this->seed(LanguageSeeder::class);
 
         Language::create([
             'title'         => 'french',
+            'name'          => 'Français',
             'iso_code'      => 'fr',
             'locale'        => 'fr',
             'right_to_left' => false,
         ]);
 
-        $english_language = Language::where('iso_code', 'en')->first();
-        $spanish_language = Language::where('iso_code', 'es')->first();
-        $french_language = Language::where('iso_code', 'fr')->first();
+        $english = Language::where('iso_code', 'en')->firstOrFail();
+        $spanish = Language::where('iso_code', 'es')->firstOrFail();
+        $french  = Language::where('iso_code', 'fr')->firstOrFail();
 
-         // Mocking a request that passes through middleware
-         $response = $this->withSession([]) // starting with an empty session
-         ->get('/');
+        // Hit home so Localization middleware sets defaults
+        $this->withSession([])->get('/')->assertOk();
 
-        // Check the session for the expected key and value
-        $this->assertEquals('en', session('locale'));
-        $this->assertEquals($english_language->id, session('language_id'));
-        $this->assertNotEquals('es', session('locale'));
+        $this->assertSame('en', session('locale'));
+        $this->assertSame($english->id, session('language_id'));
 
-        // Switch language from english to spanish
-        $this->get('/lang/es');
+        // Switch to Spanish (redirect response)
+        $res = $this->get('/lang/es');
 
-        $this->assertEquals('es', session('locale'));
-        $this->assertEquals($spanish_language->id, session('language_id'));
-        $this->assertNotEquals('en', session('locale'));
+        $res->assertRedirect(); // back() or / depending on previousUrl
+        $this->assertSame('es', session('locale'));
+        $this->assertSame($spanish->id, session('language_id'));
 
+        // Flash banner is set
+        $this->assertSame('success', session('flash.bannerStyle'));
+        $this->assertNotEmpty(session('flash.banner'));
+        $this->assertStringContainsString($spanish->name, session('flash.banner'));
 
-        // Switch language from spanish to french
-        $this->get('/lang/fr');
+        // Switch to French (redirect response)
+        $res = $this->get('/lang/fr');
 
-        $this->assertEquals('fr', session('locale'));
-        $this->assertEquals($french_language->id, session('language_id'));
-        $this->assertNotEquals('es', session('locale'));
+        $res->assertRedirect();
+        $this->assertSame('fr', session('locale'));
+        $this->assertSame($french->id, session('language_id'));
+
+        $this->assertSame('success', session('flash.bannerStyle'));
+        $this->assertNotEmpty(session('flash.banner'));
+        $this->assertStringContainsString($french->name, session('flash.banner'));
+    }
+
+    #[Test]
+    public function it_returns_json_message_for_ajax_requests(): void
+    {
+        $this->seed(LanguageSeeder::class);
+
+        // Ensure Spanish has a "name" to inject
+        $spanish = Language::where('iso_code', 'es')->firstOrFail();
+        if (! $spanish->name) {
+            $spanish->update(['name' => 'Español']);
+            $spanish->refresh();
+        }
+
+        $res = $this->get('/lang/es', [
+            'X-Requested-With' => 'XMLHttpRequest',
+            'Accept'           => 'application/json',
+        ]);
+
+        $res->assertOk()
+            ->assertJson([
+                'style'  => 'success',
+                'locale' => 'es',
+            ]);
+
+        $this->assertSame('es', session('locale'));
+        $this->assertSame($spanish->id, session('language_id'));
+
+        $json = $res->json();
+        $this->assertIsString($json['message'] ?? null);
+        $this->assertStringContainsString($spanish->name, $json['message']);
     }
 }

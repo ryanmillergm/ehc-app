@@ -37,8 +37,7 @@
         @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
             @vite(['resources/css/app.css', 'resources/js/app.js'])
         @else
-            <style>
-            </style>
+            <style></style>
             @vite(['resources/css/app.css', 'resources/js/app.js'])
         @endif
 
@@ -48,11 +47,11 @@
         <livewire:navbar />
 
         <main class="pt-16">
-            {{ $slot }}
+            <x-banner />
 
-            {{-- <p>Layout for Auth Users in General App</p> --}}
+            {{ $slot }}
         </main>
-        
+
         @livewireScripts
     </body>
 </html>

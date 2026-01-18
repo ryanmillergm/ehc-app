@@ -4,6 +4,6 @@ return [
 
     'success'           => '¡Éxito!',
 
-    'language_updated'  => 'El idioma ha sido actualizado al español.',
+    'language_updated'  => 'El idioma ha sido actualizado al :language.',
 
 ];
