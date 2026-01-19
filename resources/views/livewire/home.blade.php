@@ -64,7 +64,7 @@
                             </svg>
                         </a>
 
-                        <a href="{{ route('volunteer.apply', ['need' => 'general']) }}"
+                        <a href="#serve"
                            class="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-7 py-3.5
                                   text-lg font-semibold text-slate-800 hover:bg-slate-50 transition">
                             Volunteer with us
@@ -305,6 +305,12 @@
                                 </p>
 
                                 <div class="mt-6 flex flex-col sm:flex-row gap-3">
+                                    <a href="{{ route('volunteer.apply', ['need' => 'general']) }}"
+                                       class="inline-flex items-center justify-center rounded-full bg-white/90 px-7 py-3.5
+                                              text-sm font-semibold text-black ring-1 ring-white/60 hover:bg-white/65 transition">
+                                        Sign up to Volunteer
+                                    </a>
+
                                     <a href="#give-form"
                                        class="inline-flex items-center justify-center rounded-full bg-rose-600 px-7 py-3.5
                                               text-sm font-semibold text-white shadow-sm hover:bg-rose-700 transition">
