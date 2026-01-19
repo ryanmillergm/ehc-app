@@ -92,13 +92,14 @@ class VolunteerApplicationFlowTest extends TestCase
     }
 
     #[Test]
-    public function inactive_need_returns_404(): void
+    public function inactive_need_shows_unavailable_page(): void
     {
         $user = User::factory()->create();
         $need = VolunteerNeed::factory()->create(['is_active' => false]);
 
         $this->actingAs($user)
             ->get(route('volunteer.apply', $need))
-            ->assertNotFound();
+            ->assertOk()
+            ->assertSee('data-testid="apply-unavailable"', false);
     }
 }

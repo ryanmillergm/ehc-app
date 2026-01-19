@@ -128,7 +128,7 @@ class VolunteerApplyPageTest extends TestCase
     }
 
     #[Test]
-    public function it_returns_404_for_inactive_need_or_inactive_form(): void
+    public function it_shows_unavailable_page_for_inactive_need_or_inactive_form(): void
     {
         $user = User::factory()->create();
         $this->actingAs($user);
@@ -144,7 +144,8 @@ class VolunteerApplyPageTest extends TestCase
         ]);
 
         $this->get(route('volunteer.apply', $needWithInactiveForm))
-            ->assertNotFound();
+            ->assertOk()
+            ->assertSee('data-testid="apply-unavailable"', false);
 
         $activeForm = ApplicationForm::factory()->create([
             'is_active' => true,
@@ -157,6 +158,7 @@ class VolunteerApplyPageTest extends TestCase
         ]);
 
         $this->get(route('volunteer.apply', $inactiveNeed))
-            ->assertNotFound();
+            ->assertOk()
+            ->assertSee('data-testid="apply-unavailable"', false);
     }
 }
