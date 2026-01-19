@@ -21,22 +21,15 @@ class VolunteerApplication extends Model
         'user_id',
         'volunteer_need_id',
         'status',
-        'message',
-        'interests',
-        'availability',
+        'answers',
         'reviewed_by',
         'reviewed_at',
         'internal_notes',
     ];
 
     protected $casts = [
-        'interests'     => 'array',
-        'availability'  => 'array',
-        'reviewed_at'   => 'datetime',
-        'interests'     => 'array',
-        'availability'  => 'array',
-        'reviewed_at'   => 'datetime',
-        'answers'       => 'array',
+        'answers'     => 'array',
+        'reviewed_at' => 'datetime',
     ];
 
     public function user(): BelongsTo

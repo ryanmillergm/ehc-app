@@ -15,11 +15,7 @@ return new class extends Migration {
 
             $table->string('status')->default('submitted')->index();
 
-            $table->text('message');
-
-            $table->json('interests')->nullable();
-            $table->json('answers')->nullable();
-            $table->json('availability')->nullable();
+            $table->json('answers');
 
             $table->foreignId('reviewed_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('reviewed_at')->nullable();
@@ -27,7 +23,6 @@ return new class extends Migration {
 
             $table->timestamps();
 
-            // no duplicate app per user per need
             $table->unique(['user_id', 'volunteer_need_id']);
         });
     }
