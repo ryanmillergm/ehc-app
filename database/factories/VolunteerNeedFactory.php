@@ -22,25 +22,17 @@ class VolunteerNeedFactory extends Factory
             'is_active' => true,
             'event_id' => null,
             'capacity' => null,
-
-            // ✅ IMPORTANT: need must have a form, or Apply will 404
             'application_form_id' => ApplicationForm::factory(),
         ];
     }
 
     public function general(): self
     {
-        return $this->state(fn () => [
+        return $this->state([
             'title' => 'General Volunteer',
             'slug' => 'general',
             'description' => 'Volunteer in any area as needs arise.',
             'is_active' => true,
-            'application_form_id' => ApplicationForm::factory()->state([
-                'name' => 'Default Volunteer Form',
-                'slug' => 'default-volunteer-form',
-                'is_active' => true,
-                'use_availability' => true,
-            ]),
         ]);
     }
 }

@@ -5,6 +5,7 @@ namespace App\Filament\Resources\VolunteerApplications;
 use App\Filament\Navigation\NavigationGroup;
 use App\Filament\Resources\VolunteerApplications\Pages\EditVolunteerApplication;
 use App\Filament\Resources\VolunteerApplications\Pages\ListVolunteerApplications;
+use App\Filament\Resources\VolunteerApplications\Pages\PrintVolunteerApplication;
 use App\Filament\Resources\VolunteerApplications\Schemas\VolunteerApplicationForm;
 use App\Filament\Resources\VolunteerApplications\Tables\VolunteerApplicationsTable;
 use App\Models\VolunteerApplication;
@@ -39,6 +40,13 @@ class VolunteerApplicationResource extends Resource
         return [
             'index' => ListVolunteerApplications::route('/'),
             'edit'  => EditVolunteerApplication::route('/{record}/edit'),
+            'print' => PrintVolunteerApplication::route('/{record}/print'),
         ];
+    }
+
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return parent::getEloquentQuery()
+            ->with(['user', 'need.applicationForm.fields']);
     }
 }

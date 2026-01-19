@@ -4,9 +4,9 @@ namespace App\Filament\Resources\VolunteerApplications\Schemas;
 
 use App\Models\VolunteerApplication;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\ViewField;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 
@@ -15,7 +15,7 @@ class VolunteerApplicationForm
     public static function configure(Schema $schema): Schema
     {
         return $schema->components([
-            Section::make('Application')
+            Section::make('Applicant')
                 ->schema([
                     TextInput::make('user.full_name')
                         ->label('Volunteer')
@@ -32,6 +32,27 @@ class VolunteerApplicationForm
                         ->disabled()
                         ->dehydrated(false),
 
+                    TextInput::make('need.slug')
+                        ->label('Need slug')
+                        ->disabled()
+                        ->dehydrated(false),
+                ])
+                ->columns(1),
+
+            Section::make('Responses')
+                ->schema([
+                    // Renders builder-driven Q/A from:
+                    // - $record->need->applicationForm->fields
+                    // - $record->answers
+                    ViewField::make('answers_render')
+                        ->label(false)
+                        ->view('filament.volunteer-applications.answers')
+                        ->dehydrated(false),
+                ])
+                ->columns(1),
+
+            Section::make('Review')
+                ->schema([
                     Select::make('status')
                         ->required()
                         ->options([
@@ -42,25 +63,8 @@ class VolunteerApplicationForm
                             VolunteerApplication::STATUS_WITHDRAWN => 'Withdrawn',
                         ]),
 
-                    Textarea::make('message')
-                        ->label('Applicant message')
-                        ->rows(6)
-                        ->disabled()
-                        ->dehydrated(false),
-
-                    TagsInput::make('interests')
-                        ->label('Interests')
-                        ->placeholder('food, cleanup, prayer, ...')
-                        ->helperText('What areas they selected on the form.')
-                        ->nullable(),
-
-                    TagsInput::make('availability')
-                        ->label('Availability')
-                        ->placeholder('thursday, sunday, flexible, ...')
-                        ->nullable(),
-
                     Textarea::make('internal_notes')
-                        ->rows(6)
+                        ->rows(8)
                         ->placeholder('Internal notes / follow-up...')
                         ->nullable(),
                 ])

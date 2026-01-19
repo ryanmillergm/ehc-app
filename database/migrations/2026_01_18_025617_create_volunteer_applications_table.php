@@ -15,7 +15,7 @@ return new class extends Migration {
 
             $table->string('status')->default('submitted')->index();
 
-            $table->json('answers');
+            $table->json('answers')->nullable();
 
             $table->foreignId('reviewed_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('reviewed_at')->nullable();

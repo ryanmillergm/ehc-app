@@ -19,10 +19,6 @@ class VolunteerApplicationFactory extends Factory
             'status' => VolunteerApplication::STATUS_SUBMITTED,
             'answers' => [
                 'message' => $this->faker->sentence(16),
-                'interests' => ['food'],
-                'availability' => [
-                    'mon' => ['am' => true, 'pm' => false],
-                ],
             ],
         ];
     }
