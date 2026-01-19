@@ -23,6 +23,10 @@ class ApplicationFormFactory extends Factory
             'description' => $this->faker->optional()->sentence(12),
             'is_active' => true,
             'use_availability' => true,
+
+            // thank you settings
+            'thank_you_format' => 'text', // text|html
+            'thank_you_content' => "Thanks! Your volunteer application has been submitted.",
         ];
     }
 
@@ -34,6 +38,22 @@ class ApplicationFormFactory extends Factory
     public function withoutAvailability(): self
     {
         return $this->state(['use_availability' => false]);
+    }
+
+    public function thankYouText(string $text): self
+    {
+        return $this->state([
+            'thank_you_format' => 'text',
+            'thank_you_content' => $text,
+        ]);
+    }
+
+    public function thankYouHtml(string $html): self
+    {
+        return $this->state([
+            'thank_you_format' => 'html',
+            'thank_you_content' => $html,
+        ]);
     }
 
     /**

@@ -72,6 +72,12 @@ class VolunteerApplyPageTest extends TestCase
             'application_form_id' => $form->id,
         ]);
 
+        // Custom thank-you (text mode)
+        $form->update([
+            'thank_you_format' => 'text',
+            'thank_you_content' => "Thanks Ryan!\nWe will contact you soon.",
+        ]);
+
         // --- 1) Invalid submit -> should NOT create a record ---
         Livewire::test(Apply::class, ['need' => $need])
             ->set('answers.message', '')
@@ -82,13 +88,12 @@ class VolunteerApplyPageTest extends TestCase
                 'answers.city' => ['required'],
             ]);
 
-        // Make the test *explicitly* fail if something got created unexpectedly
         $this->assertDatabaseMissing('volunteer_applications', [
             'user_id' => $user->id,
             'volunteer_need_id' => $need->id,
         ]);
 
-        // --- 2) Valid submit -> should create + persist answers JSON ---
+        // --- 2) Valid submit -> should create + persist answers JSON + show thank-you ---
         $message = 'I would love to serve wherever needed.';
         $city = 'Denver';
 
@@ -98,7 +103,10 @@ class VolunteerApplyPageTest extends TestCase
             ->set('availability.mon.am', true)
             ->set('availability.mon.pm', false)
             ->call('submit')
-            ->assertHasNoErrors();
+            ->assertHasNoErrors()
+            ->assertSet('submitted', true)
+            ->assertSee('Thanks Ryan!')
+            ->assertSee('We will contact you soon.');
 
         $this->assertDatabaseHas('volunteer_applications', [
             'user_id' => $user->id,

@@ -12,17 +12,22 @@ class ApplicationForm extends Model
     /** @use HasFactory<\Database\Factories\ApplicationFormFactory> */
     use HasFactory;
 
+    public const THANK_YOU_TEXT = 'text';
+    public const THANK_YOU_HTML = 'html';
+
     protected $fillable = [
         'name',
         'slug',
         'description',
         'is_active',
         'use_availability',
+        'thank_you_format',
+        'thank_you_content',
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
-        'use_availability' => 'boolean',
+        'is_active'         => 'boolean',
+        'use_availability'  => 'boolean',
     ];
 
     public function fields(): HasMany
@@ -30,10 +35,16 @@ class ApplicationForm extends Model
         return $this->hasMany(ApplicationFormField::class)->orderBy('sort');
     }
 
-    /**
-     * Default field: message textarea
-     * This auto-creates *once* when the form is created.
-     */
+    public function thankYouIsHtml(): bool
+    {
+        return $this->thank_you_format === self::THANK_YOU_HTML;
+    }
+
+    public function thankYouContent(): string
+    {
+        return (string) ($this->thank_you_content ?? '');
+    }
+
     protected static function booted(): void
     {
         static::created(function (self $form) {

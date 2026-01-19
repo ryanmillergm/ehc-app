@@ -18,6 +18,8 @@ class Apply extends Component
 
     public array $availability = [];
 
+    public bool $submitted = false;
+
     public function mount(VolunteerNeed $need): void
     {
         abort_unless($need->is_active, 404);
@@ -79,12 +81,13 @@ class Apply extends Component
             throw $e;
         }
 
+        // show thank-you screen (don’t reset back to blank form)
+        $this->submitted = true;
+
+        // Optional banner
         $success = __('Thanks! Your volunteer application has been submitted.');
         session()->flash('flash.banner', $success);
         session()->flash('flash.bannerStyle', 'success');
-
-        $this->reset(['answers', 'availability']);
-        $this->primeDefaults();
 
         $this->dispatch('banner-message', style: 'success', message: $success);
     }

@@ -19,6 +19,10 @@ return new class extends Migration {
             // Option 1: per-form availability toggle
             $table->boolean('use_availability')->default(true);
 
+            // per-form thank you message (text or html)
+            $table->string('thank_you_format')->default('text'); // text|html
+            $table->longText('thank_you_content')->nullable();
+
             $table->timestamps();
         });
     }
