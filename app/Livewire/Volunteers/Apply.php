@@ -12,7 +12,7 @@ use Livewire\Component;
 
 class Apply extends Component
 {
-    public VolunteerNeed $need;
+    public ?VolunteerNeed $need = null;
 
     /**
      * Dynamic form answers (keyed by ApplicationFormField::key)
@@ -21,21 +21,22 @@ class Apply extends Component
 
     /**
      * Optional weekly availability grid (stored in volunteer_applications.availability JSON column)
-     * Format:
-     * [
-     *   'mon' => ['am' => true, 'pm' => false],
-     *   ...
-     * ]
      */
     public array $availability = [];
 
     /**
      * Optional interests selection (stored in volunteer_applications.interests JSON column)
-     * We support pulling this from answers['interests'] too for flexibility.
      */
     public array $interests = [];
 
     public bool $submitted = false;
+
+    /**
+     * "Form unavailable" state
+     */
+    public bool $unavailable = false;
+    public string $unavailableTitle = 'Application not available';
+    public string $unavailableMessage = 'This volunteer role is not accepting applications right now.';
 
     /**
      * Back-compat with older tests / callers that set $message directly.
@@ -45,21 +46,51 @@ class Apply extends Component
 
     public function mount(VolunteerNeed $need): void
     {
-        abort_unless($need->is_active, 404);
+        // Need exists (route model binding), but might be inactive.
+        if (! $need->is_active) {
+            $this->need = $need;
 
-        $this->need = $need->load([
+            $this->setUnavailable(
+                title: 'Volunteer role not available',
+                message: 'This volunteer role is currently inactive.'
+            );
+
+            return;
+        }
+
+        $need->load([
             'applicationForm.fields' => fn ($q) => $q->where('is_active', true)->orderBy('sort'),
         ]);
 
-        abort_if(! $this->need->applicationForm?->is_active, 404);
+        // Form missing or inactive => friendly screen (no abort)
+        if (! $need->applicationForm || ! $need->applicationForm->is_active) {
+            $this->need = $need;
+
+            $this->setUnavailable(
+                title: 'Application form not available',
+                message: 'This volunteer role doesn’t have an application form configured yet.'
+            );
+
+            return;
+        }
+
+        $this->need = $need;
 
         $this->primeDefaults();
+    }
+
+    protected function setUnavailable(string $title, string $message): void
+    {
+        $this->unavailable = true;
+        $this->unavailableTitle = $title;
+        $this->unavailableMessage = $message;
     }
 
     protected function primeDefaults(): void
     {
         foreach ($this->need->applicationForm->fields as $field) {
-            $this->answers[$field->key] = $this->answers[$field->key] ?? ($field->type === 'checkbox_group' ? [] : '');
+            $this->answers[$field->key] = $this->answers[$field->key]
+                ?? ($field->type === 'checkbox_group' ? [] : '');
         }
 
         // keep message alias in sync if form has a message field
@@ -84,6 +115,13 @@ class Apply extends Component
 
     public function submit(): void
     {
+        // Guard: if unavailable, do not allow submit
+        if ($this->unavailable || ! $this->need?->applicationForm?->is_active) {
+            throw ValidationException::withMessages([
+                'form' => 'This application is not currently available.',
+            ]);
+        }
+
         $user = auth()->user();
         abort_unless($user, 401);
 
@@ -100,7 +138,6 @@ class Apply extends Component
         // Availability is stored in its own column
         $availability = null;
         if ($this->need->applicationForm->use_availability) {
-            // normalize booleans
             $days = ['mon','tue','wed','thu','fri','sat','sun'];
             $normalized = [];
             foreach ($days as $day) {
@@ -113,8 +150,8 @@ class Apply extends Component
         }
 
         // Interests can come from:
-        // - a dedicated $interests property (if you add a UI for it)
-        // - OR answers['interests'] (if your dynamic builder includes it)
+        // - a dedicated $interests property
+        // - OR answers['interests']
         $interests = $this->interests;
         if (empty($interests) && isset($answers['interests']) && is_array($answers['interests'])) {
             $interests = $answers['interests'];
@@ -217,6 +254,14 @@ class Apply extends Component
 
     public function render()
     {
+        if ($this->unavailable) {
+            return view('livewire.volunteers.apply-unavailable', [
+                'need' => $this->need,
+                'title' => $this->unavailableTitle,
+                'message' => $this->unavailableMessage,
+            ])->title('Volunteer Application');
+        }
+
         return view('livewire.volunteers.apply', [
             'need' => $this->need,
             'form' => $this->need->applicationForm,
