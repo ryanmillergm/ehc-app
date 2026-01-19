@@ -19,7 +19,7 @@ class VolunteerApplicationResource extends Resource
     protected static ?string $model = VolunteerApplication::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedHandRaised;
-    protected static string|\UnitEnum|null $navigationGroup = NavigationGroup::UserSettings;
+    protected static string|\UnitEnum|null $navigationGroup = NavigationGroup::Forms;
     protected static ?string $navigationLabel = 'Volunteer Applications';
 
     protected static ?string $recordTitleAttribute = 'id';

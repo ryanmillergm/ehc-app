@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ApplicationForms;
 
+use App\Filament\Navigation\NavigationGroup;
 use App\Filament\Resources\ApplicationForms\Pages\CreateApplicationForm;
 use App\Filament\Resources\ApplicationForms\Pages\EditApplicationForm;
 use App\Filament\Resources\ApplicationForms\Pages\ListApplicationForms;
@@ -20,7 +21,7 @@ class ApplicationFormResource extends Resource
     protected static ?string $model = ApplicationForm::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
-
+    protected static string|\UnitEnum|null $navigationGroup = NavigationGroup::Forms;
     protected static ?string $recordTitleAttribute = 'name';
 
     public static function form(Schema $schema): Schema

@@ -7,6 +7,7 @@ use Filament\Support\Contracts\HasLabel;
 enum NavigationGroup implements HasLabel
 {
     case Email;
+    case Forms;
     case Pages;
     case Donations;
     case UserSettings;
@@ -16,6 +17,7 @@ enum NavigationGroup implements HasLabel
     {
         return match ($this) {
             self::Email => 'Email',
+            self::Forms => 'Forms',
             self::Pages => 'Pages',
             self::Donations => 'Donations',
             self::UserSettings => 'User Settings',

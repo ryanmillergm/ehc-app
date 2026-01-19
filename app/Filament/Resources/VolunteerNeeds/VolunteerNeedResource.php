@@ -20,7 +20,7 @@ class VolunteerNeedResource extends Resource
     protected static ?string $model = VolunteerNeed::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
-    protected static string|\UnitEnum|null $navigationGroup = NavigationGroup::UserSettings;
+    protected static string|\UnitEnum|null $navigationGroup = NavigationGroup::Forms;
     protected static ?string $navigationLabel = 'Volunteer Needs';
 
     protected static ?string $recordTitleAttribute = 'title';
