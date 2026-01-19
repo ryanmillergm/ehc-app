@@ -24,12 +24,13 @@
                 @php
                     $content = (string) ($form->thank_you_content ?? '');
                     $format = (string) ($form->thank_you_format ?? 'text');
+                    $rendersHtml = in_array($format, ['html', 'wysiwyg'], true);
                 @endphp
 
                 <div class="space-y-4">
                     <h2 class="text-2xl font-extrabold tracking-tight">Thank you!</h2>
 
-                    @if ($format === 'html')
+                    @if ($rendersHtml)
                         <div class="prose max-w-none">{!! $content !!}</div>
                     @else
                         <p class="text-slate-700 whitespace-pre-line">{{ $content }}</p>

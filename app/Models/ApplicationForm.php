@@ -13,6 +13,7 @@ class ApplicationForm extends Model
     use HasFactory;
 
     public const THANK_YOU_TEXT = 'text';
+    public const THANK_YOU_WYSIWYG = 'wysiwyg';
     public const THANK_YOU_HTML = 'html';
 
     protected $fillable = [
@@ -40,6 +41,16 @@ class ApplicationForm extends Model
         return $this->thank_you_format === self::THANK_YOU_HTML;
     }
 
+    public function thankYouIsWysiwyg(): bool
+    {
+        return $this->thank_you_format === self::THANK_YOU_WYSIWYG;
+    }
+
+    public function thankYouRendersHtml(): bool
+    {
+        return in_array($this->thank_you_format, [self::THANK_YOU_HTML, self::THANK_YOU_WYSIWYG], true);
+    }
+
     public function thankYouContent(): string
     {
         return (string) ($this->thank_you_content ?? '');
@@ -48,7 +59,6 @@ class ApplicationForm extends Model
     protected static function booted(): void
     {
         static::created(function (self $form) {
-            // Always ensure we have a message field by default
             $form->fields()->firstOrCreate(
                 ['key' => 'message'],
                 [
