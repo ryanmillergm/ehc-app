@@ -31,7 +31,7 @@
                     <h2 class="text-2xl font-extrabold tracking-tight">Thank you!</h2>
 
                     @if ($rendersHtml)
-                        <div class="prose max-w-none">{!! $content !!}</div>
+                        <div class="thank-you-content prose max-w-none">{!! $content !!}</div>
                     @else
                         <p class="text-slate-700 whitespace-pre-line">{{ $content }}</p>
                     @endif
@@ -203,3 +203,31 @@
         </div>
     </div>
 </div>
+
+<script>
+    function setLazyLoadingOnThankYouImages() {
+        document.querySelectorAll('.thank-you-content img').forEach(img => {
+            // Don't overwrite if already set
+            if (!img.hasAttribute('loading')) {
+                img.setAttribute('loading', 'lazy');
+            }
+        });
+    }
+
+    // Initial load
+    document.addEventListener('DOMContentLoaded', () => {
+        setLazyLoadingOnThankYouImages();
+    });
+
+    // Livewire updates (v2/v3 compatible)
+    document.addEventListener('livewire:load', () => {
+        setLazyLoadingOnThankYouImages();
+
+        // Re-run after any DOM patch
+        if (window.Livewire?.hook) {
+            Livewire.hook('message.processed', () => {
+                setLazyLoadingOnThankYouImages();
+            });
+        }
+    });
+</script>

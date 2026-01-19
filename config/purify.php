@@ -49,6 +49,52 @@ return [
             'AutoFormat.RemoveEmpty' => false,
         ],
 
+        // config/purify.php (only the application_form_thank_you config)
+        'application_form_thank_you' => [
+            'Core.Encoding' => 'utf-8',
+            'HTML.Doctype' => 'HTML 4.01 Transitional',
+
+            'HTML.SafeIframe' => true,
+            'URI.SafeIframeRegexp' => '%^(https?:)?//(www\.)?(youtube\.com/embed/|youtube-nocookie\.com/embed/)%',
+
+            'URI.AllowedSchemes' => [
+                'http' => true,
+                'https' => true,
+                'mailto' => true,
+                'tel' => true,
+            ],
+
+            // NOTE: NO style attributes anywhere.
+            'HTML.Allowed' => implode(',', [
+                'p[class]','br','hr',
+                'strong','b','em','i','u','s',
+                'blockquote[class]','code','pre',
+                'h1[class]','h2[class]','h3[class]','h4[class]','h5[class]','h6[class]',
+                'ul[class]','ol[class]','li[class]',
+
+                'a[href|title|target|rel|class]',
+
+                'div[class]','section[class]',
+
+                'img[src|alt|title|width|height|class]',
+
+                'figure[class]','figcaption[class]',
+
+                'table[class]','thead','tbody','tfoot','tr','th','td',
+
+                'video[src|poster|preload|controls|width|height|class]',
+                'source[src|type]',
+
+                'iframe[src|width|height|title|frameborder|class]',
+            ]),
+
+            'HTML.TargetBlank' => true,
+            'Attr.AllowedFrameTargets' => ['_blank'],
+
+            'AutoFormat.RemoveEmpty' => true,
+            'AutoFormat.AutoParagraph' => false,
+        ],
+
     ],
 
     /*
