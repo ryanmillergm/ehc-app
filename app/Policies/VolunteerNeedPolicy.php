@@ -13,7 +13,7 @@ class VolunteerNeedPolicy
      */
     public function viewAny(User $user): bool
     {
-        return false;
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('applications.read');
     }
 
     /**
@@ -21,7 +21,7 @@ class VolunteerNeedPolicy
      */
     public function view(User $user, VolunteerNeed $volunteerNeed): bool
     {
-        return false;
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('applications.read');
     }
 
     /**
@@ -29,7 +29,7 @@ class VolunteerNeedPolicy
      */
     public function create(User $user): bool
     {
-        return false;
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('applications.create');
     }
 
     /**
@@ -37,7 +37,7 @@ class VolunteerNeedPolicy
      */
     public function update(User $user, VolunteerNeed $volunteerNeed): bool
     {
-        return false;
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('applications.update');
     }
 
     /**
@@ -45,7 +45,7 @@ class VolunteerNeedPolicy
      */
     public function delete(User $user, VolunteerNeed $volunteerNeed): bool
     {
-        return false;
+        return $user->hasRole(['Super Admin']) || $user->hasPermissionTo('applications.delete');
     }
 
     /**
@@ -53,7 +53,7 @@ class VolunteerNeedPolicy
      */
     public function restore(User $user, VolunteerNeed $volunteerNeed): bool
     {
-        return false;
+        return $user->hasRole(['Super Admin']);
     }
 
     /**
@@ -61,6 +61,6 @@ class VolunteerNeedPolicy
      */
     public function forceDelete(User $user, VolunteerNeed $volunteerNeed): bool
     {
-        return false;
+        return $user->hasRole(['Super Admin']);
     }
 }

@@ -23,7 +23,6 @@ return new class extends Migration {
 
             $table->foreignId('application_form_id')
                 ->nullable()
-                ->after('id')
                 ->constrained('application_forms')
                 ->nullOnDelete();
 
