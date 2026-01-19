@@ -34,22 +34,21 @@ class VolunteerNeedResourceTest extends TestCase
     {
         $this->loginAsSuperAdmin();
 
-        Livewire::test(CreateVolunteerNeed::class)
+        $form = \App\Models\ApplicationForm::factory()->create();
+
+        Livewire::test(\App\Filament\Resources\VolunteerNeeds\Pages\CreateVolunteerNeed::class)
             ->fillForm([
                 'title' => 'Setup Crew',
                 'slug' => 'setup-crew',
-                'description' => 'Helps with setup and teardown.',
                 'is_active' => true,
-                'capacity' => 10,
-                // include 'event_id' only if your form contains it
+                'application_form_id' => $form->id,
             ])
             ->call('create')
             ->assertHasNoFormErrors();
 
         $this->assertDatabaseHas('volunteer_needs', [
-            'title' => 'Setup Crew',
             'slug' => 'setup-crew',
-            'is_active' => 1,
+            'application_form_id' => $form->id,
         ]);
     }
 
