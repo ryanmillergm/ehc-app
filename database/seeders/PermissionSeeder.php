@@ -21,6 +21,11 @@ class PermissionSeeder extends Seeder
         Permission::create(['name' => 'admin.panel']);
         Permission::create(['name' => 'org.panel']);
 
+        Permission::create(['name' => 'applications.read']);
+        Permission::create(['name' => 'applications.create']);
+        Permission::create(['name' => 'applications.update']);
+        Permission::create(['name' => 'applications.delete']);
+
         Permission::create(['name' => 'addresses.read']);
         Permission::create(['name' => 'addresses.create']);
         Permission::create(['name' => 'addresses.update']);
