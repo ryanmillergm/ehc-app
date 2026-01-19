@@ -23,14 +23,18 @@ class VolunteerApplication extends Model
         'volunteer_need_id',
         'status',
         'answers',
+        'interests',
+        'availability',
         'reviewed_by',
         'reviewed_at',
         'internal_notes',
     ];
 
     protected $casts = [
-        'answers'      => 'array',
-        'reviewed_at'  => 'datetime',
+        'answers'       => 'array',
+        'interests'     => 'array',
+        'availability'  => 'array',
+        'reviewed_at'   => 'datetime',
     ];
 
     public function user(): BelongsTo
@@ -56,7 +60,9 @@ class VolunteerApplication extends Model
      */
     public function presentedAnswers(): array
     {
-        $need = $this->need?->loadMissing(['applicationForm.fields' => fn ($q) => $q->where('is_active', true)->orderBy('sort')]);
+        $need = $this->need?->loadMissing([
+            'applicationForm.fields' => fn ($q) => $q->where('is_active', true)->orderBy('sort'),
+        ]);
 
         $form = $need?->applicationForm;
         $fields = $form?->fields ?? collect();
@@ -116,15 +122,15 @@ class VolunteerApplication extends Model
      */
     public function availabilitySummary(): string
     {
-        $availability = data_get($this->answers, 'availability');
+        $availability = $this->availability;
 
         if (! is_array($availability)) {
             return '';
         }
 
         $dayLabels = [
-            'mon' => 'Mon', 'tue' => 'Tue', 'wed' => 'Wed', 'thu' => 'Thu',
-            'fri' => 'Fri', 'sat' => 'Sat', 'sun' => 'Sun',
+            'sun' => 'Sun', 'mon' => 'Mon', 'tue' => 'Tue', 'wed' => 'Wed',
+            'thu' => 'Thu', 'fri' => 'Fri', 'sat' => 'Sat',
         ];
 
         $out = [];

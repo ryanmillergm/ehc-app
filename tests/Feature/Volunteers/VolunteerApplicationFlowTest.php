@@ -46,7 +46,9 @@ class VolunteerApplicationFlowTest extends TestCase
             ->test(\App\Livewire\Volunteers\Apply::class, ['need' => $need])
             ->set('message', 'I would love to help with setup and teardown.')
             ->set('interests', ['cleanup', 'logistics'])
-            ->set('availability', ['thursday'])
+            // availability is a structured week grid now; old "['thursday']" format isn't meaningful
+            ->set('availability.thu.am', true)
+            ->set('availability.thu.pm', false)
             ->call('submit')
             ->assertHasNoErrors();
 
@@ -67,7 +69,7 @@ class VolunteerApplicationFlowTest extends TestCase
             ->test(\App\Livewire\Volunteers\Apply::class, ['need' => $need])
             ->set('message', '')
             ->call('submit')
-            ->assertHasErrors(['message' => 'required']);
+            ->assertHasErrors(['answers.message' => 'required']);
     }
 
     #[Test]

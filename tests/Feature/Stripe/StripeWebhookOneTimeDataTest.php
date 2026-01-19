@@ -69,10 +69,10 @@ class StripeWebhookOneTimeDataTest extends TestCase
 
         $placeholder->refresh();
 
-        // ✅ preserve user_id
+        //  preserve user_id
         $this->assertSame($user->id, $placeholder->user_id);
 
-        // ✅ core fields
+        //  core fields
         $this->assertSame('succeeded', $placeholder->status);
         $this->assertSame('pi_123', $placeholder->payment_intent_id);
         $this->assertSame('ch_123', $placeholder->charge_id);
@@ -82,7 +82,7 @@ class StripeWebhookOneTimeDataTest extends TestCase
         $this->assertSame('stripe_webhook', $placeholder->source);
         $this->assertNotNull($placeholder->paid_at);
 
-        // ✅ thank-you page metadata
+        //  thank-you page metadata
         $this->assertIsArray($placeholder->metadata);
         $this->assertSame('visa', data_get($placeholder->metadata, 'card_brand'));
         $this->assertSame('4242', data_get($placeholder->metadata, 'card_last4'));

@@ -29,14 +29,22 @@ class VolunteerApplicationResourceTest extends TestCase
     }
 
     #[Test]
-    public function edit_page_can_update_status_and_notes_and_arrays(): void
+    public function edit_page_can_update_status_notes_interests_and_availability_matrix(): void
     {
         $this->loginAsSuperAdmin();
 
         $app = VolunteerApplication::factory()->create([
             'status' => VolunteerApplication::STATUS_SUBMITTED,
             'interests' => ['food'],
-            'availability' => ['thursday'],
+            'availability' => [
+                'sun' => ['am' => true,  'pm' => false],
+                'mon' => ['am' => false, 'pm' => false],
+                'tue' => ['am' => false, 'pm' => false],
+                'wed' => ['am' => false, 'pm' => false],
+                'thu' => ['am' => false, 'pm' => false],
+                'fri' => ['am' => false, 'pm' => false],
+                'sat' => ['am' => false, 'pm' => false],
+            ],
         ]);
 
         Livewire::test(EditVolunteerApplication::class, ['record' => $app->getRouteKey()])
@@ -44,7 +52,15 @@ class VolunteerApplicationResourceTest extends TestCase
                 'status' => VolunteerApplication::STATUS_REVIEWING,
                 'internal_notes' => 'Contacted applicant. Scheduling follow-up.',
                 'interests' => ['food', 'prayer'],
-                'availability' => ['sunday', 'flexible'],
+                'availability' => [
+                    'sun' => ['am' => true,  'pm' => true],
+                    'mon' => ['am' => false, 'pm' => false],
+                    'tue' => ['am' => false, 'pm' => false],
+                    'wed' => ['am' => false, 'pm' => true],
+                    'thu' => ['am' => false, 'pm' => false],
+                    'fri' => ['am' => false, 'pm' => false],
+                    'sat' => ['am' => false, 'pm' => false],
+                ],
             ])
             ->call('save')
             ->assertHasNoFormErrors();
@@ -54,6 +70,10 @@ class VolunteerApplicationResourceTest extends TestCase
         $this->assertSame(VolunteerApplication::STATUS_REVIEWING, $app->status);
         $this->assertSame('Contacted applicant. Scheduling follow-up.', $app->internal_notes);
         $this->assertSame(['food', 'prayer'], $app->interests);
-        $this->assertSame(['sunday', 'flexible'], $app->availability);
+
+        $this->assertTrue((bool) data_get($app->availability, 'sun.am'));
+        $this->assertTrue((bool) data_get($app->availability, 'sun.pm'));
+        $this->assertTrue((bool) data_get($app->availability, 'wed.pm'));
+        $this->assertFalse((bool) data_get($app->availability, 'thu.am'));
     }
 }

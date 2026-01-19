@@ -35,7 +35,7 @@ class ApplicationFormThankYouEditorTest extends TestCase
                 'name' => 'Volunteer Form',
                 'slug' => 'volunteer-form',
                 'thank_you_format' => ApplicationForm::THANK_YOU_TEXT,
-                'thank_you_content' => "Thanks!\nWe will reach out soon.",
+                'thank_you_text' => "Thanks!\nWe will reach out soon.",
                 'is_active' => true,
                 'use_availability' => true,
             ])
@@ -57,7 +57,7 @@ class ApplicationFormThankYouEditorTest extends TestCase
                 'name' => 'Volunteer Form HTML',
                 'slug' => 'volunteer-form-html',
                 'thank_you_format' => ApplicationForm::THANK_YOU_HTML,
-                'thank_you_content' => '<div><h3>Thank you!</h3><p>We will be in touch.</p></div>',
+                'thank_you_html' => '<div><h3>Thank you!</h3><p>We will be in touch.</p></div>',
                 'is_active' => true,
             ])
             ->call('create')
@@ -82,7 +82,7 @@ class ApplicationFormThankYouEditorTest extends TestCase
         Livewire::test(EditApplicationForm::class, ['record' => $form->getKey()])
             ->fillForm([
                 'thank_you_format' => ApplicationForm::THANK_YOU_HTML,
-                'thank_you_content' => '<div><h3>Thank you!</h3><p>We will be in touch.</p></div>',
+                'thank_you_html' => '<div><h3>Thank you!</h3><p>We will be in touch.</p></div>',
             ])
             ->call('save')
             ->assertHasNoFormErrors();
@@ -102,7 +102,7 @@ class ApplicationFormThankYouEditorTest extends TestCase
                 'name' => 'Volunteer Form Malicious',
                 'slug' => 'volunteer-form-malicious',
                 'thank_you_format' => ApplicationForm::THANK_YOU_HTML,
-                'thank_you_content' => '<p onclick="alert(1)">Hi</p><script>alert(1)</script><a href="javascript:alert(1)">X</a>',
+                'thank_you_html' => '<p onclick="alert(1)">Hi</p><script>alert(1)</script><a href="javascript:alert(1)">X</a>',
                 'is_active' => true,
             ])
             ->call('create')

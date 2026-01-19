@@ -9,7 +9,7 @@ use App\Filament\Resources\EmailCampaignDeliveries\Tables\EmailCampaignDeliverie
 use App\Models\EmailCampaignDelivery;
 use BackedEnum;
 use UnitEnum;
-use Filament\Infolists; // ✅ IMPORTANT
+use Filament\Infolists;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;

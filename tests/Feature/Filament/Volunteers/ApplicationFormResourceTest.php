@@ -17,11 +17,20 @@ class ApplicationFormResourceTest extends TestCase
     use RefreshDatabase;
     use InteractsWithFilamentAdmin;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        if (method_exists($this, 'bootFilamentPermissions')) {
+            $this->bootFilamentPermissions();
+        }
+
+        $this->loginAsSuperAdmin();
+    }
+
     #[Test]
     public function list_page_can_render(): void
     {
-        $this->loginAsFilamentAdmin();
-
         Livewire::test(ListApplicationForms::class)
             ->assertOk();
     }
@@ -29,8 +38,6 @@ class ApplicationFormResourceTest extends TestCase
     #[Test]
     public function create_page_can_create_application_form(): void
     {
-        $this->loginAsFilamentAdmin();
-
         Livewire::test(CreateApplicationForm::class)
             ->fillForm([
                 'name' => 'Volunteer - Setup Crew',
@@ -38,6 +45,10 @@ class ApplicationFormResourceTest extends TestCase
                 'description' => 'Setup crew application form',
                 'is_active' => true,
                 'use_availability' => false,
+
+                // keep defaults sane for thank-you:
+                'thank_you_format' => ApplicationForm::THANK_YOU_TEXT,
+                'thank_you_text' => "Thanks!\nWe will reach out soon.",
             ])
             ->call('create')
             ->assertHasNoFormErrors();
@@ -47,7 +58,6 @@ class ApplicationFormResourceTest extends TestCase
             'use_availability' => 0,
         ]);
 
-        // default message field should exist
         $form = ApplicationForm::where('slug', 'volunteer-setup-crew')->firstOrFail();
 
         $this->assertDatabaseHas('application_form_fields', [
@@ -59,16 +69,19 @@ class ApplicationFormResourceTest extends TestCase
     #[Test]
     public function edit_page_can_update_application_form(): void
     {
-        $this->loginAsFilamentAdmin();
-
         $form = ApplicationForm::factory()->create([
             'use_availability' => true,
+            'thank_you_format' => ApplicationForm::THANK_YOU_TEXT,
+            'thank_you_content' => 'Old',
         ]);
 
         Livewire::test(EditApplicationForm::class, ['record' => $form->getKey()])
             ->fillForm([
                 'name' => 'Updated Name',
                 'use_availability' => false,
+                // don’t accidentally trigger empty content:
+                'thank_you_format' => ApplicationForm::THANK_YOU_TEXT,
+                'thank_you_text' => 'Old',
             ])
             ->call('save')
             ->assertHasNoFormErrors();

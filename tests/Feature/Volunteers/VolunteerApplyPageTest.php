@@ -122,10 +122,9 @@ class VolunteerApplyPageTest extends TestCase
 
         $this->assertSame($message, data_get($app->answers, 'message'));
         $this->assertSame($city, data_get($app->answers, 'city'));
-
-        // availability is injected into answers when toggle is on
-        $this->assertTrue((bool) data_get($app->answers, 'availability.mon.am'));
-        $this->assertFalse((bool) data_get($app->answers, 'availability.mon.pm'));
+ 
+        $this->assertTrue((bool) data_get($app->availability, 'mon.am'));
+        $this->assertFalse((bool) data_get($app->availability, 'mon.pm'));
     }
 
     #[Test]

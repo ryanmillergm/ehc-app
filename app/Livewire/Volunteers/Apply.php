@@ -14,11 +14,34 @@ class Apply extends Component
 {
     public VolunteerNeed $need;
 
+    /**
+     * Dynamic form answers (keyed by ApplicationFormField::key)
+     */
     public array $answers = [];
 
+    /**
+     * Optional weekly availability grid (stored in volunteer_applications.availability JSON column)
+     * Format:
+     * [
+     *   'mon' => ['am' => true, 'pm' => false],
+     *   ...
+     * ]
+     */
     public array $availability = [];
 
+    /**
+     * Optional interests selection (stored in volunteer_applications.interests JSON column)
+     * We support pulling this from answers['interests'] too for flexibility.
+     */
+    public array $interests = [];
+
     public bool $submitted = false;
+
+    /**
+     * Back-compat with older tests / callers that set $message directly.
+     * Internally, we store it in answers['message'].
+     */
+    public string $message = '';
 
     public function mount(VolunteerNeed $need): void
     {
@@ -39,13 +62,24 @@ class Apply extends Component
             $this->answers[$field->key] = $this->answers[$field->key] ?? ($field->type === 'checkbox_group' ? [] : '');
         }
 
+        // keep message alias in sync if form has a message field
+        if (array_key_exists('message', $this->answers) && $this->message === '') {
+            $this->message = (string) ($this->answers['message'] ?? '');
+        }
+
         if ($this->need->applicationForm->use_availability) {
             $days = ['mon','tue','wed','thu','fri','sat','sun'];
             foreach ($days as $day) {
-                $this->availability[$day]['am'] = $this->availability[$day]['am'] ?? false;
-                $this->availability[$day]['pm'] = $this->availability[$day]['pm'] ?? false;
+                $this->availability[$day]['am'] = (bool) ($this->availability[$day]['am'] ?? false);
+                $this->availability[$day]['pm'] = (bool) ($this->availability[$day]['pm'] ?? false);
             }
         }
+    }
+
+    public function updatedMessage(string $value): void
+    {
+        // keep answers.message in sync with the old $message property
+        $this->answers['message'] = $value;
     }
 
     public function submit(): void
@@ -53,12 +87,43 @@ class Apply extends Component
         $user = auth()->user();
         abort_unless($user, 401);
 
+        // Ensure message alias is reflected in answers prior to validation
+        if ($this->message !== '' || array_key_exists('message', $this->answers)) {
+            $this->answers['message'] = $this->answers['message'] ?? $this->message;
+            $this->message = (string) ($this->answers['message'] ?? '');
+        }
+
         $data = $this->validate($this->buildRules());
 
-        $answers = $data['answers'];
+        $answers = (array) ($data['answers'] ?? []);
 
+        // Availability is stored in its own column
+        $availability = null;
         if ($this->need->applicationForm->use_availability) {
-            $answers['availability'] = $this->availability;
+            // normalize booleans
+            $days = ['mon','tue','wed','thu','fri','sat','sun'];
+            $normalized = [];
+            foreach ($days as $day) {
+                $normalized[$day] = [
+                    'am' => (bool) data_get($this->availability, "{$day}.am", false),
+                    'pm' => (bool) data_get($this->availability, "{$day}.pm", false),
+                ];
+            }
+            $availability = $normalized;
+        }
+
+        // Interests can come from:
+        // - a dedicated $interests property (if you add a UI for it)
+        // - OR answers['interests'] (if your dynamic builder includes it)
+        $interests = $this->interests;
+        if (empty($interests) && isset($answers['interests']) && is_array($answers['interests'])) {
+            $interests = $answers['interests'];
+        }
+
+        // If you don’t want "interests" duplicated inside answers,
+        // strip it out so the canonical location is the column.
+        if (array_key_exists('interests', $answers)) {
+            unset($answers['interests']);
         }
 
         try {
@@ -67,6 +132,8 @@ class Apply extends Component
                 'volunteer_need_id' => $this->need->id,
                 'status' => VolunteerApplication::STATUS_SUBMITTED,
                 'answers' => $answers,
+                'availability' => $availability,
+                'interests' => empty($interests) ? null : array_values($interests),
             ]);
         } catch (QueryException $e) {
             // MySQL duplicate entry => 1062
@@ -81,10 +148,8 @@ class Apply extends Component
             throw $e;
         }
 
-        // show thank-you screen (don’t reset back to blank form)
         $this->submitted = true;
 
-        // Optional banner
         $success = __('Thanks! Your volunteer application has been submitted.');
         session()->flash('flash.banner', $success);
         session()->flash('flash.bannerStyle', 'success');
@@ -142,6 +207,10 @@ class Apply extends Component
                 $rules["availability.{$day}.pm"] = ['boolean'];
             }
         }
+
+        // Optional: validate interests array if present (either via dedicated UI or answers)
+        $rules['interests'] = ['array'];
+        $rules['interests.*'] = ['string'];
 
         return $rules;
     }

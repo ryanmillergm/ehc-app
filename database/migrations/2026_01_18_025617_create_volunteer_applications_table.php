@@ -17,6 +17,9 @@ return new class extends Migration {
 
             $table->json('answers')->nullable();
 
+            $table->json('interests')->nullable();
+            $table->json('availability')->nullable();
+
             $table->foreignId('reviewed_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('reviewed_at')->nullable();
             $table->text('internal_notes')->nullable();

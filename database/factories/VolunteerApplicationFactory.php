@@ -20,6 +20,16 @@ class VolunteerApplicationFactory extends Factory
             'answers' => [
                 'message' => $this->faker->sentence(16),
             ],
+            'interests' => [$this->faker->randomElement(['food', 'prayer', 'kids', 'tech'])],
+            'availability' => [
+                'sun' => ['am' => (bool) random_int(0, 1), 'pm' => (bool) random_int(0, 1)],
+                'mon' => ['am' => false, 'pm' => false],
+                'tue' => ['am' => false, 'pm' => false],
+                'wed' => ['am' => false, 'pm' => false],
+                'thu' => ['am' => false, 'pm' => false],
+                'fri' => ['am' => false, 'pm' => false],
+                'sat' => ['am' => false, 'pm' => false],
+            ],
         ];
     }
 }

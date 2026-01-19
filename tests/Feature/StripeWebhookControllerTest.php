@@ -980,7 +980,6 @@ class StripeWebhookControllerTest extends TestCase
         // NOTE: your current code keeps status "pending" because it uses `$tx->status ?: 'succeeded'`
         $this->assertSame('pending', $placeholder->status);
 
-        // ✅ This is the assertion that fixes your new failure
         $this->assertNotNull($placeholder->paid_at);
         $this->assertEquals($paidAtTs, $placeholder->paid_at->timestamp);
 

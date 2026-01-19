@@ -45,7 +45,7 @@ class ApplicationFormForm
                     Toggle::make('is_active')->default(true),
 
                     Toggle::make('use_availability')
-                        ->label('Include availability block (Mon–Sun AM/PM)')
+                        ->label('Include availability block (Sun–Sat AM/PM)')
                         ->helperText('If enabled, applicants will see the built-in weekly availability grid.')
                         ->default(true),
                 ])
@@ -64,16 +64,15 @@ class ApplicationFormForm
                         ->required()
                         ->live(),
 
-                    // Plain text UI field (virtual)
                     Textarea::make('thank_you_text')
                         ->label('Thank you message (Text)')
                         ->helperText('Shown after successful submission.')
                         ->rows(8)
                         ->columnSpanFull()
                         ->visible(fn (Get $get) => ($get('thank_you_format') ?? ApplicationForm::THANK_YOU_WYSIWYG) === ApplicationForm::THANK_YOU_TEXT)
-                        ->dehydrated(true),
+                        // only include in $data when this format is active
+                        ->dehydrated(fn (Get $get) => ($get('thank_you_format') ?? ApplicationForm::THANK_YOU_WYSIWYG) === ApplicationForm::THANK_YOU_TEXT),
 
-                    // WYSIWYG UI field (virtual)
                     RichEditor::make('thank_you_wysiwyg')
                         ->label('Thank you message (Editor)')
                         ->helperText('Easy editing. HTML is sanitized on save.')
@@ -93,16 +92,17 @@ class ApplicationFormForm
                         ->fileAttachmentsDisk('public')
                         ->fileAttachmentsDirectory('application-forms/thank-you')
                         ->visible(fn (Get $get) => ($get('thank_you_format') ?? ApplicationForm::THANK_YOU_WYSIWYG) === ApplicationForm::THANK_YOU_WYSIWYG)
-                        ->dehydrated(true),
+                        // only include in $data when this format is active
+                        ->dehydrated(fn (Get $get) => ($get('thank_you_format') ?? ApplicationForm::THANK_YOU_WYSIWYG) === ApplicationForm::THANK_YOU_WYSIWYG),
 
-                    // HTML UI field (virtual)
                     CodeEditor::make('thank_you_html')
                         ->label('Thank you message (HTML)')
                         ->helperText('Advanced: HTML is sanitized on save.')
                         ->language(Language::Html)
                         ->columnSpanFull()
                         ->visible(fn (Get $get) => ($get('thank_you_format') ?? ApplicationForm::THANK_YOU_WYSIWYG) === ApplicationForm::THANK_YOU_HTML)
-                        ->dehydrated(true),
+                        // only include in $data when this format is active
+                        ->dehydrated(fn (Get $get) => ($get('thank_you_format') ?? ApplicationForm::THANK_YOU_WYSIWYG) === ApplicationForm::THANK_YOU_HTML),
                 ])
                 ->columns(1),
         ]);

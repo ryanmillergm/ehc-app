@@ -4,8 +4,10 @@ namespace App\Filament\Resources\VolunteerApplications\Schemas;
 
 use App\Models\VolunteerApplication;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\ViewField;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -41,15 +43,26 @@ class VolunteerApplicationForm
 
             Section::make('Responses')
                 ->schema([
-                    // Renders builder-driven Q/A from:
-                    // - $record->need->applicationForm->fields
-                    // - $record->answers
                     ViewField::make('answers_render')
                         ->label(false)
                         ->view('filament.volunteer-applications.answers')
                         ->dehydrated(false),
                 ])
                 ->columns(1),
+
+            Section::make('Availability')
+                ->schema([
+                    // Sunday -> Saturday, AM/PM
+                    self::dayRow('sun', 'Sunday'),
+                    self::dayRow('mon', 'Monday'),
+                    self::dayRow('tue', 'Tuesday'),
+                    self::dayRow('wed', 'Wednesday'),
+                    self::dayRow('thu', 'Thursday'),
+                    self::dayRow('fri', 'Friday'),
+                    self::dayRow('sat', 'Saturday'),
+                ])
+                ->columns(1)
+                ->collapsed(),
 
             Section::make('Review')
                 ->schema([
@@ -63,6 +76,12 @@ class VolunteerApplicationForm
                             VolunteerApplication::STATUS_WITHDRAWN => 'Withdrawn',
                         ]),
 
+                    TagsInput::make('interests')
+                        ->label('Interests')
+                        ->placeholder('Add interest...')
+                        ->suggestions(['food', 'prayer', 'kids', 'tech'])
+                        ->nullable(),
+
                     Textarea::make('internal_notes')
                         ->rows(8)
                         ->placeholder('Internal notes / follow-up...')
@@ -70,5 +89,25 @@ class VolunteerApplicationForm
                 ])
                 ->columns(1),
         ]);
+    }
+
+    private static function dayRow(string $dayKey, string $label)
+    {
+        return \Filament\Schemas\Components\Grid::make(3)
+            ->schema([
+                TextInput::make("availability_labels.{$dayKey}")
+                    ->label(false)
+                    ->default($label)
+                    ->disabled()
+                    ->dehydrated(false),
+
+                Toggle::make("availability.{$dayKey}.am")
+                    ->label('AM')
+                    ->default(false),
+
+                Toggle::make("availability.{$dayKey}.pm")
+                    ->label('PM')
+                    ->default(false),
+            ]);
     }
 }

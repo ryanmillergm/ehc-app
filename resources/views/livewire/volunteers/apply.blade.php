@@ -134,6 +134,37 @@
                     </div>
                 @endforeach
 
+                {{-- Interests (stored in volunteer_applications.interests) --}}
+                <div>
+                    <div class="text-sm font-semibold text-slate-900">Interests</div>
+                    <p class="mt-1 text-sm text-slate-500">Select any areas you’re interested in serving.</p>
+
+                    @php
+                        $interestOptions = [
+                            'food'   => 'Food / Hospitality',
+                            'prayer' => 'Prayer Team',
+                            'kids'   => 'Kids Ministry',
+                            'tech'   => 'Tech / AV',
+                        ];
+                    @endphp
+
+                    <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-slate-700">
+                        @foreach ($interestOptions as $key => $label)
+                            <label class="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2">
+                                <input type="checkbox"
+                                       wire:model.defer="interests"
+                                       value="{{ $key }}"
+                                       class="rounded border-slate-300 text-rose-600 focus:ring-rose-500" />
+                                <span>{{ $label }}</span>
+                            </label>
+                        @endforeach
+                    </div>
+
+                    @error('interests')
+                        <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
+                    @enderror
+                </div>
+
                 {{-- Optional availability block (per-form toggle) --}}
                 @if ($form->use_availability)
                     <div>
@@ -142,13 +173,13 @@
 
                         @php
                             $days = [
+                                'sun' => 'Sun',
                                 'mon' => 'Mon',
                                 'tue' => 'Tue',
                                 'wed' => 'Wed',
                                 'thu' => 'Thu',
                                 'fri' => 'Fri',
                                 'sat' => 'Sat',
-                                'sun' => 'Sun',
                             ];
                         @endphp
 
@@ -207,23 +238,19 @@
 <script>
     function setLazyLoadingOnThankYouImages() {
         document.querySelectorAll('.thank-you-content img').forEach(img => {
-            // Don't overwrite if already set
             if (!img.hasAttribute('loading')) {
                 img.setAttribute('loading', 'lazy');
             }
         });
     }
 
-    // Initial load
     document.addEventListener('DOMContentLoaded', () => {
         setLazyLoadingOnThankYouImages();
     });
 
-    // Livewire updates (v2/v3 compatible)
     document.addEventListener('livewire:load', () => {
         setLazyLoadingOnThankYouImages();
 
-        // Re-run after any DOM patch
         if (window.Livewire?.hook) {
             Livewire.hook('message.processed', () => {
                 setLazyLoadingOnThankYouImages();
