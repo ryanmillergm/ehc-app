@@ -20,26 +20,26 @@ class LanguageSeeder extends Seeder
             'locale'        => 'en',
             'right_to_left' => false,
         ]);
-        Language::create([
-            'title'         => 'Spanish',
-            'name'          => 'Español',
-            'iso_code'      => 'es',
-            'locale'        => 'es',
-            'right_to_left' => false,
-        ]);
-        Language::create([
-            'title'         => 'French',
-            'name'          => 'Français',
-            'iso_code'      => 'fr',
-            'locale'        => 'fr',
-            'right_to_left' => false,
-        ]);
-        Language::create([
-            'title'         => 'Arabic',
-            'name'          => 'عربي',
-            'iso_code'      => 'ar',
-            'locale'        => 'ar',
-            'right_to_left' => true,
-        ]);
+        // Language::create([
+        //     'title'         => 'Spanish',
+        //     'name'          => 'Español',
+        //     'iso_code'      => 'es',
+        //     'locale'        => 'es',
+        //     'right_to_left' => false,
+        // ]);
+        // Language::create([
+        //     'title'         => 'French',
+        //     'name'          => 'Français',
+        //     'iso_code'      => 'fr',
+        //     'locale'        => 'fr',
+        //     'right_to_left' => false,
+        // ]);
+        // Language::create([
+        //     'title'         => 'Arabic',
+        //     'name'          => 'عربي',
+        //     'iso_code'      => 'ar',
+        //     'locale'        => 'ar',
+        //     'right_to_left' => true,
+        // ]);
     }
 }
