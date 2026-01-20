@@ -73,7 +73,7 @@ jobs:
             set -euo pipefail
             cd "${DEPLOY_PATH}"
 
-            # Laravel runtime permissions (php-fpm user is typically www-data)
+            # Runtime perms (requires NOPASSWD sudo rules)
             sudo chown -R www-data:www-data storage bootstrap/cache
             sudo find storage bootstrap/cache -type d -exec chmod 775 {} \;
             sudo find storage bootstrap/cache -type f -exec chmod 664 {} \;
@@ -85,7 +85,6 @@ jobs:
             php artisan route:cache
             php artisan view:cache
 
-            # Restart (not reload) to flush stale workers/caches
-            sudo systemctl restart php8.5-fpm || true
-            sudo systemctl reload nginx || true
+            sudo systemctl restart php8.5-fpm
+            sudo systemctl reload nginx
           SSH
