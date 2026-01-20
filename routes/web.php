@@ -3,6 +3,7 @@
 use App\Livewire\Home;
 use App\Livewire\Pages\ShowPage;
 use App\Livewire\Pages\IndexPage;
+use App\Livewire\Volunteers\Apply;
 use App\Http\Middleware\Localization;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\LanguageSwitch;
@@ -94,6 +95,8 @@ Route::middleware([
     config('jetstream.auth_session'),
     'verified',
 ])->group(function () {
+    Route::get('/volunteer/{need:slug}', Apply::class)->name('volunteer.apply');
+
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
 
     // Addresses

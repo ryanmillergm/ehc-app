@@ -13,6 +13,7 @@
         "laravel/tinker": "^2.9",
         "livewire/livewire": "^3.0",
         "spatie/laravel-permission": "^6.7",
+        "stevebauman/purify": "^6.3",
         "stripe/stripe-php": "^18.2",
         "tijsverkoyen/css-to-inline-styles": "^2.4"
     },

@@ -1,0 +1,27 @@
+/* Wrapper to apply when rendering the thank-you HTML */
+.thank-you-content { line-height: 1.6; }
+
+.thank-you-content .ty-title { font-size: 1.6rem; font-weight: 700; margin: 0 0 0.75rem; }
+.thank-you-content .ty-title-sm { font-size: 1.1rem; font-weight: 700; margin: 0 0 0.5rem; }
+.thank-you-content .ty-text { margin: 0 0 0.75rem; }
+
+.thank-you-content .ty-callout {
+    padding: 1rem;
+    border: 1px solid #ddd;
+    background: #fafafa;
+}
+
+.thank-you-content .ty-button {
+    display: inline-block;
+    padding: 0.6rem 1rem;
+    border-radius: 6px;
+    background: #111;
+    color: #fff;
+    text-decoration: none;
+}
+
+.thank-you-content .ty-table { width: 100%; border-collapse: collapse; }
+.thank-you-content .ty-col { width: 50%; vertical-align: top; padding: 0.75rem; border: 1px solid #eee; }
+
+.thank-you-content .ty-video { max-width: 560px; }
+.thank-you-content .ty-iframe { width: 100%; aspect-ratio: 16 / 9; height: auto; }

@@ -23,6 +23,9 @@ class DatabaseSeeder extends Seeder
             PageSeeder::class,
             PageTranslationSeeder::class,
             EmailListSeeder::class,
+            ApplicationFormSeeder::class,
+            VolunteerNeedSeeder::class,
+            VolunteerApplicationSeeder::class,
         ]);
     }
 }

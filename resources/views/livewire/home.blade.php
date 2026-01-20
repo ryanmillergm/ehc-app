@@ -83,7 +83,7 @@
                             <p class="mt-1 text-lg font-semibold text-slate-900">Fuel outreach</p>
                             <p class="mt-1 text-sm text-slate-500">Meals, supplies, mentorship</p>
                         </a>
-                        <a href="#serve" class="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition">
+                        <a href="{{ route('volunteer.apply', ['need' => 'general']) }}" class="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition">
                             <p class="text-md font-semibold text-rose-700">Serve</p>
                             <p class="mt-1 text-lg font-semibold text-slate-900">Join the team</p>
                             <p class="mt-1 text-sm text-slate-500">Hands + hearts welcome</p>
@@ -305,6 +305,12 @@
                                 </p>
 
                                 <div class="mt-6 flex flex-col sm:flex-row gap-3">
+                                    <a href="{{ route('volunteer.apply', ['need' => 'general']) }}"
+                                       class="inline-flex items-center justify-center rounded-full bg-white/90 px-7 py-3.5
+                                              text-sm font-semibold text-black ring-1 ring-white/60 hover:bg-white/65 transition">
+                                        Sign up to Volunteer
+                                    </a>
+
                                     <a href="#give-form"
                                        class="inline-flex items-center justify-center rounded-full bg-rose-600 px-7 py-3.5
                                               text-sm font-semibold text-white shadow-sm hover:bg-rose-700 transition">
@@ -512,7 +518,7 @@
                         </a>
 
                         <a
-                            href="#serve"
+                            href="{{ route('volunteer.apply', ['need' => 'general']) }}"
                             class="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-6 py-3
                                    text-sm font-semibold text-slate-900 hover:bg-slate-100 transition"
                         >

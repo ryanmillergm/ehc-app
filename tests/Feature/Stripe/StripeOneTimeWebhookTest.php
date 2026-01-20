@@ -76,7 +76,7 @@ class StripeOneTimeWebhookTest extends TestCase
         $tx->refresh();
 
         $this->assertSame('succeeded', $tx->status);
-        $this->assertSame($user->id, $tx->user_id); // ✅ don’t clobber
+        $this->assertSame($user->id, $tx->user_id);
         $this->assertSame($piId, $tx->payment_intent_id);
         $this->assertSame($chId, $tx->charge_id);
         $this->assertSame($pm, $tx->payment_method_id);

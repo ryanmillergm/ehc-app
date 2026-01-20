@@ -31,7 +31,7 @@ class IndexPageTest extends TestCase
         parent::setUp();
 
         /**
-         * ✅ HARD RESET for this suite:
+         * HARD RESET for this suite:
          * If your base TestCase or traits seeded Pages/Translations,
          * wipe them so each test controls the universe.
          */

@@ -37,7 +37,6 @@ class StripeRealFixturesTest extends TestCase
 
         (new StripeWebhookController())->handleEvent($event);
 
-        // ✅ now expected: create OR enrich exactly one
         $this->assertDatabaseCount('transactions', 1);
 
         $tx = Transaction::firstOrFail();
@@ -117,7 +116,7 @@ class StripeRealFixturesTest extends TestCase
 
         (new StripeWebhookController())->handleEvent($event);
 
-        // ✅ must still be exactly one row
+        //  must still be exactly one row
         $this->assertDatabaseCount('transactions', 1);
 
         $placeholder->refresh();
@@ -127,7 +126,7 @@ class StripeRealFixturesTest extends TestCase
         $this->assertSame(data_get($charge, 'id'), $placeholder->charge_id);
         $this->assertSame(data_get($charge, 'payment_method'), $placeholder->payment_method_id);
 
-        // ✅ must not clobber user_id / must be same row
+        //  must not clobber user_id / must be same row
         $this->assertSame($user->id, $placeholder->user_id);
 
         // card metadata if present
@@ -207,7 +206,7 @@ class StripeRealFixturesTest extends TestCase
         $this->assertSame($invoiceId, data_get($tx->metadata, 'stripe_invoice_id'));
 
         if ($hostedInvoice) {
-            // ✅ invoice URL should win over charge receipt URL
+            //  invoice URL should win over charge receipt URL
             $this->assertSame($hostedInvoice, $tx->receipt_url);
         }
 

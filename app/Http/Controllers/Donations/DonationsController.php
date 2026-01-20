@@ -217,7 +217,6 @@ class DonationsController extends Controller
 
             'payment_intent_id' => ['nullable', 'string'],
             'charge_id'         => ['nullable', 'string'],
-            // ✅ CHANGE: required for subscription completion
             'payment_method_id' => ['nullable', 'string', 'required_if:mode,subscription'],
             'receipt_url'       => ['nullable', 'url'],
 

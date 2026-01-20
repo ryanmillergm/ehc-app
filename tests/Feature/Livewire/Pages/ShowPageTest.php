@@ -182,7 +182,6 @@ class ShowPageTest extends TestCase
         $response->assertRedirect('/pages');
     }
 
-    // ✅ NEW: proves in-place switching works
     #[Test]
     public function test_switches_translation_in_place_when_language_switched_event_received()
     {
@@ -223,7 +222,6 @@ class ShowPageTest extends TestCase
             ->assertDontSee('English events');
     }
 
-    // ✅ NEW: switching to missing language falls back to default
     #[Test]
     public function test_switch_falls_back_to_default_translation_when_target_language_missing()
     {
