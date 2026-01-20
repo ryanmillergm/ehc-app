@@ -44,15 +44,16 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.DEPLOY_KEY }}
 
-      - name: Rsync to server (safer deletes)
+      - name: Rsync to server (safe for Laravel runtime dirs)
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          rsync -az \
+          rsync -rz \
             --delete-delay \
             --delay-updates \
+            --no-times --no-perms --no-owner --no-group \
             --exclude=".env" \
             --exclude="storage/*.key" \
             --exclude="storage/logs" \
@@ -62,7 +63,7 @@ jobs:
             -e "ssh -o StrictHostKeyChecking=no" \
             ./ ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}
 
-      - name: Run post-deploy commands
+      - name: Post-deploy (migrate, cache, restart)
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
@@ -72,29 +73,19 @@ jobs:
             set -euo pipefail
             cd "${DEPLOY_PATH}"
 
-            # Optional: reduce weird mid-deploy race conditions
-            touch storage/framework/down
-
-            # Ensure Laravel runtime dirs are writable by php-fpm user
+            # Laravel runtime permissions (php-fpm user is typically www-data)
             sudo chown -R www-data:www-data storage bootstrap/cache
             sudo find storage bootstrap/cache -type d -exec chmod 775 {} \;
             sudo find storage bootstrap/cache -type f -exec chmod 664 {} \;
 
-            # Clear caches (important when files moved/updated)
             php artisan optimize:clear
-
-            # DB migrations
             php artisan migrate --force
 
-            # Rebuild caches
             php artisan config:cache
             php artisan route:cache
             php artisan view:cache
 
-            # Remove optional lock
-            rm -f storage/framework/down || true
-
-            # IMPORTANT: restart php-fpm (reload may keep stale workers)
+            # Restart (not reload) to flush stale workers/caches
             sudo systemctl restart php8.5-fpm || true
             sudo systemctl reload nginx || true
           SSH
