@@ -4,6 +4,7 @@ namespace App\Filament\Resources\ApplicationForms\RelationManagers;
 
 use App\Models\ApplicationForm;
 use App\Models\FormField;
+use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
@@ -16,6 +17,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Schemas\Components\Actions as SchemaActions;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
@@ -26,23 +28,25 @@ use Illuminate\Validation\Rule;
 
 class FieldsRelationManager extends RelationManager
 {
-    /**
-     * ApplicationForm::fieldPlacements()
-     */
     protected static string $relationship = 'fieldPlacements';
+
+    protected static ?string $title = 'Questions';
+    protected static ?string $pluralModelLabel = 'Questions';
+    protected static ?string $modelLabel = 'Question';
 
     public function form(Schema $schema): Schema
     {
         return $schema->components([
-            // Stores selected field meta so helperText can update immediately.
             Hidden::make('selected_field_meta')
-                ->dehydrated(false)
-                ->default(null),
+                ->dehydrated(false),
 
+            /* ---------------------------------------------------------
+             | Question selector (keeps the "+" inside the dropdown)
+             * --------------------------------------------------------- */
             Select::make('form_field_id')
                 ->label('Question')
                 ->required()
-                ->searchable() // manual searchable (no args)
+                ->searchable()
                 ->placeholder('Select or search for a question...')
                 ->options(fn (): array => FormField::query()
                     ->orderBy('key')
@@ -51,7 +55,8 @@ class FieldsRelationManager extends RelationManager
                     ->mapWithKeys(fn (FormField $f) => [
                         $f->id => "{$f->key} — {$f->label}",
                     ])
-                    ->all())
+                    ->all()
+                )
                 ->getSearchResultsUsing(function (string $search): array {
                     return FormField::query()
                         ->where('key', 'like', "%{$search}%")
@@ -70,66 +75,14 @@ class FieldsRelationManager extends RelationManager
                     }
 
                     $field = FormField::query()
-                        ->select(['id', 'key', 'label'])
+                        ->select(['key', 'label'])
                         ->find($value);
 
-                    return $field ? "{$field->key} — {$field->label}" : null;
+                    return $field
+                        ? "{$field->key} — {$field->label}"
+                        : null;
                 })
                 ->live()
-
-                // Create new FormField from inside the select
-                ->createOptionForm([
-                    TextInput::make('key')
-                        ->label('Key')
-                        ->required()
-                        ->rule('alpha_dash')
-                        ->maxLength(64)
-                        ->unique(FormField::class, 'key'),
-
-                    Select::make('type')
-                        ->label('Type')
-                        ->required()
-                        ->options([
-                            'text'           => 'Text input',
-                            'textarea'       => 'Textarea',
-                            'select'         => 'Select',
-                            'radio'          => 'Radio',
-                            'checkbox_group' => 'Checkbox group',
-                            'toggle'         => 'Toggle',
-                        ])
-                        ->default('text'),
-
-                    TextInput::make('label')
-                        ->label('Label')
-                        ->required()
-                        ->maxLength(160),
-
-                    Textarea::make('help_text')
-                        ->label('Help text')
-                        ->rows(2),
-
-                    KeyValue::make('config')
-                        ->label('Config')
-                        ->helperText('Example keys: options, rows, min, max, placeholder.')
-                        ->columnSpanFull(),
-                ])
-                ->createOptionUsing(function (array $data): int {
-                    $field = FormField::create([
-                        'key'       => $data['key'],
-                        'type'      => $data['type'],
-                        'label'     => $data['label'],
-                        'help_text' => $data['help_text'] ?? null,
-
-                        // normalize config storage
-                        'config'    => in_array($data['type'], ['radio', 'select', 'checkbox_group'], true)
-                            ? ['options' => ($data['config'] ?? [])]
-                            : ($data['config'] ?? []),
-                    ]);
-
-                    return (int) $field->getKey();
-                })
-
-                // Update helper text meta when selection changes
                 ->afterStateUpdated(function ($state, Set $set): void {
                     if (! $state) {
                         $set('selected_field_meta', null);
@@ -137,7 +90,7 @@ class FieldsRelationManager extends RelationManager
                     }
 
                     $field = FormField::query()
-                        ->select(['id', 'key', 'type', 'label'])
+                        ->select(['key', 'type', 'label'])
                         ->find($state);
 
                     if (! $field) {
@@ -151,36 +104,61 @@ class FieldsRelationManager extends RelationManager
                         'label' => $field->label,
                     ]);
                 })
-
                 ->helperText(function (Get $get): string {
                     $meta = $get('selected_field_meta');
 
                     if (! is_array($meta)) {
-                        return 'Pick an existing question from your global library, or create a new one.';
+                        return 'Pick an existing question, or create a new one.';
                     }
 
-                    $type  = (string) ($meta['type'] ?? '');
-                    $label = (string) ($meta['label'] ?? '');
-                    $key   = (string) ($meta['key'] ?? '');
-
-                    $typePretty = $this->prettyFieldType($type);
-                    $main = trim(implode(' — ', array_filter([$typePretty, $label])));
-
-                    return trim("Selected: {$main} ({$key})");
+                    return sprintf(
+                        'Selected: %s — %s (%s)',
+                        $this->prettyFieldType($meta['type'] ?? ''),
+                        $meta['label'] ?? '',
+                        $meta['key'] ?? '',
+                    );
                 })
-
-                // Ensure a field can’t be placed twice on the same form.
+                // ✅ Inline "+" create (power-user flow)
+                ->createOptionForm($this->questionCreateForm())
+                ->createOptionUsing(fn (array $data): int =>
+                    (int) $this->createFormFieldFromModal($data)->getKey()
+                )
                 ->rules(function () {
                     /** @var ApplicationForm $owner */
                     $owner = $this->getOwnerRecord();
+                    $currentId = $this->getMountedTableActionFormRecord()?->getKey();
 
                     return [
                         Rule::unique('form_field_placements', 'form_field_id')
                             ->where('fieldable_type', ApplicationForm::class)
                             ->where('fieldable_id', $owner->getKey())
-                            ->ignore($this->getMountedTableActionRecord()?->getKey()),
+                            ->ignore($currentId),
                     ];
                 }),
+
+            /* ---------------------------------------------------------
+             | CTA BELOW the select (Filament v4 native)
+             * --------------------------------------------------------- */
+            SchemaActions::make([
+                Action::make('createNewQuestionBelow')
+                    ->label('+ Create new question')
+                    ->color('primary')
+                    ->link()
+                    ->modalHeading('Create new question')
+                    ->schema($this->questionCreateForm())
+                    ->action(function (array $data, Set $set): void {
+                        $field = $this->createFormFieldFromModal($data);
+
+                        $set('form_field_id', (int) $field->getKey());
+
+                        $set('selected_field_meta', [
+                            'key'   => $field->key,
+                            'type'  => $field->type,
+                            'label' => $field->label,
+                        ]);
+                    }),
+            ])
+                ->columnSpanFull(),
 
             Toggle::make('is_required')
                 ->label('Required')
@@ -196,31 +174,80 @@ class FieldsRelationManager extends RelationManager
                 ->helperText('Lower numbers appear first.'),
 
             Section::make('Advanced (Overrides)')
-                ->description('Only use these if this form needs different wording or config than the global question.')
                 ->collapsed()
                 ->schema([
                     TextInput::make('label_override')
                         ->label('Label override')
-                        ->maxLength(160)
-                        ->helperText('Overrides the label for this form only.'),
+                        ->maxLength(160),
 
                     Textarea::make('help_text_override')
                         ->label('Help text override')
-                        ->rows(2)
-                        ->helperText('Overrides help text for this form only.'),
+                        ->rows(2),
 
                     KeyValue::make('config_override')
                         ->label('Config override')
-                        ->helperText('Merged on top of the base field config. Example keys: options, rows, min, max, placeholder.')
                         ->columnSpanFull(),
                 ]),
         ]);
     }
 
+    /* ---------------------------------------------------------
+     | Shared create-question modal schema
+     * --------------------------------------------------------- */
+    private function questionCreateForm(): array
+    {
+        return [
+            TextInput::make('key')
+                ->label('Key')
+                ->required()
+                ->rule('alpha_dash')
+                ->unique(FormField::class, 'key'),
+
+            Select::make('type')
+                ->label('Type')
+                ->required()
+                ->options([
+                    'text'           => 'Text input',
+                    'textarea'       => 'Textarea',
+                    'select'         => 'Select',
+                    'radio'          => 'Radio',
+                    'checkbox_group' => 'Checkbox group',
+                    'toggle'         => 'Toggle',
+                ])
+                ->default('text'),
+
+            TextInput::make('label')
+                ->label('Label')
+                ->required()
+                ->maxLength(160),
+
+            Textarea::make('help_text')
+                ->label('Help text')
+                ->rows(2),
+
+            KeyValue::make('config')
+                ->label('Config')
+                ->columnSpanFull(),
+        ];
+    }
+
+    private function createFormFieldFromModal(array $data): FormField
+    {
+        return FormField::create([
+            'key'       => $data['key'],
+            'type'      => $data['type'],
+            'label'     => $data['label'],
+            'help_text' => $data['help_text'] ?? null,
+            'config'    => $data['config'] ?? [],
+        ]);
+    }
+
+    /* ---------------------------------------------------------
+     | Table
+     * --------------------------------------------------------- */
     public function table(Table $table): Table
     {
         return $table
-            ->recordTitleAttribute('field.key')
             ->reorderable('sort')
             ->defaultSort('sort')
             ->columns([
@@ -232,20 +259,12 @@ class FieldsRelationManager extends RelationManager
 
                 Tables\Columns\TextColumn::make('field.type')
                     ->label('Type')
-                    ->formatStateUsing(fn (?string $state) => $this->prettyFieldType((string) $state)),
+                    ->formatStateUsing(fn (?string $state) =>
+                        $this->prettyFieldType((string) $state)
+                    ),
 
-                Tables\Columns\TextColumn::make('label_override')
-                    ->label('Label')
-                    ->state(fn ($record) => $record->label())
-                    ->wrap(),
-
-                Tables\Columns\IconColumn::make('is_required')->boolean()->label('Req'),
-                Tables\Columns\IconColumn::make('is_active')->boolean()->label('Active'),
-
-                Tables\Columns\TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\IconColumn::make('is_required')->boolean(),
+                Tables\Columns\IconColumn::make('is_active')->boolean(),
             ])
             ->headerActions([
                 CreateAction::make()->label('Add question'),
@@ -270,7 +289,7 @@ class FieldsRelationManager extends RelationManager
             'radio' => 'Radio',
             'checkbox_group' => 'Checkbox group',
             'toggle' => 'Toggle',
-            default => $type,
+            default => ucfirst($type),
         };
     }
 }
