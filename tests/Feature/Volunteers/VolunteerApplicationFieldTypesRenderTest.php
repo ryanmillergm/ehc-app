@@ -21,6 +21,7 @@ class VolunteerApplicationFieldTypesRenderTest extends TestCase
         // Route is auth-protected.
         $this->actingAs(User::factory()->create());
 
+        // Creating the form auto-creates + attaches the global "message" field via ApplicationForm::booted()
         $form = ApplicationForm::factory()->create([
             'is_active'        => true,
             'use_availability' => false,
@@ -42,24 +43,32 @@ class VolunteerApplicationFieldTypesRenderTest extends TestCase
         ]);
         $this->place($form, $text, sort: 10, required: true);
 
-        // TEXTAREA
-        $textarea = FormField::factory()->create([
-            'key'   => 'message',
-            'type'  => 'textarea',
-            'label' => 'Why do you want to volunteer?',
-            'config' => [
-                'rows'        => 5,
-                'placeholder' => 'Share a bit...',
-            ],
-        ]);
-        $this->place($form, $textarea, sort: 20, required: true);
+        // MESSAGE (textarea) - already exists globally because booted() created it
+        $message = FormField::query()->where('key', 'message')->firstOrFail();
 
-        // SELECT (options should render)
+        // Ensure it's placed and has some predictable config for assertions
+        FormFieldPlacement::query()->updateOrCreate(
+            [
+                'fieldable_type' => ApplicationForm::class,
+                'fieldable_id'   => $form->id,
+                'form_field_id'  => $message->id,
+            ],
+            [
+                'is_required'    => true,
+                'is_active'      => true,
+                'sort'           => 20,
+                'config_override'=> [
+                    'rows' => 5,
+                    'placeholder' => 'Share a bit...',
+                ],
+            ],
+        );
+
+        // SELECT (flat config shape)
         $select = FormField::factory()->create([
             'key'   => 'tshirt_size',
             'type'  => 'select',
             'label' => 'T-shirt size',
-            // Use the "flat" config shape to ensure normalization works.
             'config' => [
                 'S' => 'Small',
                 'M' => 'Medium',
@@ -67,13 +76,12 @@ class VolunteerApplicationFieldTypesRenderTest extends TestCase
         ]);
         $this->place($form, $select, sort: 30);
 
-        // RADIO (options should render)
+        // RADIO (flat config shape)
         $radio = FormField::factory()->create([
-            'key'   => 'radio-key',
-            'type'  => 'radio',
-            'label' => 'Label for Radio Test',
+            'key'       => 'radio-key',
+            'type'      => 'radio',
+            'label'     => 'Label for Radio Test',
             'help_text' => 'This is the test the radio buttons',
-            // Flat config shape
             'config' => [
                 'option1' => 'option1',
                 'option2' => 'option2',
@@ -81,12 +89,11 @@ class VolunteerApplicationFieldTypesRenderTest extends TestCase
         ]);
         $this->place($form, $radio, sort: 40, required: true);
 
-        // CHECKBOX GROUP (multiple checkboxes should render)
+        // CHECKBOX GROUP (nested config shape)
         $checkboxGroup = FormField::factory()->create([
             'key'   => 'interests',
             'type'  => 'checkbox_group',
             'label' => 'Areas of interest',
-            // Nested config shape (also supported)
             'config' => [
                 'options' => [
                     'food'   => 'Food',
@@ -96,7 +103,7 @@ class VolunteerApplicationFieldTypesRenderTest extends TestCase
         ]);
         $this->place($form, $checkboxGroup, sort: 50);
 
-        // TOGGLE (single checkbox should render)
+        // TOGGLE
         $toggle = FormField::factory()->create([
             'key'   => 'background_check',
             'type'  => 'toggle',
@@ -113,16 +120,17 @@ class VolunteerApplicationFieldTypesRenderTest extends TestCase
         $res->assertSee('wire:model.defer="answers.full_name"', false);
         $res->assertSee('placeholder="John Doe"', false);
 
-        // --- TEXTAREA ---
+        // --- MESSAGE (textarea) ---
+        // Label comes from your global default ("Why do you want to volunteer?")
         $res->assertSee('Why do you want to volunteer?', false);
         $res->assertSee('wire:model.defer="answers.message"', false);
+        // rows/placeholder come from placement config override we set above
         $res->assertSee('rows="5"', false);
         $res->assertSee('placeholder="Share a bit..."', false);
 
         // --- SELECT ---
         $res->assertSee('T-shirt size', false);
         $res->assertSee('wire:model.defer="answers.tshirt_size"', false);
-        // select options
         $res->assertSee('<option value="S">Small</option>', false);
         $res->assertSee('<option value="M">Medium</option>', false);
 
@@ -133,17 +141,17 @@ class VolunteerApplicationFieldTypesRenderTest extends TestCase
         $res->assertSee('wire:model.defer="answers.radio-key"', false);
         $res->assertSee('value="option1"', false);
         $res->assertSee('value="option2"', false);
+        $res->assertSee('option1', false);
+        $res->assertSee('option2', false);
 
         // --- CHECKBOX GROUP ---
         $res->assertSee('Areas of interest', false);
-        $res->assertSee('type="checkbox"', false);
-        // these are the checkbox values
+        $res->assertSee('wire:model.defer="answers.interests"', false);
         $res->assertSee('value="food"', false);
         $res->assertSee('value="prayer"', false);
 
         // --- TOGGLE ---
         $res->assertSee('Background check OK?', false);
-        // Toggle is rendered as checkbox in your blade
         $res->assertSee('wire:model.defer="answers.background_check"', false);
     }
 
