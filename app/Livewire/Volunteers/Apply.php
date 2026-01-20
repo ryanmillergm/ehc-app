@@ -15,17 +15,17 @@ class Apply extends Component
     public ?VolunteerNeed $need = null;
 
     /**
-     * Dynamic form answers (keyed by ApplicationFormField::key)
+     * Dynamic form answers (keyed by FormField::key)
      */
     public array $answers = [];
 
     /**
-     * Optional weekly availability grid (stored in volunteer_applications.availability JSON column)
+     * Optional weekly availability grid
      */
     public array $availability = [];
 
     /**
-     * Optional interests selection (stored in volunteer_applications.interests JSON column)
+     * Optional interests selection
      */
     public array $interests = [];
 
@@ -46,7 +46,6 @@ class Apply extends Component
 
     public function mount(VolunteerNeed $need): void
     {
-        // Need exists (route model binding), but might be inactive.
         if (! $need->is_active) {
             $this->need = $need;
 
@@ -59,10 +58,9 @@ class Apply extends Component
         }
 
         $need->load([
-            'applicationForm.fields' => fn ($q) => $q->where('is_active', true)->orderBy('sort'),
+            'applicationForm.fieldPlacements.field',
         ]);
 
-        // Form missing or inactive => friendly screen (no abort)
         if (! $need->applicationForm || ! $need->applicationForm->is_active) {
             $this->need = $need;
 
@@ -88,9 +86,20 @@ class Apply extends Component
 
     protected function primeDefaults(): void
     {
-        foreach ($this->need->applicationForm->fields as $field) {
-            $this->answers[$field->key] = $this->answers[$field->key]
-                ?? ($field->type === 'checkbox_group' ? [] : '');
+        $form = $this->need->applicationForm;
+
+        $placementsByKey = $form->placementMap(); // active-only map
+
+        foreach ($form->fieldKeys() as $key) {
+            $placement = $placementsByKey[$key] ?? null;
+            if (! $placement || ! $placement->field) {
+                continue;
+            }
+
+            $fieldType = $placement->field->type;
+
+            $this->answers[$key] = $this->answers[$key]
+                ?? ($fieldType === 'checkbox_group' ? [] : '');
         }
 
         // keep message alias in sync if form has a message field
@@ -98,7 +107,7 @@ class Apply extends Component
             $this->message = (string) ($this->answers['message'] ?? '');
         }
 
-        if ($this->need->applicationForm->use_availability) {
+        if ($form->use_availability) {
             $days = ['mon','tue','wed','thu','fri','sat','sun'];
             foreach ($days as $day) {
                 $this->availability[$day]['am'] = (bool) ($this->availability[$day]['am'] ?? false);
@@ -109,13 +118,11 @@ class Apply extends Component
 
     public function updatedMessage(string $value): void
     {
-        // keep answers.message in sync with the old $message property
         $this->answers['message'] = $value;
     }
 
     public function submit(): void
     {
-        // Guard: if unavailable, do not allow submit
         if ($this->unavailable || ! $this->need?->applicationForm?->is_active) {
             throw ValidationException::withMessages([
                 'form' => 'This application is not currently available.',
@@ -135,7 +142,6 @@ class Apply extends Component
 
         $answers = (array) ($data['answers'] ?? []);
 
-        // Availability is stored in its own column
         $availability = null;
         if ($this->need->applicationForm->use_availability) {
             $days = ['mon','tue','wed','thu','fri','sat','sun'];
@@ -149,16 +155,11 @@ class Apply extends Component
             $availability = $normalized;
         }
 
-        // Interests can come from:
-        // - a dedicated $interests property
-        // - OR answers['interests']
         $interests = $this->interests;
         if (empty($interests) && isset($answers['interests']) && is_array($answers['interests'])) {
             $interests = $answers['interests'];
         }
 
-        // If you don’t want "interests" duplicated inside answers,
-        // strip it out so the canonical location is the column.
         if (array_key_exists('interests', $answers)) {
             unset($answers['interests']);
         }
@@ -173,7 +174,6 @@ class Apply extends Component
                 'interests' => empty($interests) ? null : array_values($interests),
             ]);
         } catch (QueryException $e) {
-            // MySQL duplicate entry => 1062
             $isDuplicate = (int) ($e->errorInfo[1] ?? 0) === 1062;
 
             if ($isDuplicate) {
@@ -196,18 +196,26 @@ class Apply extends Component
 
     protected function buildRules(): array
     {
+        $form = $this->need->applicationForm;
+
         $rules = [
             'answers' => ['array'],
         ];
 
-        foreach ($this->need->applicationForm->fields as $field) {
-            $key = "answers.{$field->key}";
-            $required = $field->is_required ? ['required'] : ['nullable'];
+        // Helpers: active-only placements, fast required lookup
+        $placementsByKey = $form->placementMap(); // key => placement
+        $requiredLookup = array_flip($form->requiredKeys());
 
-            $config = $field->config ?? [];
+        foreach ($placementsByKey as $fieldKey => $placement) {
+            $field = $placement->field;
+
+            $key = "answers.{$fieldKey}";
+            $required = isset($requiredLookup[$fieldKey]) ? ['required'] : ['nullable'];
+
+            $config = $placement->config();
             $min = Arr::get($config, 'min');
             $max = Arr::get($config, 'max');
-            $options = array_keys($field->options());
+            $options = array_keys($placement->options());
 
             switch ($field->type) {
                 case 'text':
@@ -237,7 +245,7 @@ class Apply extends Component
             }
         }
 
-        if ($this->need->applicationForm->use_availability) {
+        if ($form->use_availability) {
             $days = ['mon','tue','wed','thu','fri','sat','sun'];
             foreach ($days as $day) {
                 $rules["availability.{$day}.am"] = ['boolean'];
@@ -245,7 +253,6 @@ class Apply extends Component
             }
         }
 
-        // Optional: validate interests array if present (either via dedicated UI or answers)
         $rules['interests'] = ['array'];
         $rules['interests.*'] = ['string'];
 
@@ -263,9 +270,9 @@ class Apply extends Component
         }
 
         return view('livewire.volunteers.apply', [
-            'need' => $this->need,
-            'form' => $this->need->applicationForm,
-            'fields' => $this->need->applicationForm->fields,
+            'need'   => $this->need,
+            'form'   => $this->need->applicationForm,
+            'fields' => $this->need->applicationForm->activePlacements(),
         ])->title('Volunteer Application');
     }
 }

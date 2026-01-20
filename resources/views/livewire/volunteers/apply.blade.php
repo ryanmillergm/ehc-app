@@ -38,131 +38,106 @@
                 </div>
             @else
 
-                {{-- Dynamic builder-driven fields --}}
-                @foreach ($fields as $field)
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-900">
-                            {{ $field->label }}
-                            @if($field->is_required) <span class="text-rose-600">*</span> @endif
-                        </label>
-
-                        @if ($field->help_text)
-                            <p class="mt-1 text-sm text-slate-500">{{ $field->help_text }}</p>
-                        @endif
-
+                {{-- Dynamic builder-driven fields (placements) --}}
+                <div class="space-y-6">
+                    @foreach ($fields as $placement)
                         @php
+                            $field = $placement->field;
+
                             $wireKey = "answers.{$field->key}";
-                            $options = $field->options();
-                            $placeholder = data_get($field->config, 'placeholder');
-                            $rows = data_get($field->config, 'rows', 4);
+                            $options = $placement->options();
+                            $config = $placement->config();
+
+                            $placeholder = data_get($config, 'placeholder');
+                            $rows = data_get($config, 'rows', 4);
                         @endphp
 
-                        @switch($field->type)
-
-                            @case('text')
-                                <input
-                                    type="text"
-                                    wire:model.defer="{{ $wireKey }}"
-                                    placeholder="{{ $placeholder }}"
-                                    class="mt-2 w-full rounded-xl border-slate-300 focus:border-rose-500 focus:ring-rose-500"
-                                />
-                                @break
-
-                            @case('textarea')
-                                <textarea
-                                    wire:model.defer="{{ $wireKey }}"
-                                    rows="{{ $rows }}"
-                                    placeholder="{{ $placeholder }}"
-                                    class="mt-2 w-full rounded-xl border-slate-300 focus:border-rose-500 focus:ring-rose-500"
-                                ></textarea>
-                                @break
-
-                            @case('select')
-                                <select
-                                    wire:model.defer="{{ $wireKey }}"
-                                    class="mt-2 w-full rounded-xl border-slate-300 focus:border-rose-500 focus:ring-rose-500"
-                                >
-                                    <option value="">Select...</option>
-                                    @foreach ($options as $k => $label)
-                                        <option value="{{ $k }}">{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                                @break
-
-                            @case('radio')
-                                <div class="mt-3 space-y-2 text-sm text-slate-700">
-                                    @foreach ($options as $k => $label)
-                                        <label class="flex items-center gap-2">
-                                            <input type="radio"
-                                                   wire:model.defer="{{ $wireKey }}"
-                                                   value="{{ $k }}"
-                                                   class="text-rose-600 focus:ring-rose-500" />
-                                            <span>{{ $label }}</span>
-                                        </label>
-                                    @endforeach
-                                </div>
-                                @break
-
-                            @case('checkbox_group')
-                                <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-slate-700">
-                                    @foreach ($options as $k => $label)
-                                        <label class="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2">
-                                            <input type="checkbox"
-                                                   wire:model.defer="{{ $wireKey }}"
-                                                   value="{{ $k }}"
-                                                   class="rounded border-slate-300 text-rose-600 focus:ring-rose-500" />
-                                            <span>{{ $label }}</span>
-                                        </label>
-                                    @endforeach
-                                </div>
-                                @break
-
-                            @case('toggle')
-                                <label class="mt-3 inline-flex items-center gap-2 text-sm text-slate-700">
-                                    <input type="checkbox"
-                                           wire:model.defer="{{ $wireKey }}"
-                                           class="rounded border-slate-300 text-rose-600 focus:ring-rose-500" />
-                                    <span>Yes</span>
-                                </label>
-                                @break
-
-                        @endswitch
-
-                        @error("answers.{$field->key}")
-                            <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
-                        @enderror
-                    </div>
-                @endforeach
-
-                {{-- Interests (stored in volunteer_applications.interests) --}}
-                <div>
-                    <div class="text-sm font-semibold text-slate-900">Interests</div>
-                    <p class="mt-1 text-sm text-slate-500">Select any areas you’re interested in serving.</p>
-
-                    @php
-                        $interestOptions = [
-                            'food'   => 'Food / Hospitality',
-                            'prayer' => 'Prayer Team',
-                            'kids'   => 'Kids Ministry',
-                            'tech'   => 'Tech / AV',
-                        ];
-                    @endphp
-
-                    <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-slate-700">
-                        @foreach ($interestOptions as $key => $label)
-                            <label class="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2">
-                                <input type="checkbox"
-                                       wire:model.defer="interests"
-                                       value="{{ $key }}"
-                                       class="rounded border-slate-300 text-rose-600 focus:ring-rose-500" />
-                                <span>{{ $label }}</span>
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-900">
+                                {{ $placement->label() }}
+                                @if($placement->is_required) <span class="text-rose-600">*</span> @endif
                             </label>
-                        @endforeach
-                    </div>
 
-                    @error('interests')
-                        <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
-                    @enderror
+                            @if ($placement->helpText())
+                                <p class="mt-1 text-sm text-slate-500">{{ $placement->helpText() }}</p>
+                            @endif
+
+                            @switch($field->type)
+
+                                @case('text')
+                                    <input
+                                        type="text"
+                                        wire:model.defer="{{ $wireKey }}"
+                                        placeholder="{{ $placeholder }}"
+                                        class="mt-2 w-full rounded-xl border-slate-300 focus:border-rose-500 focus:ring-rose-500"
+                                    />
+                                    @break
+
+                                @case('textarea')
+                                    <textarea
+                                        wire:model.defer="{{ $wireKey }}"
+                                        rows="{{ $rows }}"
+                                        placeholder="{{ $placeholder }}"
+                                        class="mt-2 w-full rounded-xl border-slate-300 focus:border-rose-500 focus:ring-rose-500"
+                                    ></textarea>
+                                    @break
+
+                                @case('select')
+                                    <select
+                                        wire:model.defer="{{ $wireKey }}"
+                                        class="mt-2 w-full rounded-xl border-slate-300 focus:border-rose-500 focus:ring-rose-500"
+                                    >
+                                        <option value="">Select...</option>
+                                        @foreach ($options as $k => $label)
+                                            <option value="{{ $k }}">{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                    @break
+
+                                @case('radio')
+                                    <div class="mt-3 space-y-2 text-sm text-slate-700">
+                                        @foreach ($options as $k => $label)
+                                            <label class="flex items-center gap-2">
+                                                <input type="radio"
+                                                       wire:model.defer="{{ $wireKey }}"
+                                                       value="{{ $k }}"
+                                                       class="text-rose-600 focus:ring-rose-500" />
+                                                <span>{{ $label }}</span>
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                    @break
+
+                                @case('checkbox_group')
+                                    <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-slate-700">
+                                        @foreach ($options as $k => $label)
+                                            <label class="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2">
+                                                <input type="checkbox"
+                                                       wire:model.defer="{{ $wireKey }}"
+                                                       value="{{ $k }}"
+                                                       class="rounded border-slate-300 text-rose-600 focus:ring-rose-500" />
+                                                <span>{{ $label }}</span>
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                    @break
+
+                                @case('toggle')
+                                    <label class="mt-3 inline-flex items-center gap-2 text-sm text-slate-700">
+                                        <input type="checkbox"
+                                               wire:model.defer="{{ $wireKey }}"
+                                               class="rounded border-slate-300 text-rose-600 focus:ring-rose-500" />
+                                        <span>Yes</span>
+                                    </label>
+                                    @break
+
+                            @endswitch
+
+                            @error("answers.{$field->key}")
+                                <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                    @endforeach
                 </div>
 
                 {{-- Optional availability block (per-form toggle) --}}

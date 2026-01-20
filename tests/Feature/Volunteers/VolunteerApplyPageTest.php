@@ -4,6 +4,8 @@ namespace Tests\Feature\Volunteers;
 
 use App\Livewire\Volunteers\Apply;
 use App\Models\ApplicationForm;
+use App\Models\FormField;
+use App\Models\FormFieldPlacement;
 use App\Models\User;
 use App\Models\VolunteerApplication;
 use App\Models\VolunteerNeed;
@@ -45,25 +47,32 @@ class VolunteerApplyPageTest extends TestCase
         $user = User::factory()->create();
         $this->actingAs($user);
 
-        // Form includes default "message" textarea from ApplicationForm::booted()
+        // Form includes default "message" textarea 
         $form = ApplicationForm::factory()->create([
             'is_active' => true,
             'use_availability' => true,
         ]);
 
-        // Add an extra required field to prove dynamic validation works
-        $form->fields()->create([
-            'type' => 'text',
-            'key' => 'city',
-            'label' => 'City',
+        // Create a reusable global field
+        $cityField = FormField::query()->create([
+            'key'       => 'city',
+            'type'      => 'text',
+            'label'     => 'City',
             'help_text' => null,
-            'is_required' => true,
-            'is_active' => true,
-            'sort' => 20,
-            'config' => [
+            'config'    => [
                 'min' => 2,
                 'max' => 50,
             ],
+        ]);
+
+        // Attach it to this form via placement
+        FormFieldPlacement::query()->create([
+            'fieldable_type' => ApplicationForm::class,
+            'fieldable_id'   => $form->id,
+            'form_field_id'  => $cityField->id,
+            'is_required'    => true,
+            'is_active'      => true,
+            'sort'           => 20,
         ]);
 
         $need = VolunteerNeed::factory()->create([
@@ -122,7 +131,7 @@ class VolunteerApplyPageTest extends TestCase
 
         $this->assertSame($message, data_get($app->answers, 'message'));
         $this->assertSame($city, data_get($app->answers, 'city'));
- 
+
         $this->assertTrue((bool) data_get($app->availability, 'mon.am'));
         $this->assertFalse((bool) data_get($app->availability, 'mon.pm'));
     }

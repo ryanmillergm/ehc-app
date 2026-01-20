@@ -3,6 +3,8 @@
 namespace Tests\Unit\Models;
 
 use App\Models\ApplicationForm;
+use App\Models\FormField;
+use App\Models\FormFieldPlacement;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -25,7 +27,7 @@ class ApplicationFormTest extends TestCase
     }
 
     #[Test]
-    public function it_creates_default_message_field_on_create(): void
+    public function it_creates_default_message_field_and_attaches_it_via_placement_on_create(): void
     {
         $form = ApplicationForm::create([
             'name' => 'Volunteer Form',
@@ -34,17 +36,27 @@ class ApplicationFormTest extends TestCase
             'use_availability' => true,
         ]);
 
-        $this->assertDatabaseHas('application_form_fields', [
-            'application_form_id' => $form->id,
-            'key' => 'message',
+        // Global field exists
+        $this->assertDatabaseHas('form_fields', [
+            'key'  => 'message',
             'type' => 'textarea',
-            'is_required' => 1,
-            'is_active' => 1,
+        ]);
+
+        $messageField = FormField::query()->where('key', 'message')->firstOrFail();
+
+        // Placement exists for this form + that field
+        $this->assertDatabaseHas('form_field_placements', [
+            'fieldable_type' => ApplicationForm::class,
+            'fieldable_id'   => $form->id,
+            'form_field_id'  => $messageField->id,
+            'is_required'    => 1,
+            'is_active'      => 1,
+            'sort'           => 10,
         ]);
     }
 
     #[Test]
-    public function it_does_not_duplicate_message_field(): void
+    public function it_does_not_duplicate_message_field_placement(): void
     {
         $form = ApplicationForm::create([
             'name' => 'Volunteer Form',
@@ -53,11 +65,27 @@ class ApplicationFormTest extends TestCase
             'use_availability' => true,
         ]);
 
+        $messageField = FormField::query()->where('key', 'message')->firstOrFail();
+
+        $this->assertSame(
+            1,
+            FormFieldPlacement::query()
+                ->where('fieldable_type', ApplicationForm::class)
+                ->where('fieldable_id', $form->id)
+                ->where('form_field_id', $messageField->id)
+                ->count()
+        );
+
+        // Updating the form should NOT create a second placement
         $form->update(['description' => 'updated']);
 
         $this->assertSame(
             1,
-            $form->fields()->where('key', 'message')->count(),
+            FormFieldPlacement::query()
+                ->where('fieldable_type', ApplicationForm::class)
+                ->where('fieldable_id', $form->id)
+                ->where('form_field_id', $messageField->id)
+                ->count()
         );
     }
 }

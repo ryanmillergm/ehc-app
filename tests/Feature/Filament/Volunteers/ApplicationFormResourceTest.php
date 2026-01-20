@@ -6,6 +6,7 @@ use App\Filament\Resources\ApplicationForms\Pages\CreateApplicationForm;
 use App\Filament\Resources\ApplicationForms\Pages\EditApplicationForm;
 use App\Filament\Resources\ApplicationForms\Pages\ListApplicationForms;
 use App\Models\ApplicationForm;
+use App\Models\FormField;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
@@ -60,9 +61,20 @@ class ApplicationFormResourceTest extends TestCase
 
         $form = ApplicationForm::where('slug', 'volunteer-setup-crew')->firstOrFail();
 
-        $this->assertDatabaseHas('application_form_fields', [
-            'application_form_id' => $form->id,
+        // ✅ Option B: "message" is a global FormField + a placement
+        $messageField = FormField::query()
+            ->where('key', 'message')
+            ->firstOrFail();
+
+        $this->assertDatabaseHas('form_fields', [
+            'id'  => $messageField->id,
             'key' => 'message',
+        ]);
+
+        $this->assertDatabaseHas('form_field_placements', [
+            'fieldable_type' => ApplicationForm::class,
+            'fieldable_id'   => $form->id,
+            'form_field_id'  => $messageField->id,
         ]);
     }
 

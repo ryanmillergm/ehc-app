@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Models\ApplicationFormField;
+use App\Models\FormFieldPlacement;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -61,51 +61,58 @@ class VolunteerApplication extends Model
     public function presentedAnswers(): array
     {
         $need = $this->need?->loadMissing([
-            'applicationForm.fields' => fn ($q) => $q->where('is_active', true)->orderBy('sort'),
+            'applicationForm.fieldPlacements.field',
         ]);
 
-        $form = $need?->applicationForm;
-        $fields = $form?->fields ?? collect();
-
+        $placements = $need?->applicationForm?->fieldPlacements ?? collect();
         $answers = (array) ($this->answers ?? []);
 
-        return $fields->map(function (ApplicationFormField $field) use ($answers) {
+        return $placements->map(function (FormFieldPlacement $placement) use ($answers) {
+            $field = $placement->field;
+
+            if (! $field) {
+                return null;
+            }
+
             $raw = data_get($answers, $field->key);
 
             $display = match ($field->type) {
-                'checkbox_group' => $this->formatCheckboxGroup($field, $raw),
-                'select', 'radio' => $this->formatOptionValue($field, $raw),
+                'checkbox_group' => $this->formatCheckboxGroupPlacement($placement, $raw),
+                'select', 'radio' => $this->formatOptionValuePlacement($placement, $raw),
                 'toggle' => $raw ? 'Yes' : 'No',
                 default => is_array($raw) ? json_encode($raw) : (string) ($raw ?? ''),
             };
 
             return [
                 'key'     => $field->key,
-                'label'   => $field->label,
+                'label'   => $placement->label(),
                 'type'    => $field->type,
                 'value'   => $raw,
                 'display' => $display,
             ];
-        })->values()->all();
+        })
+            ->filter()
+            ->values()
+            ->all();
     }
 
-    protected function formatOptionValue(ApplicationFormField $field, mixed $raw): string
+    protected function formatOptionValuePlacement(FormFieldPlacement $placement, mixed $raw): string
     {
         if (! is_string($raw) || $raw === '') {
             return '';
         }
 
-        $options = $field->options();
+        $options = $placement->options();
         return $options[$raw] ?? $raw;
     }
 
-    protected function formatCheckboxGroup(ApplicationFormField $field, mixed $raw): string
+    protected function formatCheckboxGroupPlacement(FormFieldPlacement $placement, mixed $raw): string
     {
         if (! is_array($raw)) {
             return '';
         }
 
-        $options = $field->options();
+        $options = $placement->options();
 
         $labels = collect($raw)
             ->filter(fn ($v) => is_string($v) && $v !== '')
@@ -117,8 +124,8 @@ class VolunteerApplication extends Model
     }
 
     /**
-     * Availability is stored under answers.availability if enabled.
-     * This returns a compact list like: "Mon AM, Wed PM"
+     * Availability is stored in volunteer_applications.availability JSON.
+     * Returns a compact list like: "Mon AM, Wed PM"
      */
     public function availabilitySummary(): string
     {
