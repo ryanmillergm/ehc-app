@@ -36,6 +36,11 @@ class PermissionSeeder extends Seeder
         Permission::create(['name' => 'email.update']);
         Permission::create(['name' => 'email.delete']);
 
+        Permission::create(['name' => 'forms.read']);
+        Permission::create(['name' => 'forms.create']);
+        Permission::create(['name' => 'forms.update']);
+        Permission::create(['name' => 'forms.delete']);
+
         Permission::create(['name' => 'users.read']);
         Permission::create(['name' => 'users.create']);
         Permission::create(['name' => 'users.update']);
