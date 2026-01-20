@@ -24,9 +24,9 @@ class UserSeeder extends Seeder
             ->create();
 
         $user2 = User::factory([
-            'first_name'    => 'test',
-            'last_name'     => 'eleven',
-            'email'         => 'test11@test.com',
+            'first_name'    => 'Cindy',
+            'last_name'     => 'Dewey',
+            'email'         => 'breadofgraceministry@gmail.com',
         ])
             ->hasAssignedTeams(1)
             ->create();
@@ -37,7 +37,9 @@ class UserSeeder extends Seeder
             ->create();
 
         $role = Role::where('name', 'Super Admin')->get();
+
         $user->assignRole($role);
+        $user2->assignRole($role);
         // $team->assignRole($role);
     }
 }

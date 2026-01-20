@@ -18,14 +18,14 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             UserSeeder::class,
             TeamSeeder::class,
-            ChildSeeder::class,
+            // ChildSeeder::class,
             LanguageSeeder::class,
-            PageSeeder::class,
-            PageTranslationSeeder::class,
+            // PageSeeder::class,
+            // PageTranslationSeeder::class,
             EmailListSeeder::class,
             ApplicationFormSeeder::class,
             VolunteerNeedSeeder::class,
-            VolunteerApplicationSeeder::class,
+            // VolunteerApplicationSeeder::class,
         ]);
     }
 }
