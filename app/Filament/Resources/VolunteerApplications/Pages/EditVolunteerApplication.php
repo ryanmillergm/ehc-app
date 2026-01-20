@@ -23,4 +23,13 @@ class EditVolunteerApplication extends EditRecord
             DeleteAction::make(),
         ];
     }
+
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return parent::getEloquentQuery()
+            ->with([
+                'user',
+                'need.applicationForm.fieldPlacements.field',
+            ]);
+    }
 }

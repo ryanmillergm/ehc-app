@@ -140,4 +140,38 @@ class VolunteerApplicationResponsesAndPrintTest extends TestCase
         $res->assertSee('Availability', false);
         $res->assertSee('Mon', false);
     }
+
+    #[Test]
+    public function print_page_does_not_query_missing_form_fields_is_active_column(): void
+    {
+        $form = ApplicationForm::factory()->create();
+
+        $field = FormField::query()->create([
+            'type' => 'text',
+            'key' => 'city',
+            'label' => 'City',
+            'help_text' => null,
+            'config' => [],
+        ]);
+
+        $form->fieldPlacements()->create([
+            'form_field_id' => $field->id,
+            'is_required' => true,
+            'is_active' => true,
+            'sort' => 10,
+        ]);
+
+        $need = VolunteerNeed::factory()->create([
+            'application_form_id' => $form->id,
+            'is_active' => true,
+        ]);
+
+        $app = VolunteerApplication::factory()->create([
+            'volunteer_need_id' => $need->id,
+            'answers' => ['city' => 'Denver'],
+        ]);
+
+        $res = $this->get(VolunteerApplicationResource::getUrl('print', ['record' => $app]));
+        $res->assertOk()->assertSee('Denver', false);
+    }
 }

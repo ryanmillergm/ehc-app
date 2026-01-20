@@ -24,7 +24,7 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Unique;
 
 class FieldsRelationManager extends RelationManager
 {
@@ -118,23 +118,25 @@ class FieldsRelationManager extends RelationManager
                         $meta['key'] ?? '',
                     );
                 })
-                // ✅ Inline "+" create (power-user flow)
+                //  Inline "+" create (power-user flow)
                 ->createOptionForm($this->questionCreateForm())
                 ->createOptionUsing(fn (array $data): int =>
                     (int) $this->createFormFieldFromModal($data)->getKey()
                 )
-                ->rules(function () {
-                    /** @var ApplicationForm $owner */
-                    $owner = $this->getOwnerRecord();
-                    $currentId = $this->getMountedTableActionFormRecord()?->getKey();
+                //  Non-deprecated uniqueness validation (scoped to this ApplicationForm)
+                ->unique(
+                    table: 'form_field_placements',
+                    column: 'form_field_id',
+                    ignorable: fn ($record) => $record, // ignore current placement on edit
+                    modifyRuleUsing: function (Unique $rule): Unique {
+                        /** @var ApplicationForm $owner */
+                        $owner = $this->getOwnerRecord();
 
-                    return [
-                        Rule::unique('form_field_placements', 'form_field_id')
+                        return $rule
                             ->where('fieldable_type', ApplicationForm::class)
-                            ->where('fieldable_id', $owner->getKey())
-                            ->ignore($currentId),
-                    ];
-                }),
+                            ->where('fieldable_id', $owner->getKey());
+                    },
+                ),
 
             /* ---------------------------------------------------------
              | CTA BELOW the select (Filament v4 native)

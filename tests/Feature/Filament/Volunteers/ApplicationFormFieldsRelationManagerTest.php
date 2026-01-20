@@ -7,33 +7,35 @@ use App\Filament\Resources\ApplicationForms\RelationManagers\FieldsRelationManag
 use App\Models\ApplicationForm;
 use App\Models\FormField;
 use App\Models\FormFieldPlacement;
-use App\Models\User;
 use Filament\Actions\CreateAction;
+use Filament\Actions\EditAction;
 use Filament\Actions\Testing\TestAction;
-use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Gate;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Concerns\InteractsWithFilamentAdmin;
 use Tests\TestCase;
 
 class ApplicationFormFieldsRelationManagerTest extends TestCase
 {
     use RefreshDatabase;
+    use InteractsWithFilamentAdmin;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->actingAs(User::factory()->create());
+        $this->loginAsSuperAdmin();
+    }
 
-        Gate::before(fn () => true);
+    #[Test]
+    public function edit_page_renders_including_questions_relation_manager(): void
+    {
+        $form = ApplicationForm::factory()->create();
 
-        try {
-            Filament::setCurrentPanel(Filament::getPanel('admin') ?? Filament::getDefaultPanel());
-        } catch (\Throwable $e) {
-            // ignore
-        }
+        Livewire::test(EditApplicationForm::class, ['record' => $form->getRouteKey()])
+            ->assertOk()
+            ->assertSeeLivewire(FieldsRelationManager::class);
     }
 
     #[Test]
@@ -42,13 +44,13 @@ class ApplicationFormFieldsRelationManagerTest extends TestCase
         $form = ApplicationForm::factory()->create();
 
         $field = FormField::query()->create([
-            'key'   => 'experience_years',
-            'type'  => 'text',
-            'label' => 'Years of experience',
+            'key'       => 'experience_years',
+            'type'      => 'text',
+            'label'     => 'Years of experience',
             'help_text' => 'Rough estimate is fine.',
-            'config' => [
-                'min' => 0,
-                'max' => 80,
+            'config'    => [
+                'min'         => 0,
+                'max'         => 80,
                 'placeholder' => 'e.g. 5',
             ],
         ]);
@@ -60,13 +62,13 @@ class ApplicationFormFieldsRelationManagerTest extends TestCase
             ->callAction(
                 TestAction::make(CreateAction::class)->table(),
                 [
-                    'form_field_id' => $field->id,
-                    'is_required' => true,
-                    'is_active'   => true,
-                    'sort'        => 20,
-                    'label_override'     => null,
-                    'help_text_override' => null,
-                    'config_override'    => null,
+                    'form_field_id'       => $field->id,
+                    'is_required'         => true,
+                    'is_active'           => true,
+                    'sort'                => 20,
+                    'label_override'      => null,
+                    'help_text_override'  => null,
+                    'config_override'     => null,
                 ],
             )
             ->assertHasNoFormErrors();
@@ -87,13 +89,11 @@ class ApplicationFormFieldsRelationManagerTest extends TestCase
         $form = ApplicationForm::factory()->create();
 
         $field = FormField::query()->create([
-            'key'   => 'message_extra',
-            'type'  => 'textarea',
-            'label' => 'Extra message',
+            'key'       => 'message_extra',
+            'type'      => 'textarea',
+            'label'     => 'Extra message',
             'help_text' => null,
-            'config' => [
-                'rows' => 3,
-            ],
+            'config'    => ['rows' => 3],
         ]);
 
         FormFieldPlacement::query()->create([
@@ -131,4 +131,136 @@ class ApplicationFormFieldsRelationManagerTest extends TestCase
                 ->count()
         );
     }
+
+#[Test]
+public function it_can_edit_a_placement_to_toggle_required_and_active(): void
+{
+    $form = ApplicationForm::factory()->create();
+
+    $field = FormField::query()->create([
+        'key'   => 'background_check',
+        'type'  => 'toggle',
+        'label' => 'Are you willing to complete a background check?',
+        'help_text' => null,
+        'config' => [],
+    ]);
+
+    $placement = FormFieldPlacement::query()->create([
+        'fieldable_type' => ApplicationForm::class,
+        'fieldable_id'   => $form->id,
+        'form_field_id'  => $field->id,
+        'is_required'    => false,
+        'is_active'      => true,
+        'sort'           => 10,
+    ]);
+
+    Livewire::test(FieldsRelationManager::class, [
+        'ownerRecord' => $form,
+        'pageClass'   => EditApplicationForm::class,
+    ])
+        ->callTableAction(
+            EditAction::class,
+            $placement,
+            [
+                'is_required' => true,
+                'is_active'   => false,
+                'sort'        => 15,
+            ],
+        )
+        ->assertHasNoFormErrors();
+
+    $placement->refresh();
+
+    $this->assertTrue($placement->is_required);
+    $this->assertFalse($placement->is_active);
+    $this->assertSame(15, (int) $placement->sort);
+}
+#[Test]
+public function is_active_is_only_applied_to_placements_not_form_fields(): void
+{
+    $form = ApplicationForm::factory()->create();
+
+    $field = FormField::query()->create([
+        'key'   => 'city',
+        'type'  => 'text',
+        'label' => 'City',
+        'config' => [],
+    ]);
+
+    $placement = FormFieldPlacement::query()->create([
+        'fieldable_type' => ApplicationForm::class,
+        'fieldable_id'   => $form->id,
+        'form_field_id'  => $field->id,
+        'is_active'      => false,
+        'sort'           => 10,
+    ]);
+
+    // Assert database truth (no scopes)
+    $this->assertFalse(
+        FormFieldPlacement::query()
+            ->whereKey($placement->id)
+            ->value('is_active')
+    );
+
+    // Assert FormField has no is_active column
+    $this->assertArrayNotHasKey(
+        'is_active',
+        $field->getAttributes(),
+    );
+}
+
+#[Test]
+public function inactive_placements_are_hidden_from_active_relationship(): void
+{
+    $form = ApplicationForm::factory()->create();
+    $field = FormField::factory()->create();
+
+    // Add an inactive placement
+    FormFieldPlacement::query()->create([
+        'fieldable_type' => ApplicationForm::class,
+        'fieldable_id'   => $form->id,
+        'form_field_id'  => $field->id,
+        'is_active'      => false,
+        'sort'           => 99,
+    ]);
+
+    $form->refresh();
+
+    // One active placement exists (the auto "message" field)
+    $this->assertCount(1, $form->activeFieldPlacements);
+
+    // Two total placements (active + inactive)
+    $this->assertCount(2, $form->fieldPlacements);
+
+    // Helper also respects active-only contract
+    $this->assertCount(1, $form->activePlacements());
+}
+
+
+#[Test]
+public function form_field_model_has_no_is_active_column_or_scope(): void
+{
+    $field = FormField::factory()->create();
+
+    // No attribute
+    $this->assertArrayNotHasKey('is_active', $field->getAttributes());
+
+    // No global scope silently filtering rows
+    $this->assertSame(1, FormField::query()->count());
+}
+
+
+#[Test]
+public function fields_relation_manager_mounts_without_errors(): void
+{
+    $form = ApplicationForm::factory()->create();
+
+    Livewire::test(FieldsRelationManager::class, [
+        'ownerRecord' => $form,
+        'pageClass'   => EditApplicationForm::class,
+    ])
+        ->assertOk()
+        ->assertSeeLivewire(FieldsRelationManager::class);
+}
+
 }

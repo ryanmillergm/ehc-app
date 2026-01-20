@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\VolunteerApplications\Schemas;
 
 use App\Models\VolunteerApplication;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\Textarea;
@@ -19,25 +20,21 @@ class VolunteerApplicationForm
         return $schema->components([
             Section::make('Applicant')
                 ->schema([
-                    TextInput::make('user.full_name')
+                    Placeholder::make('applicant_name')
                         ->label('Volunteer')
-                        ->disabled()
-                        ->dehydrated(false),
+                        ->content(fn (?VolunteerApplication $record) => $record?->user?->full_name ?? '—'),
 
-                    TextInput::make('user.email')
+                    Placeholder::make('applicant_email')
                         ->label('Email')
-                        ->disabled()
-                        ->dehydrated(false),
+                        ->content(fn (?VolunteerApplication $record) => $record?->user?->email ?? '—'),
 
-                    TextInput::make('need.title')
+                    Placeholder::make('need_title')
                         ->label('Need')
-                        ->disabled()
-                        ->dehydrated(false),
+                        ->content(fn (?VolunteerApplication $record) => $record?->need?->title ?? '—'),
 
-                    TextInput::make('need.slug')
+                    Placeholder::make('need_slug')
                         ->label('Need slug')
-                        ->disabled()
-                        ->dehydrated(false),
+                        ->content(fn (?VolunteerApplication $record) => $record?->need?->slug ?? '—'),
                 ])
                 ->columns(1),
 
@@ -52,7 +49,6 @@ class VolunteerApplicationForm
 
             Section::make('Availability')
                 ->schema([
-                    // Sunday -> Saturday, AM/PM
                     self::dayRow('sun', 'Sunday'),
                     self::dayRow('mon', 'Monday'),
                     self::dayRow('tue', 'Tuesday'),

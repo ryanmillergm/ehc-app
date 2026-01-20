@@ -61,7 +61,7 @@ class ApplicationFormResourceTest extends TestCase
 
         $form = ApplicationForm::where('slug', 'volunteer-setup-crew')->firstOrFail();
 
-        // ✅ Option B: "message" is a global FormField + a placement
+        //  Option B: "message" is a global FormField + a placement
         $messageField = FormField::query()
             ->where('key', 'message')
             ->firstOrFail();

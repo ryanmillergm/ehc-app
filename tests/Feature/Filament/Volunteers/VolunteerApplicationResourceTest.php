@@ -29,6 +29,20 @@ class VolunteerApplicationResourceTest extends TestCase
     }
 
     #[Test]
+    public function edit_page_shows_applicant_and_need_details(): void
+    {
+        $this->loginAsSuperAdmin();
+
+        $app = VolunteerApplication::factory()->create();
+
+        Livewire::test(EditVolunteerApplication::class, ['record' => $app->getRouteKey()])
+            ->assertOk()
+            ->assertSee($app->user->full_name)
+            ->assertSee($app->user->email)
+            ->assertSee($app->need->title);
+    }
+
+    #[Test]
     public function edit_page_can_update_status_notes_interests_and_availability_matrix(): void
     {
         $this->loginAsSuperAdmin();
@@ -75,5 +89,37 @@ class VolunteerApplicationResourceTest extends TestCase
         $this->assertTrue((bool) data_get($app->availability, 'sun.pm'));
         $this->assertTrue((bool) data_get($app->availability, 'wed.pm'));
         $this->assertFalse((bool) data_get($app->availability, 'thu.am'));
+    }
+
+    #[Test]
+    public function edit_page_shows_responses_using_field_labels_and_availability(): void
+    {
+        $this->loginAsSuperAdmin();
+
+        $app = VolunteerApplication::factory()->create([
+            'answers' => [
+                'message' => 'I want to serve because I’ve been blessed and I want to bless others.',
+            ],
+            'availability' => [
+                'sun' => ['am' => true,  'pm' => false],
+                'mon' => ['am' => true,  'pm' => false],
+                'tue' => ['am' => true,  'pm' => false],
+                'wed' => ['am' => true,  'pm' => false],
+                'thu' => ['am' => false, 'pm' => true],
+                'fri' => ['am' => true,  'pm' => true],
+                'sat' => ['am' => true,  'pm' => true],
+            ],
+        ]);
+
+        Livewire::test(EditVolunteerApplication::class, ['record' => $app->getRouteKey()])
+            ->assertOk()
+            //  Assert the human label (from FormField label / placement label())
+            ->assertSee('Why do you want to volunteer?')
+            //  Assert the actual answer content
+            ->assertSee('I want to serve because I’ve been blessed and I want to bless others.')
+            //  Availability section renders (we don’t need to assert ✓ specifically)
+            ->assertSee('Availability')
+            ->assertSee('Sun')
+            ->assertSee('Mon');
     }
 }

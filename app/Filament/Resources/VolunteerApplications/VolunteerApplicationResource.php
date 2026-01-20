@@ -47,6 +47,14 @@ class VolunteerApplicationResource extends Resource
     public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
     {
         return parent::getEloquentQuery()
-            ->with(['user', 'need.applicationForm.fields']);
+            ->with([
+                'user',
+                'need.applicationForm' => fn ($q) => $q->with([
+                    'fieldPlacements' => fn ($q) => $q
+                        ->where('is_active', true)
+                        ->orderBy('sort')
+                        ->with('field'),
+                ]),
+            ]);
     }
 }

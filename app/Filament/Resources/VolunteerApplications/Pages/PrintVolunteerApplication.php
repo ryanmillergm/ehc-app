@@ -18,7 +18,13 @@ class PrintVolunteerApplication extends Page
     {
         $this->record = $record->loadMissing([
             'user',
-            'need.applicationForm.fields' => fn ($q) => $q->where('is_active', true)->orderBy('sort'),
+            'need.applicationForm' => fn ($q) => $q->with([
+                //  filter on placements (form_field_placements.is_active)
+                'fieldPlacements' => fn ($q) => $q
+                    ->where('is_active', true)
+                    ->orderBy('sort')
+                    ->with('field'),
+            ]),
         ]);
     }
 
