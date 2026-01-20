@@ -2,7 +2,11 @@ name: Deploy
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -40,13 +44,15 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.DEPLOY_KEY }}
 
-      - name: Rsync to server
+      - name: Rsync to server (safer deletes)
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          rsync -az --delete \
+          rsync -az \
+            --delete-delay \
+            --delay-updates \
             --exclude=".env" \
             --exclude="storage/*.key" \
             --exclude="storage/logs" \
@@ -62,17 +68,33 @@ jobs:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} << 'SSH'
-            set -e
-            cd /var/www/breadofgrace/ehc-app
+          ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} << SSH
+            set -euo pipefail
+            cd "${DEPLOY_PATH}"
 
+            # Optional: reduce weird mid-deploy race conditions
+            touch storage/framework/down
+
+            # Ensure Laravel runtime dirs are writable by php-fpm user
+            sudo chown -R www-data:www-data storage bootstrap/cache
+            sudo find storage bootstrap/cache -type d -exec chmod 775 {} \;
+            sudo find storage bootstrap/cache -type f -exec chmod 664 {} \;
+
+            # Clear caches (important when files moved/updated)
             php artisan optimize:clear
+
+            # DB migrations
             php artisan migrate --force
 
+            # Rebuild caches
             php artisan config:cache
             php artisan route:cache
             php artisan view:cache
 
-            sudo systemctl reload php8.5-fpm || true
+            # Remove optional lock
+            rm -f storage/framework/down || true
+
+            # IMPORTANT: restart php-fpm (reload may keep stale workers)
+            sudo systemctl restart php8.5-fpm || true
             sudo systemctl reload nginx || true
           SSH
