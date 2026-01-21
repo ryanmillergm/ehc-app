@@ -2,78 +2,81 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
 class PermissionSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-        // Reset cached roles and permissions
-        app()[PermissionRegistrar::class]->forgetCachedPermissions();
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-        Permission::create(['name' => 'admin.panel']);
-        Permission::create(['name' => 'org.panel']);
+        $permissions = [
+            'admin.panel',
+            'org.panel',
 
-        Permission::create(['name' => 'applications.read']);
-        Permission::create(['name' => 'applications.create']);
-        Permission::create(['name' => 'applications.update']);
-        Permission::create(['name' => 'applications.delete']);
+            'applications.read',
+            'applications.create',
+            'applications.update',
+            'applications.delete',
 
-        Permission::create(['name' => 'addresses.read']);
-        Permission::create(['name' => 'addresses.create']);
-        Permission::create(['name' => 'addresses.update']);
-        Permission::create(['name' => 'addresses.delete']);
+            'addresses.read',
+            'addresses.create',
+            'addresses.update',
+            'addresses.delete',
 
-        Permission::create(['name' => 'email.read']);
-        Permission::create(['name' => 'email.create']);
-        Permission::create(['name' => 'email.update']);
-        Permission::create(['name' => 'email.delete']);
+            'email.read',
+            'email.create',
+            'email.update',
+            'email.delete',
 
-        Permission::create(['name' => 'forms.read']);
-        Permission::create(['name' => 'forms.create']);
-        Permission::create(['name' => 'forms.update']);
-        Permission::create(['name' => 'forms.delete']);
+            'forms.read',
+            'forms.create',
+            'forms.update',
+            'forms.delete',
 
-        Permission::create(['name' => 'users.read']);
-        Permission::create(['name' => 'users.create']);
-        Permission::create(['name' => 'users.update']);
-        Permission::create(['name' => 'users.delete']);
+            'users.read',
+            'users.create',
+            'users.update',
+            'users.delete',
 
-        Permission::create(['name' => 'permissions.read']);
-        Permission::create(['name' => 'permissions.create']);
-        Permission::create(['name' => 'permissions.update']);
-        Permission::create(['name' => 'permissions.delete']);
+            'permissions.read',
+            'permissions.create',
+            'permissions.update',
+            'permissions.delete',
 
-        Permission::create(['name' => 'roles.read']);
-        Permission::create(['name' => 'roles.create']);
-        Permission::create(['name' => 'roles.update']);
-        Permission::create(['name' => 'roles.delete']);
+            'roles.read',
+            'roles.create',
+            'roles.update',
+            'roles.delete',
 
-        Permission::create(['name' => 'children.read']);
-        Permission::create(['name' => 'children.create']);
-        Permission::create(['name' => 'children.update']);
-        Permission::create(['name' => 'children.delete']);
+            'children.read',
+            'children.create',
+            'children.update',
+            'children.delete',
 
-        Permission::create(['name' => 'languages.read']);
-        Permission::create(['name' => 'languages.create']);
-        Permission::create(['name' => 'languages.update']);
-        Permission::create(['name' => 'languages.delete']);
+            'languages.read',
+            'languages.create',
+            'languages.update',
+            'languages.delete',
 
-        Permission::create(['name' => 'teams.read']);
-        Permission::create(['name' => 'teams.create']);
-        Permission::create(['name' => 'teams.update']);
-        Permission::create(['name' => 'teams.delete']);
+            'teams.read',
+            'teams.create',
+            'teams.update',
+            'teams.delete',
 
-        Permission::create(['name' => 'pages.read']);
-        Permission::create(['name' => 'pages.create']);
-        Permission::create(['name' => 'pages.update']);
-        Permission::create(['name' => 'pages.delete']);
+            'pages.read',
+            'pages.create',
+            'pages.update',
+            'pages.delete',
+        ];
+
+        foreach ($permissions as $name) {
+            Permission::query()->updateOrCreate(
+                ['name' => $name],
+                ['name' => $name]
+            );
+        }
     }
 }

@@ -2,44 +2,38 @@
 
 namespace Database\Seeders;
 
-// use App\Models\Team;
 use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
 
 class UserSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-        $user = User::factory([
-            'first_name'    => 'Ryan',
-            'last_name'     => 'Miller',
-            'email'         => 'ryanmillergm@gmail.com'
-        ])
-            ->hasAssignedTeams(1)
-            ->create();
+        $user = User::query()->updateOrCreate(
+            ['email' => 'ryanmillergm@gmail.com'],
+            [
+                'first_name' => 'Ryan',
+                'last_name'  => 'Miller',
+                'email_verified_at' => now(),
+                'password' => Hash::make('password'),
+            ],
+        );
 
-        $user2 = User::factory([
-            'first_name'    => 'Cindy',
-            'last_name'     => 'Dewey',
-            'email'         => 'breadofgraceministry@gmail.com',
-        ])
-            ->hasAssignedTeams(1)
-            ->create();
+        $user2 = User::query()->updateOrCreate(
+            ['email' => 'breadofgraceministry@gmail.com'],
+            [
+                'first_name' => 'Cindy',
+                'last_name'  => 'Dewey',
+                'email_verified_at' => now(),
+                'password' => Hash::make('password'),
+            ],
+        );
 
-        User::factory()
-            ->count(2)
-            ->hasAssignedTeams(1)
-            ->create();
-
-        $role = Role::where('name', 'Super Admin')->get();
+        $role = Role::query()->where('name', 'Super Admin')->firstOrFail();
 
         $user->assignRole($role);
         $user2->assignRole($role);
-        // $team->assignRole($role);
     }
 }

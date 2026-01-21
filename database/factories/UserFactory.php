@@ -17,7 +17,7 @@ class UserFactory extends Factory
     /**
      * The current password being used by the factory.
      */
-    protected static ?string $password;
+    protected static ?string $password = null;
 
     /**
      * Define the model's default state.
@@ -28,15 +28,18 @@ class UserFactory extends Factory
     {
         return [
             'first_name' => $this->faker->firstName(),
-            'last_name' => $this->faker->lastName(),
-            'email' => fake()->unique()->safeEmail(),
+            'last_name'  => $this->faker->lastName(),
+            'email'      => $this->faker->unique()->safeEmail(),
             'email_verified_at' => now(),
+
             'password' => static::$password ??= Hash::make('password'),
-            'two_factor_secret' => null,
+
+            'two_factor_secret'         => null,
             'two_factor_recovery_codes' => null,
-            'remember_token' => Str::random(10),
+            'remember_token'            => Str::random(10),
+
             'profile_photo_path' => null,
-            'current_team_id' => null,
+            'current_team_id'    => null,
         ];
     }
 
@@ -51,7 +54,7 @@ class UserFactory extends Factory
     }
 
     /**
-     * Indicate that the user should have a personal team.
+     * Indicate that the user should have a Jetstream personal team.
      */
     public function withPersonalTeam(callable $callback = null): static
     {
@@ -61,13 +64,41 @@ class UserFactory extends Factory
 
         return $this->has(
             Team::factory()
-                ->state(fn (array $attributes, User $user) => [
-                    'name' => $user->first_name . ' ' . $user->last_name . '\'s Team',
-                    'user_id' => $user->id,
-                    'slug' => strtolower($user->first_name) . '-' . strtolower($user->last_name) . "s-team",
-                ])
+                ->state(function (array $attributes, User $user) {
+                    $first = (string) $user->first_name;
+                    $last  = (string) $user->last_name;
+
+                    return [
+                        'name'    => "{$first} {$last}'s Team",
+                        'user_id' => $user->id,
+                        'slug'    => strtolower($first) . '-' . strtolower($last) . 's-team',
+                    ];
+                })
                 ->when(is_callable($callback), $callback),
             'ownedTeams'
         );
+    }
+
+    /**
+     * Convenience state: create and attach "assigned teams" (for your app's relation).
+     *
+     * This assumes your User model has an assignedTeams() belongsToMany relation.
+     */
+    public function hasAssignedTeams(int $count = 1): static
+    {
+        return $this->afterCreating(function (User $user) use ($count) {
+            // If your app doesn't have assignedTeams(), remove this method.
+            if (! method_exists($user, 'assignedTeams')) {
+                return;
+            }
+
+            $teams = Team::factory()
+                ->count($count)
+                ->create([
+                    'user_id' => $user->id,
+                ]);
+
+            $user->assignedTeams()->syncWithoutDetaching($teams->modelKeys());
+        });
     }
 }
