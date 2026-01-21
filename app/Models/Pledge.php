@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasStageMetadata;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Pledge extends Model
 {
     use HasFactory;
+    use HasStageMetadata;
 
     protected $fillable = [
         'user_id',
@@ -41,8 +43,8 @@ class Pledge extends Model
         'last_pledge_at'       => 'datetime',
         'next_pledge_at'       => 'datetime',
         'metadata'             => 'array',
+        'amount_cents'         => 'int',
     ];
-
 
     // --------------------------
     // Accessors

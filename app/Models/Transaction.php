@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasStageMetadata;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,12 +11,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Transaction extends Model
 {
     use HasFactory;
+    use HasStageMetadata;
 
     protected $fillable = [
         'user_id',
         'pledge_id',
         'payment_intent_id',
         'subscription_id',
+        'stripe_invoice_id',
         'charge_id',
         'customer_id',
         'payment_method_id',
@@ -33,8 +36,9 @@ class Transaction extends Model
     ];
 
     protected $casts = [
-        'paid_at' => 'datetime',
-        'metadata' => 'array',
+        'paid_at'   => 'datetime',
+        'metadata'  => 'array',
+        'amount_cents' => 'int',
     ];
 
     public function user(): BelongsTo

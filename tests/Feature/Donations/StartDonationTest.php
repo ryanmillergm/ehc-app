@@ -79,13 +79,21 @@ class StartDonationTest extends TestCase
     {
         // Mock Stripe so we don't hit the network.
         $this->mock(StripeService::class, function ($mock) {
-            $pi = \Stripe\PaymentIntent::constructFrom([
-                'id'            => 'pi_test',
-                'client_secret' => 'cs_test',
+            $pi1 = \Stripe\PaymentIntent::constructFrom([
+                'id'            => 'pi_test_1',
+                'client_secret' => 'cs_test_1',
                 'status'        => 'requires_payment_method',
             ]);
 
-            $mock->shouldReceive('createOneTimePaymentIntent')->andReturn($pi);
+            $pi2 = \Stripe\PaymentIntent::constructFrom([
+                'id'            => 'pi_test_2',
+                'client_secret' => 'cs_test_2',
+                'status'        => 'requires_payment_method',
+            ]);
+
+            $mock->shouldReceive('createOneTimePaymentIntent')
+                ->twice()
+                ->andReturn($pi1, $pi2);
         });
 
         // 1) Start WITHOUT attempt_id (server creates it)

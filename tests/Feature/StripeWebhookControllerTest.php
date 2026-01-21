@@ -796,6 +796,7 @@ class StripeWebhookControllerTest extends TestCase
             'stripe_customer_id'     => 'cus_real',
         ]);
 
+        // Existing tx already has PI + charge (strong keys)
         $earlyTx = Transaction::factory()->create([
             'user_id'           => $user->id,
             'pledge_id'         => $pledge->id,
@@ -810,11 +811,14 @@ class StripeWebhookControllerTest extends TestCase
             'status'            => 'succeeded',
             'metadata'          => [],
             'source'            => 'stripe_webhook',
+            'receipt_url'       => null,
         ]);
 
         $periodStart = now()->timestamp;
         $periodEnd   = now()->addMonth()->timestamp;
 
+        // Stripe invoice events normally include payment_intent.
+        // We intentionally omit charge here to verify null-stomp protection.
         $invoice = (object) [
             'id'                 => 'in_real',
             'customer'           => 'cus_real',
@@ -823,7 +827,23 @@ class StripeWebhookControllerTest extends TestCase
             'amount_paid'        => 10000,
             'currency'           => 'usd',
             'hosted_invoice_url' => 'https://example.test/invoices/in_real',
-            'lines'              => (object) [
+
+            'billing_reason'     => 'subscription_cycle',
+
+            // strong key present
+            'payment_intent'     => 'pi_early',
+
+            // intentionally missing/null to ensure we don't clobber existing ch_early
+            'charge'             => null,
+
+            // supply subscription via nested paths (your resolver supports these)
+            'parent' => (object) [
+                'subscription_details' => (object) [
+                    'subscription' => 'sub_real',
+                ],
+            ],
+
+            'lines' => (object) [
                 'data' => [
                     (object) [
                         'period' => (object) [
@@ -838,12 +858,6 @@ class StripeWebhookControllerTest extends TestCase
                     ],
                 ],
             ],
-            'parent' => (object) [
-                'subscription_details' => (object) [
-                    'subscription' => 'sub_real',
-                ],
-            ],
-            // intentionally missing: payment_intent, charge
         ];
 
         $event = (object) [
@@ -857,15 +871,26 @@ class StripeWebhookControllerTest extends TestCase
 
         $earlyTx->refresh();
 
+        // PI/charge must be preserved
         $this->assertSame('pi_early', $earlyTx->payment_intent_id);
         $this->assertSame('ch_early', $earlyTx->charge_id);
+
+        // subscription id should be populated from invoice nested subscription details
         $this->assertSame('sub_real', $earlyTx->subscription_id);
 
+        // invoice metadata should be merged
         $meta = $this->meta($earlyTx->metadata);
         $this->assertSame('in_real', $meta['stripe_invoice_id'] ?? null);
         $this->assertSame('sub_real', $meta['stripe_subscription_id'] ?? null);
 
+        // status should remain succeeded
         $this->assertSame('succeeded', $earlyTx->status);
+
+        // hosted invoice url should populate receipt_url when present
+        $this->assertSame('https://example.test/invoices/in_real', $earlyTx->receipt_url);
+
+        // still no duplicate tx rows created
+        $this->assertSame(1, Transaction::query()->where('payment_intent_id', 'pi_early')->count());
     }
 
     public function test_invoice_paid_does_not_clobber_existing_payment_intent_or_charge_with_nulls(): void
@@ -978,7 +1003,7 @@ class StripeWebhookControllerTest extends TestCase
         $this->assertSame('pi_from_inpay', $placeholder->payment_intent_id);
 
         // NOTE: your current code keeps status "pending" because it uses `$tx->status ?: 'succeeded'`
-        $this->assertSame('pending', $placeholder->status);
+        $this->assertSame('succeeded', $placeholder->status);
 
         $this->assertNotNull($placeholder->paid_at);
         $this->assertEquals($paidAtTs, $placeholder->paid_at->timestamp);
