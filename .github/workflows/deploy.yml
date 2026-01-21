@@ -55,6 +55,7 @@ jobs:
             --delay-updates \
             --no-times --no-perms --no-owner --no-group \
             --exclude=".env" \
+            --exclude="public/storage" \
             --exclude="storage/*.key" \
             --exclude="storage/logs" \
             --exclude="storage/framework/cache" \
