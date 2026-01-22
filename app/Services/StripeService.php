@@ -469,6 +469,22 @@ class StripeService
             if ($invoiceObj) {
                 $charge = $invoiceObj->charge ?? $charge;
                 $chargeId = $chargeId ?: (is_string($charge) ? $charge : ($charge->id ?? null));
+
+
+                // Some subscription invoices don't expose ->charge directly (e.g. SCA flows).
+                // Fallback: retrieve the latest PaymentIntent and use its latest_charge.
+                if (! $chargeId && $latestPiId) {
+                    try {
+                        $piForCharge = $this->retrievePaymentIntent($latestPiId);
+                        $chargeId = $this->extractId($piForCharge->latest_charge ?? null);
+                    } catch (Throwable $e) {
+                        $this->dbg('syncFromSubscription: could not resolve charge_id from PaymentIntent', [
+                            'pledge_id' => $pledge->id,
+                            'pi_id'     => $latestPiId,
+                            'error'     => $e->getMessage(),
+                        ], 'warning');
+                    }
+                }
             }
 
             // Prefer invoice line period if item period missing
