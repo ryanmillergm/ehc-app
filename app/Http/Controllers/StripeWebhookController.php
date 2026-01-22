@@ -9,6 +9,7 @@ use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Stripe\StripeClient;
 use Stripe\Exception\SignatureVerificationException;
 use Stripe\Webhook;
 use UnexpectedValueException;
@@ -16,6 +17,26 @@ use Illuminate\Database\UniqueConstraintViolationException;
 
 class StripeWebhookController extends Controller
 {
+    public function __construct(
+        protected ?StripeClient $stripe = null,
+    ) {
+    }
+
+    protected function stripeClient(): ?StripeClient
+    {
+        if ($this->stripe instanceof StripeClient) {
+            return $this->stripe;
+        }
+
+        $secret = trim((string) config('services.stripe.secret'));
+        if ($secret === '') {
+            return null;
+        }
+
+        $this->stripe = new StripeClient($secret);
+        return $this->stripe;
+    }
+
     /**
      * Stripe webhook endpoint.
      */
@@ -397,6 +418,33 @@ class StripeWebhookController extends Controller
             ?: $this->extractId(data_get($invoice, 'charges.data.0.id'))
             ?: $this->extractId(data_get($invoice, 'payment_intent.latest_charge'))
             ?: $this->extractId(data_get($invoice, 'charges.data.0.charge'));
+
+        // Fallback: if Stripe didn't include a charge id on the invoice payload, look it up via the PaymentIntent.
+        // This happens sometimes unless the event payload expanded `latest_charge`.
+        if (! $chargeId && $paymentIntentId) {
+            $client = $this->stripeClient();
+
+            if ($client) {
+                try {
+                    $pi = $client->paymentIntents->retrieve($paymentIntentId, [
+                        'expand' => ['latest_charge'],
+                    ]);
+
+                    $chargeId = $chargeId
+                        ?: $this->extractId($pi->latest_charge ?? null)
+                        ?: (is_object($pi->latest_charge ?? null) ? ($pi->latest_charge->id ?? null) : null);
+                } catch (\Throwable $e) {
+                    $this->dbg('invoice.paid: payment_intent lookup failed', [
+                        'payment_intent_id' => $paymentIntentId,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            } else {
+                $this->dbg('invoice.paid: cannot lookup payment_intent (missing Stripe secret)', [
+                    'payment_intent_id' => $paymentIntentId,
+                ]);
+            }
+        }
 
         $amountPaid = $invoice->amount_paid ?? $invoice->amount_due ?? null;
         $currency   = $invoice->currency ?? 'usd';
