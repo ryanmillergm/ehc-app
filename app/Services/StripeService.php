@@ -528,6 +528,8 @@ class StripeService
 
                     $latestPiId = null;
                     $chargeId = null;
+
+                    $pledge->latest_payment_intent_id = null;
                 } else {
                     // If PI is OK and we found a charge on PI, prefer it if invoice lacked it
                     if (! $chargeId && $guardedChargeId) {
