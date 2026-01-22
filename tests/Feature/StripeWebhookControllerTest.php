@@ -441,7 +441,7 @@ class StripeWebhookControllerTest extends TestCase
 
         $this->assertDatabaseHas('transactions', [
             'id'     => $tx->id,
-            'status' => 'refunded',
+            'status' => 'partially_refunded',
         ]);
 
         $this->assertDatabaseHas('refunds', [
@@ -454,6 +454,44 @@ class StripeWebhookControllerTest extends TestCase
         ]);
 
         $this->assertSame(1, Refund::count());
+    }
+
+    public function test_charge_refunded_full_marks_transaction_refunded(): void
+    {
+        $tx = Transaction::factory()->create([
+            'charge_id'    => 'ch_full',
+            'status'       => 'succeeded',
+            'amount_cents' => 2000,
+            'currency'     => 'usd',
+        ]);
+
+        $event = (object) [
+            'type' => 'charge.refunded',
+            'data' => (object) [
+                'object' => (object) [
+                    'id'      => 'ch_full',
+                    'refunds' => (object) [
+                        'data' => [
+                            (object) [
+                                'id'       => 're_full',
+                                'amount'   => 2000,
+                                'currency' => 'usd',
+                                'status'   => 'succeeded',
+                                'reason'   => null,
+                                'metadata' => (object) [],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        (new StripeWebhookController())->handleEvent($event);
+
+        $this->assertDatabaseHas('transactions', [
+            'id'     => $tx->id,
+            'status' => 'refunded',
+        ]);
     }
 
     public function test_invoice_paid_uses_charges_data_fallback_when_charge_is_null(): void

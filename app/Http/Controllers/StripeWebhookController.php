@@ -153,6 +153,16 @@ class StripeWebhookController extends Controller
                 $this->handleChargeRefunded($object);
                 break;
 
+
+            case 'refund.created':
+            case 'refund.updated':
+            case 'refund.failed':
+                $this->handleRefundCreatedOrUpdated($object);
+                break;
+
+            case 'charge.refund.updated':
+                $this->handleChargeRefundUpdated($object);
+                break;
             case 'customer.subscription.created':
             case 'customer.subscription.updated':
             case 'customer.subscription.deleted':
@@ -991,15 +1001,16 @@ class StripeWebhookController extends Controller
             return;
         }
 
-        $tx->status = 'refunded';
-        $tx->save();
-
         $refunds = data_get($charge, 'refunds.data', []);
         if (! is_array($refunds)) {
             $refunds = [];
         }
 
         foreach ($refunds as $refundObj) {
+            if (! is_object($refundObj)) {
+                continue;
+            }
+
             $refundId = $refundObj->id ?? null;
             if (! $refundId) {
                 continue;
@@ -1010,20 +1021,103 @@ class StripeWebhookController extends Controller
                 [
                     'transaction_id' => $tx->id,
                     'charge_id'      => $chargeId,
-                    'amount_cents'   => $refundObj->amount ?? 0,
-                    'currency'       => $refundObj->currency ?? $tx->currency,
-                    'status'         => $refundObj->status ?? 'succeeded',
+                    'amount_cents'   => (int) ($refundObj->amount ?? 0),
+                    'currency'       => (string) ($refundObj->currency ?? $tx->currency ?? 'usd'),
+                    'status'         => (string) ($refundObj->status ?? 'succeeded'),
                     'reason'         => $refundObj->reason ?? null,
                     'metadata'       => (array) ($refundObj->metadata ?? []),
                 ]
             );
         }
 
-        $this->dbg('charge.refunded: tx refunded + refunds upserted', [
-            'tx_id'        => $tx->id,
-            'charge_id'    => $chargeId,
-            'refund_count' => count($refunds),
+        // Determine full vs partial refund.
+        // Prefer Stripe's amount_refunded when present; otherwise sum succeeded refunds in DB.
+        $amountRefunded = data_get($charge, 'amount_refunded');
+        if ($amountRefunded === null) {
+            $amountRefunded = (int) Refund::query()
+                ->where('charge_id', $chargeId)
+                ->where('status', 'succeeded')
+                ->sum('amount_cents');
+        } else {
+            $amountRefunded = (int) $amountRefunded;
+        }
+
+        if ($amountRefunded >= (int) $tx->amount_cents) {
+            $tx->status = 'refunded';
+        } elseif ($amountRefunded > 0) {
+            $tx->status = 'partially_refunded';
+        }
+
+        $tx->save();
+
+        $this->dbg('charge.refunded: refunds upserted + tx status updated', [
+            'tx_id'          => $tx->id,
+            'charge_id'      => $chargeId,
+            'refund_count'   => count($refunds),
+            'amountRefunded' => $amountRefunded,
+            'tx_amount'      => (int) $tx->amount_cents,
+            'tx_status'      => $tx->status,
         ], 'info');
+    }
+
+
+
+    protected function handleRefundCreatedOrUpdated(object $refund): void
+    {
+        $refundId = $refund->id ?? null;
+        $chargeId = $this->extractId($refund->charge ?? null);
+
+        if (! $refundId || ! $chargeId) {
+            return;
+        }
+
+        $tx = Transaction::where('charge_id', $chargeId)->first();
+        if (! $tx) {
+            return;
+        }
+
+        Refund::updateOrCreate(
+            ['stripe_refund_id' => $refundId],
+            [
+                'transaction_id' => $tx->id,
+                'charge_id'      => $chargeId,
+                'amount_cents'   => (int) ($refund->amount ?? 0),
+                'currency'       => (string) ($refund->currency ?? $tx->currency ?? 'usd'),
+                'status'         => (string) ($refund->status ?? 'succeeded'),
+                'reason'         => $refund->reason ?? null,
+                'metadata'       => (array) ($refund->metadata ?? []),
+            ]
+        );
+
+        // Compute total succeeded refunds so partial refunds are represented correctly.
+        $totalSucceededRefunded = (int) Refund::query()
+            ->where('charge_id', $chargeId)
+            ->where('status', 'succeeded')
+            ->sum('amount_cents');
+
+        if ($totalSucceededRefunded >= (int) $tx->amount_cents) {
+            $tx->status = 'refunded';
+        } elseif ($totalSucceededRefunded > 0) {
+            $tx->status = 'partially_refunded';
+        }
+
+        $tx->save();
+
+        $this->dbg('refund.*: upserted refund + updated tx status', [
+            'tx_id'                 => $tx->id,
+            'charge_id'             => $chargeId,
+            'refund_id'             => $refundId,
+            'refund_status'         => (string) ($refund->status ?? 'succeeded'),
+            'total_succeeded_cents' => $totalSucceededRefunded,
+            'tx_amount'             => (int) $tx->amount_cents,
+            'tx_status'             => $tx->status,
+        ], 'info');
+    }
+
+    protected function handleChargeRefundUpdated(object $refund): void
+    {
+        // Stripe sends a Refund object for charge.refund.updated.
+        $this->handleRefundCreatedOrUpdated($refund);
     }
 
     // -------------------------------------------------------------------------
