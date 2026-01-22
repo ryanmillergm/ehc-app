@@ -698,6 +698,9 @@
                                 attempt_id: this.attemptId || this.getOrCreateAttemptId(),
                                 mode: this.mode === 'payment' ? 'payment' : 'subscription',
 
+                                amount: this.totalAmount(),
+                                frequency: this.frequency,
+
                                 donor_first_name: this.donor.first_name,
                                 donor_last_name:  this.donor.last_name,
                                 donor_email:      this.donor.email,
@@ -720,7 +723,9 @@
                                 payload.receipt_url       = pi.charges?.data?.[0]?.receipt_url ?? null;
                             } else {
                                 const si = result.setupIntent;
+                                
                                 payload.pledge_id         = this.pledgeId;
+                                payload.setup_intent_id   = si.id;
                                 payload.payment_method_id = si.payment_method;
                             }
 

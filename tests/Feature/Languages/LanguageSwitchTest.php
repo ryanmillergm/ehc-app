@@ -12,51 +12,96 @@ class LanguageSwitchTest extends TestCase
 {
     use RefreshDatabase;
 
+    private function label(Language $lang): string
+    {
+        // Use the most human-friendly non-null value.
+        return (string) ($lang->name ?: $lang->title ?: $lang->iso_code);
+    }
+
     #[Test]
     public function it_switches_locale_and_language_id_and_sets_flash_banner_on_redirect(): void
     {
         $this->seed(LanguageSeeder::class);
 
-        Language::create([
-            'title'         => 'french',
-            'name'          => 'Français',
-            'iso_code'      => 'fr',
-            'locale'        => 'fr',
-            'right_to_left' => false,
-        ]);
+        $english = Language::query()->updateOrCreate(
+            ['iso_code' => 'en'],
+            [
+                'title'         => 'English',
+                'name'          => 'English',
+                'iso_code'      => 'en',
+                'locale'        => 'en',
+                'right_to_left' => false,
+            ]
+        )->refresh();
 
-        $english = Language::where('iso_code', 'en')->firstOrFail();
-        $spanish = Language::where('iso_code', 'es')->firstOrFail();
-        $french  = Language::where('iso_code', 'fr')->firstOrFail();
+        $spanish = Language::query()->updateOrCreate(
+            ['iso_code' => 'es'],
+            [
+                'title'         => 'Spanish',
+                'name'          => 'Español',
+                'iso_code'      => 'es',
+                'locale'        => 'es',
+                'right_to_left' => false,
+            ]
+        )->refresh();
 
-        // Hit home so Localization middleware sets defaults
+        $french = Language::query()->updateOrCreate(
+            ['iso_code' => 'fr'],
+            [
+                'title'         => 'French',
+                'name'          => 'Français',
+                'iso_code'      => 'fr',
+                'locale'        => 'fr',
+                'right_to_left' => false,
+            ]
+        )->refresh();
+
+        // Optional extra language
+        Language::query()->updateOrCreate(
+            ['iso_code' => 'ar'],
+            [
+                'title'         => 'Arabic',
+                'name'          => 'عربي',
+                'iso_code'      => 'ar',
+                'locale'        => 'ar',
+                'right_to_left' => true,
+            ]
+        );
+
+        // Hit home so Localization middleware sets defaults (if that's how your app works)
         $this->withSession([])->get('/')->assertOk();
 
+        // Defaults should be English
         $this->assertSame('en', session('locale'));
         $this->assertSame($english->id, session('language_id'));
 
-        // Switch to Spanish (redirect response)
+        // Switch to Spanish
         $res = $this->get('/lang/es');
+        $res->assertRedirect();
 
-        $res->assertRedirect(); // back() or / depending on previousUrl
         $this->assertSame('es', session('locale'));
         $this->assertSame($spanish->id, session('language_id'));
 
-        // Flash banner is set
         $this->assertSame('success', session('flash.bannerStyle'));
         $this->assertNotEmpty(session('flash.banner'));
-        $this->assertStringContainsString($spanish->name, session('flash.banner'));
+        $this->assertStringContainsString(
+            $this->label($spanish),
+            (string) session('flash.banner')
+        );
 
-        // Switch to French (redirect response)
+        // Switch to French
         $res = $this->get('/lang/fr');
-
         $res->assertRedirect();
+
         $this->assertSame('fr', session('locale'));
         $this->assertSame($french->id, session('language_id'));
 
         $this->assertSame('success', session('flash.bannerStyle'));
         $this->assertNotEmpty(session('flash.banner'));
-        $this->assertStringContainsString($french->name, session('flash.banner'));
+        $this->assertStringContainsString(
+            $this->label($french),
+            (string) session('flash.banner')
+        );
     }
 
     #[Test]
@@ -64,12 +109,16 @@ class LanguageSwitchTest extends TestCase
     {
         $this->seed(LanguageSeeder::class);
 
-        // Ensure Spanish has a "name" to inject
-        $spanish = Language::where('iso_code', 'es')->firstOrFail();
-        if (! $spanish->name) {
-            $spanish->update(['name' => 'Español']);
-            $spanish->refresh();
-        }
+        $spanish = Language::query()->updateOrCreate(
+            ['iso_code' => 'es'],
+            [
+                'title'         => 'Spanish',
+                'name'          => 'Español',
+                'iso_code'      => 'es',
+                'locale'        => 'es',
+                'right_to_left' => false,
+            ]
+        )->refresh();
 
         $res = $this->get('/lang/es', [
             'X-Requested-With' => 'XMLHttpRequest',
@@ -87,6 +136,9 @@ class LanguageSwitchTest extends TestCase
 
         $json = $res->json();
         $this->assertIsString($json['message'] ?? null);
-        $this->assertStringContainsString($spanish->name, $json['message']);
+        $this->assertStringContainsString(
+            $this->label($spanish),
+            (string) ($json['message'] ?? '')
+        );
     }
 }

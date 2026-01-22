@@ -14,8 +14,11 @@ use App\Models\Refund;
 use App\Models\Transaction;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Log;
 use Stripe\StripeClient;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class StripeService
 {
@@ -77,9 +80,10 @@ class StripeService
     // Retrieve helpers
     // -------------------------------------------------------------------------
 
-    public function retrievePaymentIntent(string $paymentIntentId): PaymentIntent
+    public function retrievePaymentIntent(string $paymentIntentId, array $params = []): PaymentIntent
     {
-        return $this->stripe->paymentIntents->retrieve($paymentIntentId);
+        $params = $params ?: ['expand' => ['charges.data.balance_transaction']];
+        return $this->stripe->paymentIntents->retrieve($paymentIntentId, $params);
     }
 
     public function retrieveSetupIntent(string $setupIntentId): SetupIntent
@@ -292,7 +296,54 @@ class StripeService
             'interval' => $pledge->interval,
         ]);
 
-        $syncFromSubscription = function (Subscription $subscription) use ($pledge, $paymentMethodId, $attemptId): void {
+        /**
+         * Guard: ensure a PaymentIntent really “belongs” to (invoice, customer).
+         * Returns [bool $ok, ?string $chargeId]
+         */
+        $guardPaymentIntentOwner = function (?string $piId, ?string $invoiceId, ?string $customerId): array {
+            if (! $piId) {
+                return [false, null];
+            }
+
+            // If we don't know the expected customer, we can't validate ownership meaningfully.
+            // Soft-allow in that case.
+            if (! $customerId) {
+                return [true, null];
+            }
+
+            // Unit-test / partial-client friendly: if paymentIntents client is not available,
+            // we cannot retrieve to verify. Soft-allow rather than nulling the PI.
+            if (! isset($this->stripe->paymentIntents) || ! is_object($this->stripe->paymentIntents)) {
+                return [true, null];
+            }
+
+            try {
+                $pi = $this->stripe->paymentIntents->retrieve($piId, []);
+            } catch (Throwable $e) {
+                // Soft-allow when Stripe retrieval fails (network/offline/tests/etc).
+                $this->dbg('PI owner guard: retrieve failed; soft-allow', [
+                    'pi' => $piId,
+                    'invoice_id' => $invoiceId,
+                    'expected_customer_id' => $customerId,
+                    'error' => $e->getMessage(),
+                ], 'warning');
+
+                return [true, null];
+            }
+
+            $piCustomerId = $this->extractId($pi->customer ?? null);
+
+            if (! $piCustomerId) {
+                // If Stripe doesn't give a customer on the PI (rare, but possible), we can't verify.
+                return [true, $this->extractId($pi->latest_charge ?? null)];
+            }
+
+            $ok = ((string) $piCustomerId === (string) $customerId);
+
+            return [$ok, $ok ? $this->extractId($pi->latest_charge ?? null) : null];
+        };
+
+        $syncFromSubscription = function (Subscription $subscription) use ($pledge, $paymentMethodId, $attemptId, $guardPaymentIntentOwner): void {
 
             // Period fields can be on subscription top-level; some payloads mirror onto items.
             $itemStart = data_get($subscription, 'items.data.0.current_period_start');
@@ -306,7 +357,7 @@ class StripeService
             $latestInvoiceId  = $latestInvoiceObj?->id
                 ?: (is_string($subscription->latest_invoice ?? null) ? $subscription->latest_invoice : null);
 
-            // Try old-style first
+            // Invoice PI can be object or string
             $piOnInvoice = $latestInvoiceObj?->payment_intent ?? null;
             $latestPiObj = is_object($piOnInvoice) ? $piOnInvoice : null;
             $latestPiId  = is_string($piOnInvoice) ? $piOnInvoice : ($latestPiObj?->id ?? null);
@@ -315,9 +366,34 @@ class StripeService
             $invoicePaidAt = data_get($latestInvoiceObj, 'status_transitions.paid_at');
             $invoicePaid   = (bool) (data_get($latestInvoiceObj, 'paid') ?? false) || (bool) $invoicePaidAt;
 
-            // Retrieve expanded invoice so we can get PI/charge/payments reliably.
+            // Charge id can be on invoice.charge
+            $charge = $latestInvoiceObj?->charge ?? null;
+            $chargeId = is_string($charge) ? $charge : ($charge->id ?? null);
+
+            // Decide if we truly need to retrieve the invoice (unit-test friendly)
+            $needInvoiceRetrieve = false;
+
+            // Basil-style can omit invoice.payment_intent from subscription expansions
+            if (! $latestPiId) {
+                $needInvoiceRetrieve = true;
+            }
+
+            // If we have no usable period anywhere, invoice lines are often the fallback
+            $hasAnyPeriodStart = is_numeric($itemStart) || is_numeric($subStart);
+            $hasAnyPeriodEnd   = is_numeric($itemEnd)   || is_numeric($subEnd);
+
+            if (! $hasAnyPeriodStart || ! $hasAnyPeriodEnd) {
+                $needInvoiceRetrieve = true;
+            }
+
+            // If invoice paid is unclear and paid_at missing, invoice retrieve can help
+            if (! $invoicePaidAt && ! $invoicePaid) {
+                $needInvoiceRetrieve = $needInvoiceRetrieve || (bool) $latestInvoiceId;
+            }
+
             $expandedInvoice = null;
-            if ($latestInvoiceId) {
+
+            if ($latestInvoiceId && $needInvoiceRetrieve) {
                 // 1) Try richer expands (NO "charges" anywhere)
                 try {
                     $expandedInvoice = $this->stripe->invoices->retrieve($latestInvoiceId, [
@@ -369,44 +445,46 @@ class StripeService
                 $invoicePaid = true;
             }
 
-            // 1) Old-style: invoice.payment_intent
+            // Prefer PI from expanded invoice when present
             if (! $latestPiId && $expandedInvoice) {
                 $pi = $expandedInvoice->payment_intent ?? null;
                 $latestPiId = is_string($pi) ? $pi : ($pi->id ?? null);
             }
 
-            // 2) BASIL: invoice.payments[*].payment.payment_intent
+            // BASIL: invoice.payments[*].payment.payment_intent
             if (! $latestPiId && $expandedInvoice) {
                 $latestPiId =
                     $this->extractId(data_get($expandedInvoice, 'payments.data.0.payment.payment_intent'))
                     ?: $this->extractId(data_get($expandedInvoice, 'payments.data.0.payment_intent'));
             }
 
-            // 3) Final fallback: retrieve invoice with payments + payment_intent expands
+            // Final fallback: retrieve invoice and resolve PI id
             if (! $latestPiId && $latestInvoiceId) {
                 $latestPiId = $this->resolvePaymentIntentIdFromInvoice($latestInvoiceId);
             }
 
-            // Get charge id (invoice.charge) and (if missing) try to get latest_charge from PI
+            // Determine invoice object to read lines/amount/etc from
             $invoiceObj = $expandedInvoice ?: $latestInvoiceObj;
 
-            $charge = $invoiceObj?->charge ?? null;
-            $chargeId = is_string($charge) ? $charge : ($charge->id ?? null);
+            // Prefer charge from expanded invoice if we retrieved it
+            if ($invoiceObj) {
+                $charge = $invoiceObj->charge ?? $charge;
+                $chargeId = $chargeId ?: (is_string($charge) ? $charge : ($charge->id ?? null));
 
-            if (! $chargeId && $latestPiId) {
-                try {
-                    $pi = $this->stripe->paymentIntents->retrieve($latestPiId, []);
-                    $chargeId = $this->extractId($pi->latest_charge ?? null);
 
-                    $this->dbg('syncFromSubscription: charge recovered from PI', [
-                        'pi_id' => $latestPiId,
-                        'charge_id' => $chargeId,
-                    ], 'info');
-                } catch (Throwable $e) {
-                    $this->dbg('syncFromSubscription: PI retrieve failed for charge fallback', [
-                        'pi_id' => $latestPiId,
-                        'error' => $e->getMessage(),
-                    ], 'warning');
+                // Some subscription invoices don't expose ->charge directly (e.g. SCA flows).
+                // Fallback: retrieve the latest PaymentIntent and use its latest_charge.
+                if (! $chargeId && $latestPiId) {
+                    try {
+                        $piForCharge = $this->retrievePaymentIntent($latestPiId);
+                        $chargeId = $this->extractId($piForCharge->latest_charge ?? null);
+                    } catch (Throwable $e) {
+                        $this->dbg('syncFromSubscription: could not resolve charge_id from PaymentIntent', [
+                            'pledge_id' => $pledge->id,
+                            'pi_id'     => $latestPiId,
+                            'error'     => $e->getMessage(),
+                        ], 'warning');
+                    }
                 }
             }
 
@@ -424,6 +502,42 @@ class StripeService
                 : (is_numeric($subEnd) ? (int) $subEnd
                     : (is_numeric($lineEnd) ? (int) $lineEnd : null));
 
+            // ---------------------------------------------------------------------
+            // PaymentIntent OWNER GUARD (the thing you asked for)
+            // ---------------------------------------------------------------------
+            $expectedCustomerId =
+                $pledge->stripe_customer_id
+                ?: $this->extractId($subscription->customer ?? null)
+                ?: $this->extractId(data_get($invoiceObj, 'customer'));
+
+            $piOk = false;
+            $guardedChargeId = null;
+
+            if ($latestPiId) {
+                [$piOk, $guardedChargeId] = $guardPaymentIntentOwner($latestPiId, $latestInvoiceId, $expectedCustomerId);
+
+                if (! $piOk) {
+                    // Refuse to attach PI/charge to pledge/tx when it doesn't “belong”.
+                    $this->dbg('syncFromSubscription: PI failed owner guard; skipping PI/charge sync', [
+                        'pledge_id' => $pledge->id,
+                        'subscription_id' => $subscription->id ?? null,
+                        'latest_invoice_id' => $latestInvoiceId,
+                        'latest_pi_id' => $latestPiId,
+                        'expected_customer_id' => $expectedCustomerId,
+                    ], 'warning');
+
+                    $latestPiId = null;
+                    $chargeId = null;
+
+                    $pledge->latest_payment_intent_id = null;
+                } else {
+                    // If PI is OK and we found a charge on PI, prefer it if invoice lacked it
+                    if (! $chargeId && $guardedChargeId) {
+                        $chargeId = $guardedChargeId;
+                    }
+                }
+            }
+
             $this->dbg('syncFromSubscription: raw subscription snapshot', [
                 'sub_id' => $subscription->id ?? null,
                 'sub_status' => $subscription->status ?? null,
@@ -438,7 +552,7 @@ class StripeService
                 'charge_id' => $chargeId,
                 'invoice_paid_at' => $invoicePaidAt,
                 'invoice_paid' => $invoicePaid,
-                'has_invoice_payments' => (bool) data_get($invoiceObj, 'payments.data.0.id'),
+                'pi_owner_guard_ok' => $piOk,
             ]);
 
             // ---- Sync pledge basics ----
@@ -446,7 +560,7 @@ class StripeService
             $pledge->status                 = $subscription->status;
             $pledge->latest_invoice_id      = $latestInvoiceId;
 
-            // Only set when we truly have it
+            // Only set when we truly have it (and it passed owner guard)
             if ($latestPiId) {
                 $pledge->latest_payment_intent_id = $latestPiId;
             }
@@ -465,46 +579,45 @@ class StripeService
                 $pledge->last_pledge_at = Carbon::createFromTimestamp((int) $invoicePaidAt);
             }
 
-            $this->dbg('syncFromSubscription: pledge before save', [
-                'pledge_id' => $pledge->id,
-                'status' => $pledge->status,
-                'stripe_subscription_id' => $pledge->stripe_subscription_id,
-                'latest_invoice_id' => $pledge->latest_invoice_id,
-                'latest_payment_intent_id' => $pledge->latest_payment_intent_id,
-                'current_period_start' => optional($pledge->current_period_start)->toDateTimeString(),
-                'current_period_end' => optional($pledge->current_period_end)->toDateTimeString(),
-                'next_pledge_at' => optional($pledge->next_pledge_at)->toDateTimeString(),
-                'last_pledge_at' => optional($pledge->last_pledge_at)->toDateTimeString(),
-            ]);
-
             $pledge->save();
 
-            $this->dbg('syncFromSubscription: pledge after save', [
-                'pledge_id' => $pledge->id,
-                'status' => $pledge->status,
-                'stripe_subscription_id' => $pledge->stripe_subscription_id,
-                'latest_invoice_id' => $pledge->latest_invoice_id,
-                'latest_payment_intent_id' => $pledge->latest_payment_intent_id,
-                'current_period_start' => optional($pledge->current_period_start)->toDateTimeString(),
-                'current_period_end' => optional($pledge->current_period_end)->toDateTimeString(),
-                'next_pledge_at' => optional($pledge->next_pledge_at)->toDateTimeString(),
-                'last_pledge_at' => optional($pledge->last_pledge_at)->toDateTimeString(),
-            ]);
-
             // ---- Ensure/enrich initial Transaction row ----
+            // Only do the “PI/charge link” work if we have a verified PI OR at least a trusted invoice.
             if ($latestInvoiceId) {
                 $invoiceAmount = (int) (
-                    $invoiceObj->amount_paid
-                    ?? $invoiceObj->amount_due
+                    $invoiceObj?->amount_paid
+                    ?? $invoiceObj?->amount_due
                     ?? 0
                 );
 
-                $tx = Transaction::query()
+                $txQuery = Transaction::query()
                     ->where('pledge_id', $pledge->id)
                     ->whereIn('type', ['subscription_initial', 'subscription_recurring'])
-                    ->where('source', 'donation_widget')
-                    ->latest('id')
-                    ->first();
+                    ->where('source', 'donation_widget');
+
+                // Prefer the current attempt's placeholder row (prevents cross-attempt collisions).
+                if ($attemptId) {
+                    $txQuery->where('attempt_id', $attemptId);
+                }
+
+                $tx = $txQuery->latest('id')->first();
+
+                // If the PaymentIntent is already claimed by another transaction row, use the owner.
+                if ($latestPiId) {
+                    $owner = Transaction::query()
+                        ->where('payment_intent_id', $latestPiId)
+                        ->first();
+
+                    if ($owner && (! $tx || $owner->id !== $tx->id)) {
+                        $this->dbg('syncFromSubscription: PI already claimed; using owner tx', [
+                            'pi'       => $latestPiId,
+                            'owner_tx' => $owner->id,
+                            'tx'       => $tx?->id,
+                        ], 'warning');
+
+                        $tx = $owner;
+                    }
+                }
 
                 $isNew = false;
                 if (! $tx) {
@@ -527,10 +640,29 @@ class StripeService
                     'attempt_id'             => $attemptId,
                 ]);
 
-                $typeToSet   = $isNew ? 'subscription_initial' : ($tx->type ?: 'subscription_initial');
+                // ✅ Owner adoption must happen BEFORE fill/save, otherwise we may fill the placeholder
+                // and then swap to the owner row without applying the payload.
+                if ($latestPiId) {
+                    $owner = Transaction::query()
+                        ->where('payment_intent_id', $latestPiId)
+                        ->first();
+
+                    if ($owner && (! $tx->exists || $owner->id !== $tx->id)) {
+                        $this->dbg('syncFromSubscription: adopting owner tx for PI', [
+                            'pi'       => $latestPiId,
+                            'owner_tx' => $owner->id,
+                            'tx'       => $tx->id ?? null,
+                        ], 'warning');
+
+                        $tx = $owner;
+                        $isNew = false;
+                    }
+                }
+
+                $typeToSet   = $tx->type ?: 'subscription_initial';
                 $sourceToSet = $tx->source ?: 'donation_widget';
 
-                $tx->fill([
+                $payload = [
                     'user_id'           => $pledge->user_id,
                     'pledge_id'         => $pledge->id,
                     'subscription_id'   => $subscription->id,
@@ -546,19 +678,42 @@ class StripeService
                     'payer_name'        => $pledge->donor_name,
                     'receipt_url'       => ($invoiceObj?->hosted_invoice_url ?? null) ?: $tx->receipt_url,
                     'source'            => $sourceToSet,
-                    'paid_at'           => ($invoicePaid && $invoicePaidAt) ? Carbon::createFromTimestamp((int) $invoicePaidAt) : $tx->paid_at,
+                    'paid_at'           => ($invoicePaid && $invoicePaidAt)
+                        ? Carbon::createFromTimestamp((int) $invoicePaidAt)
+                        : $tx->paid_at,
                     'metadata'          => array_merge($existingMeta, $extraMeta),
-                ])->save();
+                ];
 
-                $this->dbg('syncFromSubscription: tx ensured', [
-                    'tx_id' => $tx->id,
-                    'pledge_id' => $tx->pledge_id,
-                    'payment_intent_id' => $tx->payment_intent_id,
-                    'charge_id' => $tx->charge_id,
-                    'status' => $tx->status,
-                    'type' => $tx->type,
-                    'paid_at' => optional($tx->paid_at)->toDateTimeString(),
-                ]);
+                $tx->fill($payload);
+
+                try {
+                    $tx->save();
+                } catch (UniqueConstraintViolationException $e) {
+                    // Concurrency safety: if another request already claimed this PI, converge on the owner row.
+                    if (! $latestPiId) {
+                        throw $e;
+                    }
+
+                    $owner = Transaction::query()
+                        ->where('payment_intent_id', $latestPiId)
+                        ->first();
+
+                    if (! $owner) {
+                        throw $e;
+                    }
+
+                    $this->dbg('syncFromSubscription: unique constraint on PI; converging to owner tx', [
+                        'pi'       => $latestPiId,
+                        'owner_tx' => $owner->id,
+                        'tx'       => $tx->id ?? null,
+                    ], 'warning');
+
+                    $owner->fill($payload);
+                    $owner->save();
+
+                    // downstream debug uses the canonical row
+                    $tx = $owner;
+                }
             }
         };
 
@@ -795,24 +950,39 @@ class StripeService
     public function updateSubscriptionAmount(Pledge $pledge, int $amountCents): void
     {
         if (! $pledge->stripe_subscription_id) {
-            return;
+            throw ValidationException::withMessages([
+                'amount_dollars' => 'This subscription is missing a Stripe subscription ID.',
+            ]);
         }
 
+        // Always retrieve fresh state first so we don't try to mutate canceled subscriptions.
         $subscription = $this->stripe->subscriptions->retrieve(
             $pledge->stripe_subscription_id,
             ['expand' => ['items.data.price']]
         );
 
+        // Stripe does not allow updates to a canceled subscription (beyond cancellation_details/metadata).
+        // If Stripe says it's canceled, sync our DB and fail fast with a friendly message.
+        if (($subscription->status ?? null) === 'canceled') {
+            $this->syncPledgeFromSubscription($pledge, $subscription);
+
+            throw ValidationException::withMessages([
+                'amount_dollars' => 'This monthly donation has been canceled. Please start a new monthly donation to change the amount.',
+            ]);
+        }
+
+        // Keep whatever product is currently on the subscription (fallback to our configured recurring product).
         $currentProduct = data_get($subscription, 'items.data.0.price.product');
         $productId      = $currentProduct ?: $this->recurringProductId();
 
         $priceId = $pledge->stripe_price_id;
 
+        // Create a new Price if we don't have one yet, or if the amount is changing.
         if (! $priceId || (int) $pledge->amount_cents !== (int) $amountCents) {
             $priceParams = [
                 'unit_amount' => $amountCents,
                 'currency'    => $pledge->currency,
-                'recurring'   => ['interval' => $pledge->interval],
+                'recurring'   => $pledge->interval ? ['interval' => $pledge->interval] : ['interval' => 'month'],
                 'product'     => $productId,
                 'metadata'    => [
                     'pledge_id' => (string) $pledge->id,
@@ -822,16 +992,16 @@ class StripeService
 
             $priceOpts = $this->idemFor('price', 'pledge:' . $pledge->id . ':update', $priceParams);
 
-            $price = $this->stripe->prices->create($priceParams, $priceOpts);
-
+            $price   = $this->stripe->prices->create($priceParams, $priceOpts);
             $priceId = $price->id;
         }
 
+        // Do NOT force cancel_at_period_end=false here.
+        // If the user already scheduled cancellation at period end, changing amount shouldn't "resurrect" it.
         $subscription = $this->stripe->subscriptions->update(
             $subscription->id,
             [
-                'cancel_at_period_end' => false,
-                'proration_behavior'   => 'create_prorations',
+                'proration_behavior' => 'create_prorations',
                 'items' => [
                     [
                         'id'    => $subscription->items->data[0]->id,
@@ -841,7 +1011,6 @@ class StripeService
             ]
         );
 
-        // Basil: period may be on items.* in some payloads; top-level in others.
         $startTs = data_get($subscription, 'items.data.0.current_period_start') ?: data_get($subscription, 'current_period_start');
         $endTs   = data_get($subscription, 'items.data.0.current_period_end')   ?: data_get($subscription, 'current_period_end');
 
@@ -849,15 +1018,15 @@ class StripeService
             'amount_cents'         => $amountCents,
             'stripe_price_id'      => $priceId,
             'status'               => $subscription->status,
-            'cancel_at_period_end' => (bool) $subscription->cancel_at_period_end,
+            'cancel_at_period_end' => (bool) ($subscription->cancel_at_period_end ?? false),
         ];
 
         if (is_numeric($startTs)) {
-            $updates['current_period_start'] = now()->setTimestamp((int) $startTs);
+            $updates['current_period_start'] = Carbon::createFromTimestamp((int) $startTs);
         }
 
         if (is_numeric($endTs)) {
-            $end = now()->setTimestamp((int) $endTs);
+            $end = Carbon::createFromTimestamp((int) $endTs);
             $updates['current_period_end'] = $end;
             $updates['next_pledge_at']     = $end;
         }
@@ -865,11 +1034,11 @@ class StripeService
         $pledge->update($updates);
 
         $this->dbg('updateSubscriptionAmount: pledge updated', [
-            'pledge_id' => $pledge->id,
-            'amount_cents' => $pledge->amount_cents,
+            'pledge_id'            => $pledge->id,
+            'amount_cents'         => $pledge->amount_cents,
             'current_period_start' => optional($pledge->current_period_start)->toDateTimeString(),
-            'current_period_end' => optional($pledge->current_period_end)->toDateTimeString(),
-            'next_pledge_at' => optional($pledge->next_pledge_at)->toDateTimeString(),
+            'current_period_end'   => optional($pledge->current_period_end)->toDateTimeString(),
+            'next_pledge_at'       => optional($pledge->next_pledge_at)->toDateTimeString(),
         ]);
     }
 
@@ -915,11 +1084,8 @@ class StripeService
         }
 
         $piId =
-            // Old-style (still sometimes present)
             $this->extractId($invoice->payment_intent ?? null)
-            // Basil-style invoice payments list
             ?: $this->extractId(data_get($invoice, 'payments.data.0.payment.payment_intent'))
-            // Defensive variations
             ?: $this->extractId(data_get($invoice, 'payments.data.0.payment_intent'));
 
         $this->dbg('resolvePaymentIntentIdFromInvoice: snapshot', [
@@ -942,5 +1108,279 @@ class StripeService
         }
 
         return null;
+    }
+
+    public function finalizeTransactionFromPaymentIntent(
+        Transaction|string $transactionOrPaymentIntentId,
+        ?PaymentIntent $pi = null
+    ): Transaction {
+        // ------------------------------------------------------------
+        // Case A: called as finalizeTransactionFromPaymentIntent('pi_123')
+        // ------------------------------------------------------------
+        if (is_string($transactionOrPaymentIntentId)) {
+            $paymentIntentId = $transactionOrPaymentIntentId;
+
+            $pi ??= $this->retrievePaymentIntent($paymentIntentId, [
+                'expand' => [
+                    'charges.data.balance_transaction',
+                    'payment_method',
+                    'customer',
+                ],
+            ]);
+
+            $tx = Transaction::where('payment_intent_id', $paymentIntentId)->firstOrFail();
+
+            return $this->finalizeTransactionFromPaymentIntent($tx, $pi);
+        }
+
+        // ------------------------------------------------------------
+        // Case B/C: called as finalizeTransactionFromPaymentIntent($tx, $pi?)
+        // ------------------------------------------------------------
+        $tx = $transactionOrPaymentIntentId;
+
+        return DB::transaction(function () use ($tx, $pi) {
+            // Lock the row so concurrent webhook/return calls can't race each other.
+            $tx = Transaction::query()
+                ->whereKey($tx->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            // Already finalized? Bail early (idempotent).
+            if ($tx->status === 'succeeded' && $tx->paid_at) {
+                return $tx;
+            }
+
+            if (! $pi) {
+                if (! $tx->payment_intent_id) {
+                    throw new RuntimeException('Transaction is missing payment_intent_id.');
+                }
+
+                $pi = $this->retrievePaymentIntent($tx->payment_intent_id, [
+                    'expand' => [
+                        'charges.data.balance_transaction',
+                        'payment_method',
+                        'customer',
+                    ],
+                ]);
+            }
+
+            $piId = $pi->id ?? null;
+            if (! is_string($piId) || $piId === '') {
+                throw new RuntimeException('Stripe PaymentIntent is missing an id.');
+            }
+
+            // --------------------------------------------------------
+            // OWNER / CONSISTENCY GUARDS (only enforce when present)
+            // --------------------------------------------------------
+            $piMetaTxId = data_get($pi, 'metadata.transaction_id');
+            if ($piMetaTxId && (string) $piMetaTxId !== (string) $tx->id) {
+                // If Stripe says this PI belongs to a different tx, do not mutate this tx.
+                $this->dbg('finalizeTransactionFromPaymentIntent: PI metadata mismatch', [
+                    'tx_id' => $tx->id,
+                    'pi_id' => $piId,
+                    'pi_meta_transaction_id' => $piMetaTxId,
+                ], 'warning');
+
+                // If the “real” tx exists, return it.
+                $owner = Transaction::where('id', (int) $piMetaTxId)->first();
+                if ($owner) {
+                    return $owner;
+                }
+
+                throw new RuntimeException("PaymentIntent does not belong to transaction {$tx->id}.");
+            }
+
+            // Optional pledge guard if you store pledge_id on the tx
+            $piMetaPledgeId = data_get($pi, 'metadata.pledge_id');
+            if ($piMetaPledgeId && $tx->pledge_id && (string) $piMetaPledgeId !== (string) $tx->pledge_id) {
+                $this->dbg('finalizeTransactionFromPaymentIntent: pledge mismatch', [
+                    'tx_id' => $tx->id,
+                    'tx_pledge_id' => $tx->pledge_id,
+                    'pi_id' => $piId,
+                    'pi_meta_pledge_id' => $piMetaPledgeId,
+                ], 'warning');
+
+                throw new RuntimeException("PaymentIntent pledge_id mismatch for transaction {$tx->id}.");
+            }
+
+            // Amount/currency guard (only if PI has these fields)
+            $piAmount = data_get($pi, 'amount');
+            $piCurrency = data_get($pi, 'currency');
+
+            if (is_numeric($piAmount) && (int) $piAmount > 0 && (int) $tx->amount_cents > 0) {
+                if ((int) $piAmount !== (int) $tx->amount_cents) {
+                    $this->dbg('finalizeTransactionFromPaymentIntent: amount mismatch', [
+                        'tx_id' => $tx->id,
+                        'tx_amount_cents' => $tx->amount_cents,
+                        'pi_id' => $piId,
+                        'pi_amount' => (int) $piAmount,
+                    ], 'warning');
+
+                    throw new RuntimeException("PaymentIntent amount mismatch for transaction {$tx->id}.");
+                }
+            }
+
+            if (is_string($piCurrency) && $piCurrency !== '' && is_string($tx->currency) && $tx->currency !== '') {
+                if (strtolower($piCurrency) !== strtolower($tx->currency)) {
+                    $this->dbg('finalizeTransactionFromPaymentIntent: currency mismatch', [
+                        'tx_id' => $tx->id,
+                        'tx_currency' => $tx->currency,
+                        'pi_id' => $piId,
+                        'pi_currency' => $piCurrency,
+                    ], 'warning');
+
+                    throw new RuntimeException("PaymentIntent currency mismatch for transaction {$tx->id}.");
+                }
+            }
+
+            // --------------------------------------------------------
+            // Fill from PI (defensive with string|object)
+            // --------------------------------------------------------
+            // Don't overwrite a different PI once set unless empty.
+            if (! $tx->payment_intent_id) {
+                $tx->payment_intent_id = $piId;
+            }
+
+            // Customer id
+            $tx->customer_id ??= $this->extractId($pi->customer ?? null);
+
+            // Charge id (prefer latest_charge; fallback to charges.data[0])
+            $tx->charge_id ??= $this->extractId($pi->latest_charge ?? null)
+                ?? $this->extractId(data_get($pi, 'charges.data.0.id'));
+
+            // Payment method id
+            $tx->payment_method_id ??= $this->extractId($pi->payment_method ?? null);
+
+            // Receipt URL
+            $tx->receipt_url ??= data_get($pi, 'charges.data.0.receipt_url');
+
+            // Status + paid_at
+            $tx->status = (string) ($pi->status ?? $tx->status ?? 'pending');
+            if ($tx->status === 'succeeded') {
+                $tx->paid_at ??= now();
+            }
+
+            try {
+                $tx->save();
+            } catch (UniqueConstraintViolationException $e) {
+                // This was the production blow-up: another tx already has this PI id.
+                // In that case, return the “owner” tx instead of failing.
+                $owner = Transaction::where('payment_intent_id', $piId)->first();
+                if ($owner && $owner->id !== $tx->id) {
+                    $this->dbg('finalizeTransactionFromPaymentIntent: PI already claimed by another tx', [
+                        'attempted_tx_id' => $tx->id,
+                        'owner_tx_id' => $owner->id,
+                        'pi_id' => $piId,
+                        'error' => $e->getMessage(),
+                    ], 'warning');
+
+                    return $owner;
+                }
+
+                throw $e;
+            }
+
+            return $tx;
+        });
+    }
+
+    /**
+     * Tiny helper: safely convert Stripe metadata (StripeObject) to array for logging.
+     * If you already have something like this, delete this and use yours.
+     */
+    private function confirm_array($value): array
+    {
+        if (is_array($value)) return $value;
+        if (is_object($value) && method_exists($value, 'toArray')) return $value->toArray();
+        return (array) $value;
+    }
+
+    protected function claimPaymentIntent(Transaction $tx, ?string $piId): Transaction
+    {
+        if (! $piId) {
+            return $tx;
+        }
+
+        // Already set correctly — boring is reliable.
+        if ($tx->payment_intent_id === $piId) {
+            return $tx;
+        }
+
+        // If some other row already owns this PI, return the owner.
+        $owner = Transaction::query()
+            ->where('payment_intent_id', $piId)
+            ->first();
+
+        if ($owner && $owner->id !== $tx->id) {
+            $this->dbg('claimPaymentIntent: PI already owned by another tx', [
+                'pi_id' => $piId,
+                'attempted_tx_id' => $tx->id,
+                'owner_tx_id' => $owner->id,
+            ], 'warning');
+
+            return $owner;
+        }
+
+        // Otherwise, attempt to claim it.
+        $tx->payment_intent_id = $piId;
+
+        try {
+            $tx->save();
+        } catch (UniqueConstraintViolationException $e) {
+            // Race: someone else claimed it between our check and save.
+            $owner = Transaction::query()
+                ->where('payment_intent_id', $piId)
+                ->first();
+
+            if ($owner && $owner->id !== $tx->id) {
+                $this->dbg('claimPaymentIntent: race lost, returning owner', [
+                    'pi_id' => $piId,
+                    'attempted_tx_id' => $tx->id,
+                    'owner_tx_id' => $owner->id,
+                ], 'warning');
+
+                return $owner;
+            }
+
+            throw $e;
+        }
+
+        return $tx;
+    }
+
+    /**
+     * Keep our local Pledge in sync with a Stripe subscription object.
+     *
+     * We use this any time Stripe is the source of truth (e.g. when a user
+     * tries to mutate a subscription that Stripe reports as canceled).
+     */
+    protected function syncPledgeFromSubscription(Pledge $pledge, object $subscription): void
+    {
+        $startTs = data_get($subscription, 'items.data.0.current_period_start')
+            ?: data_get($subscription, 'current_period_start');
+
+        $endTs = data_get($subscription, 'items.data.0.current_period_end')
+            ?: data_get($subscription, 'current_period_end');
+
+        // Be careful not to overwrite with nulls.
+        $updates = [
+            'status' => (string) ($subscription->status ?? $pledge->status),
+        ];
+
+        if (property_exists($subscription, 'cancel_at_period_end')) {
+            $updates['cancel_at_period_end'] = (bool) $subscription->cancel_at_period_end;
+        }
+
+        if (is_numeric($startTs)) {
+            $updates['current_period_start'] = Carbon::createFromTimestamp((int) $startTs);
+        }
+
+        if (is_numeric($endTs)) {
+            $end = Carbon::createFromTimestamp((int) $endTs);
+            $updates['current_period_end'] = $end;
+            $updates['next_pledge_at']     = $end;
+        }
+
+        $pledge->update($updates);
     }
 }

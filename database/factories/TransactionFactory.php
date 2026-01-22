@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Models\Pledge;
 use App\Models\Transaction;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
@@ -17,15 +16,20 @@ class TransactionFactory extends Factory
     public function definition(): array
     {
         return [
-            'pledge_id'         => null, // or Pledge::factory() if you want linked pledges by default
-            'payment_intent_id' => 'pi_' . Str::random(24),
+            'pledge_id'         => null,
+            'payment_intent_id' => null,
             'subscription_id'   => null,
+            'stripe_invoice_id' => null,
             'charge_id'         => null,
             'customer_id'       => 'cus_' . Str::random(14),
+            'payment_method_id' => null,
+
+            'attempt_id'        => null,
 
             'amount_cents'      => $this->faker->numberBetween(1000, 10000),
             'currency'          => 'usd',
 
+            'type'              => 'one_time',
             'status'            => 'pending',
 
             'payer_email'       => $this->faker->safeEmail(),
@@ -39,12 +43,19 @@ class TransactionFactory extends Factory
         ];
     }
 
+    public function withPaymentIntent(): static
+    {
+        return $this->state(fn () => [
+            'payment_intent_id' => 'pi_' . Str::random(24),
+        ]);
+    }
+
     /**
      * Convenience state for succeeded transactions
      */
     public function succeeded(): static
     {
-        return $this->state(fn (array $attributes) => [
+        return $this->state(fn () => [
             'status'  => 'succeeded',
             'paid_at' => now(),
         ]);
@@ -55,7 +66,7 @@ class TransactionFactory extends Factory
      */
     public function failed(): static
     {
-        return $this->state(fn (array $attributes) => [
+        return $this->state(fn () => [
             'status'  => 'failed',
             'paid_at' => null,
         ]);
