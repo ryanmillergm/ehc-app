@@ -638,14 +638,32 @@ class StripeService
                     'attempt_id'             => $attemptId,
                 ]);
 
-                $typeToSet   = $isNew ? 'subscription_initial' : ($tx->type ?: 'subscription_initial');
+                // ✅ Owner adoption must happen BEFORE fill/save, otherwise we may fill the placeholder
+                // and then swap to the owner row without applying the payload.
+                if ($latestPiId) {
+                    $owner = Transaction::query()
+                        ->where('payment_intent_id', $latestPiId)
+                        ->first();
+
+                    if ($owner && (! $tx->exists || $owner->id !== $tx->id)) {
+                        $this->dbg('syncFromSubscription: adopting owner tx for PI', [
+                            'pi'       => $latestPiId,
+                            'owner_tx' => $owner->id,
+                            'tx'       => $tx->id ?? null,
+                        ], 'warning');
+
+                        $tx = $owner;
+                        $isNew = false;
+                    }
+                }
+
+                $typeToSet   = $tx->type ?: 'subscription_initial';
                 $sourceToSet = $tx->source ?: 'donation_widget';
 
                 $payload = [
                     'user_id'           => $pledge->user_id,
                     'pledge_id'         => $pledge->id,
                     'subscription_id'   => $subscription->id,
-                    // Only set PI/charge if PI passed owner guard
                     'payment_intent_id' => $latestPiId ?: $tx->payment_intent_id,
                     'charge_id'         => $chargeId ?: $tx->charge_id,
                     'customer_id'       => $pledge->stripe_customer_id ?: $tx->customer_id,
@@ -670,40 +688,30 @@ class StripeService
                     $tx->save();
                 } catch (UniqueConstraintViolationException $e) {
                     // Concurrency safety: if another request already claimed this PI, converge on the owner row.
-                    if ($latestPiId) {
-                        $owner = Transaction::query()
-                            ->where('payment_intent_id', $latestPiId)
-                            ->first();
-
-                        if ($owner) {
-                            $this->dbg('syncFromSubscription: unique constraint on PI; switching to owner tx', [
-                                'pi'       => $latestPiId,
-                                'owner_tx' => $owner->id,
-                                'tx'       => $tx->id ?? null,
-                            ], 'warning');
-
-                            $owner->fill($payload);
-                            $owner->save();
-
-                            // Also update our reference so downstream logs show the right tx id.
-                            $tx = $owner;
-                        } else {
-                            throw $e;
-                        }
-                    } else {
+                    if (! $latestPiId) {
                         throw $e;
                     }
-                }
 
-                $this->dbg('syncFromSubscription: tx ensured', [
-                    'tx_id' => $tx->id,
-                    'pledge_id' => $tx->pledge_id,
-                    'payment_intent_id' => $tx->payment_intent_id,
-                    'charge_id' => $tx->charge_id,
-                    'status' => $tx->status,
-                    'type' => $tx->type,
-                    'paid_at' => optional($tx->paid_at)->toDateTimeString(),
-                ]);
+                    $owner = Transaction::query()
+                        ->where('payment_intent_id', $latestPiId)
+                        ->first();
+
+                    if (! $owner) {
+                        throw $e;
+                    }
+
+                    $this->dbg('syncFromSubscription: unique constraint on PI; converging to owner tx', [
+                        'pi'       => $latestPiId,
+                        'owner_tx' => $owner->id,
+                        'tx'       => $tx->id ?? null,
+                    ], 'warning');
+
+                    $owner->fill($payload);
+                    $owner->save();
+
+                    // downstream debug uses the canonical row
+                    $tx = $owner;
+                }
             }
         };
 
