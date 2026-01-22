@@ -466,40 +466,37 @@ class DonationsController extends Controller
                 }
 
                 $this->stripe->finalizeTransactionFromPaymentIntent($transaction, $pi);
-
                 $transaction->refresh();
+
+                $request->session()->put('transaction_thankyou_id', $transaction->id);
+                if ($attemptId) {
+                    $request->session()->put('donation_attempt_id', $attemptId);
+                }
 
                 return response()->json([
                     'ok'       => true,
                     'redirect' => route('donations.thankyou'),
                 ]);
-            } else {
-                // Offline completion (form posts): trust the payload and mark succeeded.
-                $transaction->status  = 'succeeded';
-                $transaction->paid_at = $transaction->paid_at ?: now();
             }
 
-            $transaction->source = $transaction->source ?: 'donation_widget';
+            // Offline completion (form posts)
+            $transaction->status  = 'succeeded';
+            $transaction->paid_at = $transaction->paid_at ?: now();
+            $transaction->source  = $transaction->source ?: 'donation_widget';
 
-            $transaction->metadata = $this->mergeMetadata($transaction->metadata, array_merge([
+            $transaction->metadata = $this->mergeMetadata($transaction->metadata, [
                 'frequency' => 'one_time',
-                'stage'     => $isJsonFlow ? 'complete_payment' : 'complete_payment_offline',
-            ], $cardMeta));
+                'stage'     => 'complete_payment_offline',
+            ]);
 
             $transaction->save();
 
-            // Thank-you session + response type
             $request->session()->put('transaction_thankyou_id', $transaction->id);
-
-            if ($isJsonFlow) {
-                return response()->json([
-                    'ok'       => true,
-                    'status'   => $transaction->status,
-                    'redirect' => route('donations.thankyou'),
-                ]);
+            if ($attemptId) {
+                $request->session()->put('donation_attempt_id', $attemptId);
             }
 
-            return redirect()->route('donations.thankyou');
+            return redirect()->route('donations.thankyou', ['attempt_id' => $transaction->attempt_id]);
         }
 
         // ---------------------------------------------------------------------
@@ -527,7 +524,9 @@ class DonationsController extends Controller
 
         $placeholder = Transaction::query()
             ->where('pledge_id', $pledge->id)
+            ->where('source', 'donation_widget')
             ->whereIn('type', ['subscription_initial', 'subscription_recurring'])
+            ->where('attempt_id', $attemptId)
             ->whereNull('payment_intent_id')
             ->whereNull('charge_id')
             ->latest('id')
@@ -794,13 +793,16 @@ class DonationsController extends Controller
     public function thankYou(Request $request)
     {
         $transactionId = $request->session()->pull('transaction_thankyou_id');
+
         if (! $transactionId) {
             abort(404);
         }
 
         $transaction = Transaction::findOrFail($transactionId);
 
-        return view('donations.thankyou', compact('transaction'));
+        return view('donations.thankyou', [
+            'transaction' => $transaction,
+        ]);
     }
 
     public function thankYouSubscription(Request $request)

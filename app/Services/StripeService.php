@@ -571,12 +571,34 @@ class StripeService
                     ?? 0
                 );
 
-                $tx = Transaction::query()
+                $txQuery = Transaction::query()
                     ->where('pledge_id', $pledge->id)
                     ->whereIn('type', ['subscription_initial', 'subscription_recurring'])
-                    ->where('source', 'donation_widget')
-                    ->latest('id')
-                    ->first();
+                    ->where('source', 'donation_widget');
+
+                // Prefer the current attempt's placeholder row (prevents cross-attempt collisions).
+                if ($attemptId) {
+                    $txQuery->where('attempt_id', $attemptId);
+                }
+
+                $tx = $txQuery->latest('id')->first();
+
+                // If the PaymentIntent is already claimed by another transaction row, use the owner.
+                if ($latestPiId) {
+                    $owner = Transaction::query()
+                        ->where('payment_intent_id', $latestPiId)
+                        ->first();
+
+                    if ($owner && (! $tx || $owner->id !== $tx->id)) {
+                        $this->dbg('syncFromSubscription: PI already claimed; using owner tx', [
+                            'pi'       => $latestPiId,
+                            'owner_tx' => $owner->id,
+                            'tx'       => $tx?->id,
+                        ], 'warning');
+
+                        $tx = $owner;
+                    }
+                }
 
                 $isNew = false;
                 if (! $tx) {
@@ -602,7 +624,7 @@ class StripeService
                 $typeToSet   = $isNew ? 'subscription_initial' : ($tx->type ?: 'subscription_initial');
                 $sourceToSet = $tx->source ?: 'donation_widget';
 
-                $tx->fill([
+                $payload = [
                     'user_id'           => $pledge->user_id,
                     'pledge_id'         => $pledge->id,
                     'subscription_id'   => $subscription->id,
@@ -623,7 +645,38 @@ class StripeService
                         ? Carbon::createFromTimestamp((int) $invoicePaidAt)
                         : $tx->paid_at,
                     'metadata'          => array_merge($existingMeta, $extraMeta),
-                ])->save();
+                ];
+
+                $tx->fill($payload);
+
+                try {
+                    $tx->save();
+                } catch (UniqueConstraintViolationException $e) {
+                    // Concurrency safety: if another request already claimed this PI, converge on the owner row.
+                    if ($latestPiId) {
+                        $owner = Transaction::query()
+                            ->where('payment_intent_id', $latestPiId)
+                            ->first();
+
+                        if ($owner) {
+                            $this->dbg('syncFromSubscription: unique constraint on PI; switching to owner tx', [
+                                'pi'       => $latestPiId,
+                                'owner_tx' => $owner->id,
+                                'tx'       => $tx->id ?? null,
+                            ], 'warning');
+
+                            $owner->fill($payload);
+                            $owner->save();
+
+                            // Also update our reference so downstream logs show the right tx id.
+                            $tx = $owner;
+                        } else {
+                            throw $e;
+                        }
+                    } else {
+                        throw $e;
+                    }
+                }
 
                 $this->dbg('syncFromSubscription: tx ensured', [
                     'tx_id' => $tx->id,
