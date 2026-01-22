@@ -8,6 +8,7 @@ use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
 use Filament\Facades\Filament;
+use Mockery;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -64,5 +65,11 @@ abstract class TestCase extends BaseTestCase
         $user->assignRole($role);
 
         return $user;
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
     }
 }

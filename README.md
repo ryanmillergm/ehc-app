@@ -182,6 +182,125 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 - Verify signature: webhook secret matches and middleware/handler verifies it
 - Verify your DB records: transaction status, amounts, refund state
 
+
+---
+
+## Stripe donation lifecycle (important)
+
+This application follows a **deliberate, hardened Stripe architecture** designed to survive retries, out-of-order webhook delivery, and partial client failures.
+
+**Core rule**
+
+> **Controllers create intent + placeholders. Webhooks finalize reality.**
+
+This rule is enforced by tests and is critical to preventing duplicate transactions.
+
+---
+
+### Key data model concepts
+
+**Transactions**
+Local representation of Stripe payment attempts.
+
+Important fields:
+- `payment_intent_id` — canonical attempt identifier
+- `charge_id` — actual card charge (may arrive later)
+- `stripe_invoice_id` — invoices (mainly for subscriptions)
+- `subscription_id` — recurring subscriptions
+- `status` — `pending`, `succeeded`, etc.
+
+Idempotency expectations:
+- One transaction per `payment_intent_id`
+- One transaction per `charge_id`
+- One transaction per invoice
+
+---
+
+### One-time donation flow
+
+1. **`POST /donations/start`**
+   - Creates a pending `transactions` row
+   - Creates a Stripe `PaymentIntent`
+   - Saves `payment_intent_id`
+   - Status is **not** `succeeded`
+
+2. **Client confirms payment with Stripe**
+   - Handles SCA / 3DS / card confirmation
+
+3. **`POST /donations/complete`**
+   - Updates the existing transaction with:
+     - `payment_intent_id`
+     - `charge_id` (if available)
+     - `payment_method_id`
+     - `receipt_url`
+     - payer metadata
+   - Marks transaction `succeeded` for UI purposes
+
+4. **Webhooks (`payment_intent.succeeded`, `charge.succeeded`)**
+   - May arrive before or after `complete`
+   - Enrich the same transaction
+   - Must never create duplicates
+
+> Note: One-time donations **may not have invoices**. `stripe_invoice_id` is optional.
+
+---
+
+### Monthly (subscription) donation flow
+
+1. **`POST /donations/start`**
+   - Creates a `pledges` row (`status = incomplete`)
+   - Generates an `attempt_id`
+
+2. **Client collects payment method**
+   - Uses a Stripe `SetupIntent`
+
+3. **`POST /donations/complete` (`mode=subscription`)**
+   - Calls `StripeService::createSubscriptionForPledge`
+   - Updates pledge donor info
+   - Creates or enriches a **`subscription_initial` transaction**
+   - Captures best-effort identifiers:
+     - `subscription_id`
+     - latest `stripe_invoice_id`
+     - latest `payment_intent_id`
+     - latest `charge_id`
+   - **Leaves transaction `status = pending`**
+   - Does **not** set `paid_at`
+
+4. **Webhooks (`invoice.paid`)**
+   - Are the **source of truth**
+   - For `billing_reason=subscription_create`:
+     - Marks `subscription_initial` as `succeeded`
+   - For `billing_reason=subscription_cycle`:
+     - Creates/updates a `subscription_recurring` transaction
+   - Updates pledge billing periods and timestamps
+
+Webhook behavior must be:
+- Idempotent
+- Order-independent
+- Safe to retry
+
+---
+
+### Why this matters
+
+Stripe webhooks:
+- Retry automatically
+- Can arrive out of order
+- Can arrive before controller actions complete
+
+By **never finalizing subscription payments in controllers**, the system avoids:
+- Duplicate transactions
+- Incorrect `paid_at` timestamps
+- “Phantom succeeded” rows
+
+This behavior is protected by end-to-end tests simulating:
+- Out-of-order events
+- Duplicate webhook delivery
+- Partial Stripe responses
+
+---
+
+
 ---
 
 ## Local setup

@@ -202,8 +202,9 @@
                                                 <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold
                                                     @class([
                                                         'bg-green-100 text-green-800' => $tx->status === 'succeeded',
-                                                        'bg-yellow-100 text-yellow-800' => $tx->status === 'pending',
+                                                        'bg-yellow-100 text-yellow-800' => in_array($tx->status, ['pending', 'incomplete', 'requires_payment_method']),
                                                         'bg-red-100 text-red-800' => $tx->status === 'failed',
+                                                        'bg-gray-100 text-gray-800' => in_array($tx->status, ['refunded', 'partially_refunded']),
                                                     ])">
                                                     {{ ucfirst($tx->status) }}
                                                 </span>

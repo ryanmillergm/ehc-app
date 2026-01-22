@@ -70,7 +70,11 @@ class CompleteDonationTest extends TestCase
         ]);
 
         // Fake Stripe subscription instance to satisfy the return type
-        $fakeStripeSubscription = \Mockery::mock(StripeSubscription::class);
+        // Real Stripe object (safe for data_get / property access)
+        $fakeStripeSubscription = StripeSubscription::constructFrom([
+            'id' => 'sub_test_123',
+            'status' => 'active',
+        ]);
 
         // Expect the controller to call StripeService::createSubscriptionForPledge()
         $this->stripeMock
@@ -81,6 +85,11 @@ class CompleteDonationTest extends TestCase
                     $paymentMethodId === 'pm_123';
             })
             ->andReturn($fakeStripeSubscription);
+
+        $this->stripeMock->shouldReceive('syncFromSubscription')
+            ->zeroOrMoreTimes()
+            ->andReturnNull();
+
 
         $payload = [
             'mode'              => 'subscription',

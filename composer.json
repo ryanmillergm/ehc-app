@@ -14,7 +14,7 @@
         "livewire/livewire": "^3.0",
         "spatie/laravel-permission": "^6.7",
         "stevebauman/purify": "^6.3",
-        "stripe/stripe-php": "^18.2",
+        "stripe/stripe-php": "19.0",
         "tijsverkoyen/css-to-inline-styles": "^2.4"
     },
     "require-dev": {
