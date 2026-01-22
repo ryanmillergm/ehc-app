@@ -18,6 +18,7 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Log;
 use Stripe\StripeClient;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class StripeService
 {
@@ -939,19 +940,34 @@ class StripeService
     public function updateSubscriptionAmount(Pledge $pledge, int $amountCents): void
     {
         if (! $pledge->stripe_subscription_id) {
-            return;
+            throw ValidationException::withMessages([
+                'amount_dollars' => 'This subscription is missing a Stripe subscription ID.',
+            ]);
         }
 
+        // Always retrieve fresh state first so we don't try to mutate canceled subscriptions.
         $subscription = $this->stripe->subscriptions->retrieve(
             $pledge->stripe_subscription_id,
             ['expand' => ['items.data.price']]
         );
 
+        // Stripe does not allow updates to a canceled subscription (beyond cancellation_details/metadata).
+        // If Stripe says it's canceled, sync our DB and fail fast with a friendly message.
+        if (($subscription->status ?? null) === 'canceled') {
+            $this->syncPledgeFromSubscription($pledge, $subscription);
+
+            throw ValidationException::withMessages([
+                'amount_dollars' => 'This monthly donation has been canceled. Please start a new monthly donation to change the amount.',
+            ]);
+        }
+
+        // Keep whatever product is currently on the subscription (fallback to our configured recurring product).
         $currentProduct = data_get($subscription, 'items.data.0.price.product');
         $productId      = $currentProduct ?: $this->recurringProductId();
 
         $priceId = $pledge->stripe_price_id;
 
+        // Create a new Price if we don't have one yet, or if the amount is changing.
         if (! $priceId || (int) $pledge->amount_cents !== (int) $amountCents) {
             $priceParams = [
                 'unit_amount' => $amountCents,
@@ -966,16 +982,16 @@ class StripeService
 
             $priceOpts = $this->idemFor('price', 'pledge:' . $pledge->id . ':update', $priceParams);
 
-            $price = $this->stripe->prices->create($priceParams, $priceOpts);
-
+            $price   = $this->stripe->prices->create($priceParams, $priceOpts);
             $priceId = $price->id;
         }
 
+        // Do NOT force cancel_at_period_end=false here.
+        // If the user already scheduled cancellation at period end, changing amount shouldn't "resurrect" it.
         $subscription = $this->stripe->subscriptions->update(
             $subscription->id,
             [
-                'cancel_at_period_end' => false,
-                'proration_behavior'   => 'create_prorations',
+                'proration_behavior' => 'create_prorations',
                 'items' => [
                     [
                         'id'    => $subscription->items->data[0]->id,
@@ -992,15 +1008,15 @@ class StripeService
             'amount_cents'         => $amountCents,
             'stripe_price_id'      => $priceId,
             'status'               => $subscription->status,
-            'cancel_at_period_end' => (bool) $subscription->cancel_at_period_end,
+            'cancel_at_period_end' => (bool) ($subscription->cancel_at_period_end ?? false),
         ];
 
         if (is_numeric($startTs)) {
-            $updates['current_period_start'] = now()->setTimestamp((int) $startTs);
+            $updates['current_period_start'] = Carbon::createFromTimestamp((int) $startTs);
         }
 
         if (is_numeric($endTs)) {
-            $end = now()->setTimestamp((int) $endTs);
+            $end = Carbon::createFromTimestamp((int) $endTs);
             $updates['current_period_end'] = $end;
             $updates['next_pledge_at']     = $end;
         }
@@ -1008,11 +1024,11 @@ class StripeService
         $pledge->update($updates);
 
         $this->dbg('updateSubscriptionAmount: pledge updated', [
-            'pledge_id' => $pledge->id,
-            'amount_cents' => $pledge->amount_cents,
+            'pledge_id'            => $pledge->id,
+            'amount_cents'         => $pledge->amount_cents,
             'current_period_start' => optional($pledge->current_period_start)->toDateTimeString(),
-            'current_period_end' => optional($pledge->current_period_end)->toDateTimeString(),
-            'next_pledge_at' => optional($pledge->next_pledge_at)->toDateTimeString(),
+            'current_period_end'   => optional($pledge->current_period_end)->toDateTimeString(),
+            'next_pledge_at'       => optional($pledge->next_pledge_at)->toDateTimeString(),
         ]);
     }
 
@@ -1320,5 +1336,41 @@ class StripeService
         }
 
         return $tx;
+    }
+
+    /**
+     * Keep our local Pledge in sync with a Stripe subscription object.
+     *
+     * We use this any time Stripe is the source of truth (e.g. when a user
+     * tries to mutate a subscription that Stripe reports as canceled).
+     */
+    protected function syncPledgeFromSubscription(Pledge $pledge, object $subscription): void
+    {
+        $startTs = data_get($subscription, 'items.data.0.current_period_start')
+            ?: data_get($subscription, 'current_period_start');
+
+        $endTs = data_get($subscription, 'items.data.0.current_period_end')
+            ?: data_get($subscription, 'current_period_end');
+
+        // Be careful not to overwrite with nulls.
+        $updates = [
+            'status' => (string) ($subscription->status ?? $pledge->status),
+        ];
+
+        if (property_exists($subscription, 'cancel_at_period_end')) {
+            $updates['cancel_at_period_end'] = (bool) $subscription->cancel_at_period_end;
+        }
+
+        if (is_numeric($startTs)) {
+            $updates['current_period_start'] = Carbon::createFromTimestamp((int) $startTs);
+        }
+
+        if (is_numeric($endTs)) {
+            $end = Carbon::createFromTimestamp((int) $endTs);
+            $updates['current_period_end'] = $end;
+            $updates['next_pledge_at']     = $end;
+        }
+
+        $pledge->update($updates);
     }
 }
