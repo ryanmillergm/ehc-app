@@ -814,6 +814,24 @@ class StripeService
 
         $subscription = $this->stripe->subscriptions->create($subParams, $subOpts);
 
+        // Stripe sometimes does not fully expand nested objects on create.
+        // Re-retrieve with explicit expands so we can reliably extract PI + charge.
+        try {
+            $subscription = $this->stripe->subscriptions->retrieve($subscription->id, [
+                'expand' => [
+                    'latest_invoice.payment_intent',
+                    'latest_invoice.charge',
+                    'latest_invoice.payment_intent.latest_charge',
+                    'default_payment_method',
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            $this->dbg('createSubscriptionForPledge: retrieve(expanded) failed', [
+                'sub_id' => $subscription->id ?? null,
+                'error'  => $e->getMessage(),
+            ], 'warning');
+        }
+
         $this->dbg('createSubscriptionForPledge: created subscription', [
             'sub_id' => $subscription->id ?? null,
             'sub_status' => $subscription->status ?? null,

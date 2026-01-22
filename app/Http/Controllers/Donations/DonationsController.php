@@ -522,13 +522,14 @@ class DonationsController extends Controller
         }
         $pledge->save();
 
+        // Find-or-create the subscription_initial placeholder transaction for this pledge/attempt.
+        // IMPORTANT: do not depend on the returned $subscription being expanded; StripeService syncs
+        // authoritative IDs onto the pledge and may also enrich the tx inside its own transaction.
         $placeholder = Transaction::query()
             ->where('pledge_id', $pledge->id)
             ->where('source', 'donation_widget')
-            ->whereIn('type', ['subscription_initial', 'subscription_recurring'])
+            ->where('type', 'subscription_initial')
             ->where('attempt_id', $attemptId)
-            ->whereNull('payment_intent_id')
-            ->whereNull('charge_id')
             ->latest('id')
             ->first();
 
@@ -565,6 +566,105 @@ class DonationsController extends Controller
 
         $subscription = $this->stripe->createSubscriptionForPledge($pledge, $pmId);
 
+        // StripeService syncs authoritative IDs onto the pledge (invoice/pi/sub/etc.)
+        $pledge->refresh();
+
+        // CRITICAL: reload tx after the service, so we don't overwrite service writes with stale in-memory values.
+        $placeholder->refresh();
+
+        // Prefer pledge-synced IDs (they come from StripeService's expanded invoice/PI reads).
+        $subId     = $pledge->stripe_subscription_id ?: $this->extractId(data_get($subscription, 'id'));
+        $invoiceId = $pledge->latest_invoice_id ?: $this->extractId(data_get($subscription, 'latest_invoice.id') ?? data_get($subscription, 'latest_invoice'));
+        $piId      = $pledge->latest_payment_intent_id ?: $this->extractId(data_get($subscription, 'latest_invoice.payment_intent.id') ?? data_get($subscription, 'latest_invoice.payment_intent'));
+
+        if (! $placeholder->subscription_id && $subId) {
+            $placeholder->subscription_id = $subId;
+        }
+
+        if (! $placeholder->stripe_invoice_id && $invoiceId) {
+            $placeholder->stripe_invoice_id = $invoiceId;
+        }
+
+        if (! $placeholder->payment_intent_id && $piId) {
+            // Unique guard: don't claim a PI already used by another tx.
+            $already = Transaction::query()
+                ->where('payment_intent_id', $piId)
+                ->whereKeyNot($placeholder->id)
+                ->exists();
+
+            if (! $already) {
+                $placeholder->payment_intent_id = $piId;
+            } else {
+                $this->sdbg('complete(subscription): PI already claimed; leaving placeholder.payment_intent_id null', [
+                    'tx_id' => $placeholder->id,
+                    'pi'    => $piId,
+                ], 'warning');
+            }
+        }
+
+        // Try to grab a charge id directly from the returned subscription's latest invoice (when present).
+        // This is common in tests/mocks and in some expanded Stripe responses.
+        if (! $placeholder->charge_id) {
+            $chFromSub = $this->extractId(data_get($subscription, 'latest_invoice.charge'))
+                ?: $this->extractId(data_get($subscription, 'latest_invoice.charge.id'))
+                ?: $this->extractId(data_get($subscription, 'latest_invoice.payment_intent.latest_charge'))
+                ?: $this->extractId(data_get($subscription, 'latest_invoice.payment_intent.latest_charge.id'));
+
+            if ($chFromSub) {
+                $placeholder->charge_id = $chFromSub;
+            }
+        }
+
+        // Resolve charge_id from PI.latest_charge if we have a PI but no charge yet.
+        if (! $placeholder->charge_id && $placeholder->payment_intent_id) {
+            try {
+                $pi = $this->stripe->retrievePaymentIntent($placeholder->payment_intent_id);
+                $resolvedChargeId = $this->extractId($pi->latest_charge ?? null);
+
+                if ($resolvedChargeId) {
+                    $placeholder->charge_id = $resolvedChargeId;
+                }
+            } catch (Throwable $e) {
+                // Non-fatal. Webhooks can backfill charge_id later.
+                $this->sdbg('complete(subscription): could not resolve charge_id from PaymentIntent', [
+                    'pledge_id' => $pledge->id,
+                    'pi_id'     => $placeholder->payment_intent_id,
+                    'error'     => $e->getMessage(),
+                ], 'warning');
+            }
+        }
+
+        // Best-effort receipt URL from hosted invoice URL (often not expanded on returned subscription).
+        $hostedInvoiceUrl = data_get($subscription, 'latest_invoice.hosted_invoice_url');
+        if (! $placeholder->receipt_url && is_string($hostedInvoiceUrl) && $hostedInvoiceUrl !== '') {
+            $placeholder->receipt_url = $hostedInvoiceUrl;
+        }
+
+        // Leave the initial subscription transaction as pending.
+        // Stripe webhooks (invoice.paid / payment_intent.succeeded) are the source of truth for when funds have actually settled.
+        $placeholder->status = 'pending';
+        $placeholder->paid_at = null;
+
+        $placeholder->payer_email ??= $pledge->donor_email;
+        $placeholder->payer_name  ??= $pledge->donor_name;
+
+        $meta = is_array($placeholder->metadata)
+            ? $placeholder->metadata
+            : (json_decode((string) $placeholder->metadata, true) ?: []);
+
+        $meta['stage'] = $meta['stage'] ?? 'subscription_created';
+        if ($invoiceId) {
+            $meta['stripe_invoice_id'] = $meta['stripe_invoice_id'] ?? $invoiceId;
+        }
+        if ($subId) {
+            $meta['stripe_subscription_id'] = $meta['stripe_subscription_id'] ?? $subId;
+        }
+
+        $placeholder->metadata = $meta;
+        $placeholder->save();
+
+        $this->sdbg('complete(subscription): placeholder saved after pledge-truth sync', $this->txSnap($placeholder));
+
         $placeholder->setStage('subscription_created', save: true);
 
         // Pledge stage just means “we’re waiting for Stripe invoice event”
@@ -592,7 +692,6 @@ class DonationsController extends Controller
 
                 $this->sdbg('complete(subscription): pledge after StripeService', $this->pledgeSnap($pledge));
             } catch (Throwable $e) {
-                // Debug should never take down the request (or tests).
                 $this->sdbg('complete(subscription): debug extract failed', [
                     'error'              => $e->getMessage(),
                     'subscription_class' => is_object($subscription) ? get_class($subscription) : gettype($subscription),
@@ -607,8 +706,9 @@ class DonationsController extends Controller
         }
 
         return redirect()->route('donations.thankyou-subscription')->with('success', 'Thank you for your monthly pledge!');
-    }
 
+
+    }
     /**
      * Stripe redirect return
      */
