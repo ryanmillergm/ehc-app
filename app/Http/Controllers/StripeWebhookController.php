@@ -14,6 +14,7 @@ use Stripe\Exception\SignatureVerificationException;
 use Stripe\Webhook;
 use UnexpectedValueException;
 use Illuminate\Database\UniqueConstraintViolationException;
+use App\Support\Stripe\TransactionResolver;
 
 class StripeWebhookController extends Controller
 {
@@ -275,7 +276,7 @@ class StripeWebhookController extends Controller
         }
 
         // Prefer the canonical column first (back-compat fallback inside)
-        $tx = $this->findTransactionByStripeInvoiceId($invoiceId);
+        $tx = app(TransactionResolver::class)->resolveForInvoice($pledge, $invoiceId, $paymentIntentId);
 
         $pledge = null;
 
@@ -581,30 +582,6 @@ class StripeWebhookController extends Controller
         }
 
         if (! $pledge) {
-            // Fallback: many invoice.* webhook payloads don't include enough top-level identifiers
-            // to map back to our local pledge, but the invoice line metadata does.
-            $metaPledgeId = data_get($invoice, 'lines.data.0.metadata.pledge_id')
-                ?: data_get($invoice, 'lines.data.0.metadata.pledgeId');
-
-            if ($metaPledgeId) {
-                $pledge = Pledge::find((int) $metaPledgeId);
-
-                if ($pledge) {
-                    // Enrich ids if they were missing.
-                    $customerId     = $customerId     ?: $pledge->stripe_customer_id;
-                    $subscriptionId = $subscriptionId ?: $pledge->stripe_subscription_id;
-
-                    $this->dbg('handleInvoicePaid: resolved pledge from invoice metadata', [
-                        'pledge_id'       => $pledge->id,
-                        'invoice_id'      => $invoiceId,
-                        'subscription_id' => $subscriptionId,
-                        'customer_id'     => $customerId,
-                    ], 'info');
-                }
-            }
-        }
-
-        if (! $pledge) {
             Log::warning('handleInvoicePaid: pledge not found', [
                 'invoice_id'        => $invoiceId,
                 'subscription_id'   => $subscriptionId,
@@ -677,7 +654,7 @@ class StripeWebhookController extends Controller
                     ->where('metadata->stripe_invoice_id', $invoiceId)
                     ->first();
             }
-            if ($existingTx) {
+if ($existingTx) {
                 $this->dbg('handleInvoicePaid: matched tx by invoice id', [
                     'tx_id'      => $existingTx->id,
                     'invoice_id' => $invoiceId,
@@ -686,47 +663,6 @@ class StripeWebhookController extends Controller
         }
 
         $hasStrongTxKeys = (bool) ($paymentIntentId || $chargeId);
-
-        // When Stripe omits both payment_intent and charge on invoice.* events (common),
-        // we still want to avoid creating a "third row" if we already have a transaction
-        // for this pledge+subscription that owns a PaymentIntent.
-        //
-        // Heuristic (safe-ish):
-        // - same pledge
-        // - same subscription (invoice subscription id)
-        // - no stripe_invoice_id yet
-        // - has a payment_intent_id (and usually a charge_id)
-        // - optionally shares attempt_id from invoice metadata
-        if (! $existingTx && $invoiceId && ! $hasStrongTxKeys && $subscriptionId) {
-            $invoiceAttemptId = data_get($invoice, 'lines.data.0.metadata.attempt_id');
-
-            $candidate = Transaction::query()
-                ->where('pledge_id', $pledge->id)
-                ->where('subscription_id', $subscriptionId)
-                ->whereNull('stripe_invoice_id')
-                ->whereNotNull('payment_intent_id')
-                ->when($invoiceAttemptId, function ($q) use ($invoiceAttemptId) {
-                    $q->where(function ($qq) use ($invoiceAttemptId) {
-                        $qq->where('attempt_id', $invoiceAttemptId)
-                           ->orWhere('metadata->attempt_id', $invoiceAttemptId);
-                    });
-                })
-                ->latest('id')
-                ->first();
-
-            if ($candidate) {
-                $existingTx = $candidate;
-                $matchedByPaymentIntent = true; // treat as strong ownership; prevents "completed tx" guard
-
-                $this->dbg('handleInvoicePaid: adopting existing PI-owner tx (no PI/charge on invoice payload)', [
-                    'tx_id'           => $candidate->id,
-                    'invoice_id'      => $invoiceId,
-                    'subscription_id' => $subscriptionId,
-                    'attempt_id'      => $invoiceAttemptId,
-                ], 'info');
-            }
-        }
-
 
         // If PI + charge are missing, do NOT try to match some other tx for the pledge/subscription.
         // We’ll create a new tx for this invoice id (idempotent on invoice id).
@@ -962,29 +898,6 @@ class StripeWebhookController extends Controller
                 }
             }
 
-            
-
-            // Safety net: in some payload shapes (and in certain tests), $paymentIntentId can end up null
-            // even though the invoice payload contains it. If we're updating the canonical invoice-owned tx,
-            // re-derive the PI from the invoice and claim it if it is truly unowned.
-            if (! $paymentIntentId && $invoiceId && $existingTx && (string) $existingTx->stripe_invoice_id === (string) $invoiceId) {
-                $piCandidate =
-                    $this->extractId($invoice->payment_intent ?? null)
-                    ?: $this->extractId(data_get($invoice, 'payment_intent.id'))
-                    ?: $this->extractId(data_get($invoice, 'charges.data.0.payment_intent'));
-
-                if ($piCandidate) {
-                    $alreadyOwned = Transaction::query()
-                        ->where('payment_intent_id', $piCandidate)
-                        ->where('id', '!=', $existingTx->id)
-                        ->exists();
-
-                    if (! $alreadyOwned) {
-                        $paymentIntentId = $piCandidate;
-                    }
-                }
-            }
-
             if (! $existingTx->payment_intent_id) {
                 $this->claimPaymentIntentId($existingTx, $paymentIntentId);
             }
@@ -1005,85 +918,8 @@ class StripeWebhookController extends Controller
                 $existingTx->type = $txType;
             }
 
-            try {
-                $existingTx->save();
-            } catch (UniqueConstraintViolationException $e) {
-                // Update-path race safety:
-                // Another tx already owns (pledge_id, stripe_invoice_id). Switch to canonical and retry.
-                $this->dbg('handleInvoicePaid: unique violation on update; switching to canonical invoice tx', [
-                    'pledge_id'    => $pledge->id,
-                    'invoice_id'   => $invoiceId,
-                    'tx_id'        => $existingTx->id ?? null,
-                    'pi'           => $paymentIntentId,
-                    'charge_id'    => $chargeId,
-                    'error'        => $e->getMessage(),
-                ], 'warning');
-
-                if (! $invoiceId) {
-                    // Without invoice id we can't safely recover this specific unique violation.
-                    throw $e;
-                }
-
-                $canonical = Transaction::query()
-                    ->where('pledge_id', $pledge->id)
-                    ->where('stripe_invoice_id', $invoiceId)
-                    ->lockForUpdate()
-                    ->first();
-
-                if (! $canonical) {
-                    // Extremely unlikely: unique violation but we can't find canonical. Re-throw so we see it.
-                    throw $e;
-                }
-
-                // Switch to canonical and re-apply minimal enrichment.
-                $existingTx = $canonical;
-
-                $existingTx->attempt_id = $existingTx->attempt_id ?: $pledge->attempt_id;
-
-                $existingTx->amount_cents = $amountPaid ?? $existingTx->amount_cents ?? $pledge->amount_cents;
-                $existingTx->currency     = $currency ?? $existingTx->currency;
-                $existingTx->status       = 'succeeded';
-                $existingTx->setStage('invoice_paid');
-                $existingTx->source       = 'stripe_webhook';
-                $existingTx->receipt_url  = $hostedInvoiceUrl ?: $existingTx->receipt_url;
-                $existingTx->paid_at      = $existingTx->paid_at ?? now();
-
-                $existingTx->subscription_id = $existingTx->subscription_id ?: $subscriptionId;
-
-                // DO NOT set stripe_invoice_id here; canonical already has it by definition.
-
-                // Respect uniqueness rules
-                if (! $existingTx->payment_intent_id) {
-                    $this->claimPaymentIntentId($existingTx, $paymentIntentId);
-                }
-                if (! $existingTx->charge_id) {
-                    $this->claimChargeId($existingTx, $chargeId);
-                }
-
-                $existingTx->customer_id       = $existingTx->customer_id       ?? $customerId;
-                $existingTx->payment_method_id = $existingTx->payment_method_id ?? $paymentMethodId;
-
-                $existingTx->payer_email = $existingTx->payer_email ?? ($payerEmail ?: $pledge->donor_email);
-                $existingTx->payer_name  = $existingTx->payer_name  ?? ($payerName ?: $pledge->donor_name);
-
-                $existingTx->metadata = $this->mergeMetadata($existingTx->metadata, $baseMetadata);
-
-                if ($billingReason === 'subscription_create') {
-                    $existingTx->type = 'subscription_initial';
-                } elseif (empty($existingTx->type)) {
-                    $existingTx->type = $txType;
-                }
-
-                // Retry save on canonical row.
-                $existingTx->save();
-
-                $this->dbg('handleInvoicePaid: recovered from update unique violation', [
-                    'canonical_tx_id' => $existingTx->id,
-                    'invoice_id'      => $invoiceId,
-                    'pledge_id'       => $pledge->id,
-                ], 'info');
-            }
-
+            $existingTx->save();
+            
             $pledge->setStage('active', save: true);
 
             $this->dbg('handleInvoicePaid: tx updated', $this->txSnap($existingTx));

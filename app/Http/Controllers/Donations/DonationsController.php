@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Stripe\Exception\IdempotencyException;
+use App\Support\Stripe\TransactionInvoiceLinker;
+use App\Support\Stripe\TransactionResolver;
 
 class DonationsController extends Controller
 {
@@ -580,6 +582,16 @@ class DonationsController extends Controller
         if (! $placeholder->subscription_id && $subId) {
             $placeholder->subscription_id = $subId;
         }
+
+        // Prefer the canonical transaction for this pledge+invoice (webhook may have already created it).
+        $resolvedTx = app(TransactionResolver::class)->resolveForInvoice($pledge, $invoiceId, $piId);
+
+        if ($resolvedTx) {
+            $placeholder = $resolvedTx;
+        }
+
+        // Ensure we never violate the (pledge_id, stripe_invoice_id) unique constraint.
+        $placeholder = app(TransactionInvoiceLinker::class)->adoptOwnerIfInvoiceClaimed($placeholder, (int) $pledge->id, $invoiceId);
 
         if (! $placeholder->stripe_invoice_id && $invoiceId) {
             $placeholder->stripe_invoice_id = $invoiceId;
