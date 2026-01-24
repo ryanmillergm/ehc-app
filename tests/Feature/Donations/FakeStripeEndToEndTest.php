@@ -85,7 +85,7 @@ class FakeStripeEndToEndTest extends TestCase
         $this->assertSame('price_FAKE_301', $pledge->stripe_price_id);
         $this->assertSame('sub_FAKE_1', $pledge->stripe_subscription_id);
         $this->assertSame('active', $pledge->status);
-        $this->assertSame('in_FAKE_INITIAL', $pledge->latest_invoice_id);
+        $this->assertSame('in_WEBHOOK_1', $pledge->latest_invoice_id);
         $this->assertSame('pi_FAKE_INITIAL', $pledge->latest_payment_intent_id);
 
         // Canonical initial tx is the one tied to the initial PI.
@@ -381,11 +381,11 @@ class FakeStripeClient extends StripeClient
                     'current_period_start' => 1700000000,
                     'current_period_end'   => 1702592000,
                     'latest_invoice' => [
-                        'id' => 'in_FAKE_INITIAL',
+                        'id' => 'in_WEBHOOK_1',
                         'amount_due' => 301,
                         'currency' => 'usd',
                         'paid' => false,
-                        'hosted_invoice_url' => 'https://invoice.test/in_FAKE_INITIAL',
+                        'hosted_invoice_url' => 'https://invoice.test/in_WEBHOOK_1',
                         'payment_intent' => [
                             'id' => 'pi_FAKE_INITIAL',
                             'latest_charge' => 'ch_FAKE_INITIAL',
@@ -402,11 +402,11 @@ class FakeStripeClient extends StripeClient
                     'current_period_start' => 1700000000,
                     'current_period_end'   => 1702592000,
                     'latest_invoice' => [
-                        'id' => 'in_FAKE_INITIAL',
+                        'id' => 'in_WEBHOOK_1',
                         'amount_due' => 301,
                         'currency' => 'usd',
                         'paid' => false,
-                        'hosted_invoice_url' => 'https://invoice.test/in_FAKE_INITIAL',
+                        'hosted_invoice_url' => 'https://invoice.test/in_WEBHOOK_1',
                         'payment_intent' => [
                             'id' => 'pi_FAKE_INITIAL',
                             'latest_charge' => 'ch_FAKE_INITIAL',
@@ -441,7 +441,7 @@ class FakeStripeClient extends StripeClient
                 };
 
                 $invoice = match ($id) {
-                    'pi_FAKE_INITIAL'   => 'in_FAKE_INITIAL',
+                    'pi_FAKE_INITIAL'   => 'in_WEBHOOK_1',
                     'pi_FAKE_RECUR_1'   => 'in_WEBHOOK_2',
                     default             => null,
                 };

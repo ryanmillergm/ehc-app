@@ -17,6 +17,7 @@ use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Log;
 use Stripe\StripeClient;
+use App\Support\Stripe\TransactionInvoiceLinker;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -592,8 +593,7 @@ class StripeService
 
                 $txQuery = Transaction::query()
                     ->where('pledge_id', $pledge->id)
-                    ->whereIn('type', ['subscription_initial', 'subscription_recurring'])
-                    ->where('source', 'donation_widget');
+                    ->whereIn('type', ['subscription_initial', 'subscription_recurring']);
 
                 // Prefer the current attempt's placeholder row (prevents cross-attempt collisions).
                 if ($attemptId) {
@@ -618,6 +618,26 @@ class StripeService
                         $tx = $owner;
                     }
                 }
+
+                // If the invoice is already claimed by another transaction row (webhook may have won the race),
+                // converge on the invoice-owned row.
+                if ($latestInvoiceId) {
+                    $invoiceOwner = Transaction::query()
+                        ->where('pledge_id', $pledge->id)
+                        ->where('stripe_invoice_id', $latestInvoiceId)
+                        ->first();
+
+                    if ($invoiceOwner && (! $tx || $invoiceOwner->id !== $tx->id)) {
+                        $this->dbg('syncFromSubscription: invoice already claimed; using owner tx', [
+                            'invoice'   => $latestInvoiceId,
+                            'owner_tx'  => $invoiceOwner->id,
+                            'tx'        => $tx?->id,
+                        ], 'warning');
+
+                        $tx = $invoiceOwner;
+                    }
+                }
+
 
                 $isNew = false;
                 if (! $tx) {
@@ -659,12 +679,21 @@ class StripeService
                     }
                 }
 
+                if ($latestInvoiceId) {
+                    /** @var TransactionInvoiceLinker $invoiceLinker */
+                    $invoiceLinker = app(TransactionInvoiceLinker::class);
+                    $tx = $invoiceLinker->adoptOwnerIfInvoiceClaimed($tx, $pledge->id, $latestInvoiceId);
+                    $isNew = false;
+                }
+
+
                 $typeToSet   = $tx->type ?: 'subscription_initial';
                 $sourceToSet = $tx->source ?: 'donation_widget';
 
                 $payload = [
                     'user_id'           => $pledge->user_id,
                     'pledge_id'         => $pledge->id,
+                    'stripe_invoice_id' => $latestInvoiceId ?: $tx->stripe_invoice_id,
                     'subscription_id'   => $subscription->id,
                     'payment_intent_id' => $latestPiId ?: $tx->payment_intent_id,
                     'charge_id'         => $chargeId ?: $tx->charge_id,
@@ -701,6 +730,23 @@ class StripeService
                     if (! $owner) {
                         throw $e;
                     }
+
+                    if (! $owner && $latestInvoiceId) {
+                        $owner = Transaction::query()
+                            ->where('pledge_id', $pledge->id)
+                            ->where('stripe_invoice_id', $latestInvoiceId)
+                            ->first();
+
+                        if ($owner) {
+                            $this->dbg('syncFromSubscription: unique constraint on invoice; converging to owner tx', [
+                                'invoice'   => $latestInvoiceId,
+                                'owner_tx'  => $owner->id,
+                                'tx'        => $tx->id ?? null,
+                            ], 'warning');
+                        }
+                    }
+
+
 
                     $this->dbg('syncFromSubscription: unique constraint on PI; converging to owner tx', [
                         'pi'       => $latestPiId,
