@@ -109,23 +109,23 @@ class TransactionInvoiceLinker
             return $tx;
         }
 
-        // If another tx already owns this invoice for the pledge, return it and DO NOT mutate $tx.
-        $owner = Transaction::query()
-            ->where('pledge_id', $pledgeId)
-            ->where('stripe_invoice_id', $invoiceId)
-            ->lockForUpdate()
-            ->first();
+        return $this->inTransaction(function () use ($tx, $pledgeId, $invoiceId) {
+            $owner = Transaction::query()
+                ->where('pledge_id', $pledgeId)
+                ->where('stripe_invoice_id', $invoiceId)
+                ->lockForUpdate()
+                ->first();
 
-        if ($owner && $owner->id !== $tx->id) {
-            return $owner;
-        }
+            if ($owner && (int) $owner->id !== (int) $tx->id) {
+                return $owner;
+            }
 
-        // Otherwise, safe to claim on this row if empty.
-        if (empty($tx->stripe_invoice_id)) {
-            $tx->stripe_invoice_id = $invoiceId;
-            $tx->save();
-        }
+            if (empty($tx->stripe_invoice_id)) {
+                $tx->stripe_invoice_id = $invoiceId;
+                $tx->save();
+            }
 
-        return $tx;
+            return $tx;
+        });
     }
 }

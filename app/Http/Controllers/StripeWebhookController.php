@@ -31,6 +31,16 @@ class StripeWebhookController extends Controller
 
     protected function stripeClient(): ?StripeClient
     {
+        // If the container already has a StripeClient (ex: FakeStripeClient in tests),
+        // use it. This avoids hitting the network and avoids needing STRIPE_SECRET in tests.
+        if (app()->bound(StripeClient::class)) {
+            $client = app(StripeClient::class);
+            if ($client instanceof StripeClient) {
+                return $client;
+            }
+        }
+
+        // Existing behavior for production/local.
         if ($this->stripe instanceof StripeClient) {
             return $this->stripe;
         }
@@ -41,6 +51,7 @@ class StripeWebhookController extends Controller
         }
 
         $this->stripe = new StripeClient($secret);
+
         return $this->stripe;
     }
 
@@ -77,9 +88,9 @@ class StripeWebhookController extends Controller
                 return response()->json(['ok' => false], 400);
             }
         } catch (UnexpectedValueException|SignatureVerificationException $e) {
-            // In local dev, optionally allow unsigned payloads so you can test without Stripe CLI sig headers.
-            if (app()->environment('local') && config('services.stripe.debug_state')) {
-                $this->dbg('webhook: signature invalid (local) - falling back to unsigned decode', [
+            // In local dev OR unit tests, optionally allow unsigned payloads so tests can POST fixtures without Stripe headers.
+            if ((app()->environment('local') || app()->runningUnitTests()) && config('services.stripe.debug_state')) {
+                $this->dbg('webhook: signature invalid (local/testing) - falling back to unsigned decode', [
                     'error' => $e->getMessage(),
                 ], 'warning');
 
@@ -103,8 +114,12 @@ class StripeWebhookController extends Controller
         try {
             $this->handleEvent($event);
         } catch (Throwable $e) {
-            // IMPORTANT: never 500 a Stripe webhook for internal bookkeeping issues.
-            // A 500 causes Stripe retries, which can amplify races / duplicates.
+
+            if (app()->runningUnitTests()) {
+                throw $e;
+            }
+
+            // In production: never 500 a webhook for bookkeeping issues.
             Log::error('Stripe webhook handler crashed (swallowed)', [
                 'event_id'   => $event->id ?? null,
                 'event_type' => $event->type ?? null,
@@ -141,7 +156,7 @@ class StripeWebhookController extends Controller
                 $this->handlePaymentIntentFailed($object);
                 break;
 
-            // Basil uses invoice_payment.* for the PI reference needed.
+            // Treat invoice_payment.paid as an alias for invoice paid/succeeded.
             case 'invoice_payment.paid':
                 $this->handleInvoicePaymentPaid($object);
                 break;
@@ -195,27 +210,40 @@ class StripeWebhookController extends Controller
             return;
         }
 
-        $tx = Transaction::where('payment_intent_id', $piId)->first();
+        $invoiceId = $this->extractId($pi->invoice ?? null)
+            ?: $this->extractId(data_get($pi, 'invoice.id'));
 
-        if (! $tx) {
-            // For subscription payments Stripe will send invoice.* events.
-            // Do not create or “claim” anything here to avoid duplicates.
-            $this->dbg('PI succeeded but no transaction found (waiting for invoice event)', [
+        if ($invoiceId) {
+            $this->dbg('payment_intent.succeeded: invoice-linked; invoice is single writer', [
                 'payment_intent_id' => $piId,
-                'invoice'           => $this->extractId($pi->invoice ?? null),
-                'customer'          => $this->extractId($pi->customer ?? null),
+                'invoice_id'        => $invoiceId,
             ], 'info');
 
             return;
         }
 
-        $tx->status  = 'succeeded';
-        $tx->paid_at = $tx->paid_at ?? now();
-        $tx->source  = 'stripe_webhook';
+        $tx = Transaction::query()
+            ->where('payment_intent_id', $piId)
+            ->first();
 
-        $latestCharge = $pi->latest_charge ?? null;
-        if ($latestCharge && empty($tx->charge_id)) {
-            $tx->charge_id = $this->extractId($latestCharge);
+        if (! $tx) {
+            $this->dbg('payment_intent.succeeded: no existing tx to update; ignoring to prevent duplicates', [
+                'payment_intent_id' => $piId,
+                'invoice_id'        => $invoiceId,
+                'customer'          => $this->extractId($pi->customer ?? null),
+                'latest_charge'     => $this->extractId($pi->latest_charge ?? null),
+            ], 'warning');
+
+            return;
+        }
+
+        /** @var \App\Support\Stripe\TransactionInvoiceLinker $linker */
+        $linker = app(\App\Support\Stripe\TransactionInvoiceLinker::class);
+
+        // Enrich identifiers safely (unique-safe)
+        $latestChargeId = $this->extractId($pi->latest_charge ?? null);
+        if (empty($tx->charge_id) && $latestChargeId) {
+            $tx = $linker->claimChargeId($tx, $latestChargeId);
         }
 
         if (empty($tx->payment_method_id) && ! empty($pi->payment_method)) {
@@ -226,14 +254,48 @@ class StripeWebhookController extends Controller
             $tx->customer_id = $this->extractId($pi->customer);
         }
 
+        $isSubscriptionTx = ! empty($invoiceId)
+            || ! empty($tx->pledge_id)
+            || in_array($tx->type, ['subscription_initial', 'subscription_recurring'], true);
+
+        // Only one-time: PI succeeded is allowed to mark paid
+        if (! $isSubscriptionTx) {
+            if ($tx->status !== 'succeeded') {
+                $tx->status = 'succeeded';
+            }
+
+            $tx->paid_at = $tx->paid_at ?? now();
+
+            $tx->setStage('paid');
+
+            // Preserve historical metadata, but assert truth
+            $tx->metadata = $this->mergeMetadata($tx->metadata, [
+                'event'  => 'payment_intent.succeeded',
+                'writer' => 'payment_intent_succeeded',
+            ]);
+
+            // Do not stomp source; only fill if empty
+            $tx->source = $tx->source ?: 'stripe_webhook';
+        } else {
+            // Subscription world: enrichment only (invoice.* is single writer for paid)
+            $this->dbg('payment_intent.succeeded: subscription-related; enriched only (invoice is single writer)', [
+                'tx_id'     => $tx->id,
+                'tx_type'   => $tx->type,
+                'pledge_id' => $tx->pledge_id,
+                'pi'        => $piId,
+                'invoice_id'=> $invoiceId,
+            ], 'info');
+        }
+
         // Ensure metadata is never lost.
-        $tx->metadata = $this->mergeMetadata($tx->metadata, [
-            'stage' => 'payment_intent_succeeded',
-        ]);
+        $tx->metadata = $this->mergeMetadata($tx->metadata, array_filter([
+            'event'      => 'payment_intent.succeeded',
+            'invoice_id' => $invoiceId,
+        ]));
 
         $tx->save();
 
-        $this->dbg('PI succeeded: tx updated', $this->txSnap($tx));
+        $this->dbg('payment_intent.succeeded: updated tx', $this->txSnap($tx), 'info');
     }
 
     protected function handlePaymentIntentFailed(object $pi): void
@@ -266,292 +328,61 @@ class StripeWebhookController extends Controller
     // -------------------------------------------------------------------------
 
     /**
-     * `invoice_payment.paid` carries the PI in:
+     * `invoice_payment.paid` (Basil) is NOT a writer.
+     * It only exists to bridge to invoice.* where the invoice is the single writer.
+     *
+     * It carries:
+     *   data.object.invoice = "in_..."
      *   data.object.payment.payment_intent = "pi_..."
      */
     protected function handleInvoicePaymentPaid(object $inpay): void
     {
-        // Pattern: resolve → update → (optional create) → never throw.
-
-        $invoicePaymentId = $this->extractId($inpay->id ?? null); // inpay_...
-        $invoiceId        = $this->extractId($inpay->invoice ?? null); // in_...
-        $paymentIntentId  = $this->extractId(data_get($inpay, 'payment.payment_intent'))
-            ?: $this->extractId(data_get($inpay, 'payment_intent')); // defensive
-
-        $paidAtTs = data_get($inpay, 'status_transitions.paid_at');
-        $paidAt   = is_numeric($paidAtTs) ? Carbon::createFromTimestamp((int) $paidAtTs) : null;
+        $invoiceId = $this->extractId($inpay->invoice ?? null);
 
         if (! $invoiceId) {
-            $this->dbg('invoice_payment.paid: missing invoice id', [
-                'invoice_payment_id' => $invoicePaymentId,
+            $this->dbg('invoice_payment.paid: missing invoice id; cannot forward to invoice handler', [
+                'invoice_payment_id' => $this->extractId($inpay->id ?? null),
+                'pi' => $this->extractId(data_get($inpay, 'payment.payment_intent'))
+                    ?: $this->extractId(data_get($inpay, 'payment_intent')),
             ], 'warning');
+
             return;
         }
 
-        // ---------------------------------------------------------------------
-        // Resolve pledge + best tx hint.
-        //
-        // IMPORTANT: invoice_payment.paid happens *because* the invoice exists.
-        // In your system, the invoice id is first stashed into tx.metadata during
-        // subscription creation. So the most reliable anchor is:
-        //   Transaction where metadata->stripe_invoice_id == $invoiceId
-        // ---------------------------------------------------------------------
-
-        $txHint = Transaction::query()
-            ->whereJsonContains('metadata->stripe_invoice_id', $invoiceId)
-            ->orderByDesc('id')
-            ->first();
-
-        $pledge = null;
-
-        if ($txHint?->pledge_id) {
-            $pledge = Pledge::find($txHint->pledge_id);
-        }
-
-        // Fallbacks (best-effort, never throw)
-        if (! $pledge && $paymentIntentId) {
-            $byPi = Transaction::query()->where('payment_intent_id', $paymentIntentId)->first();
-            if ($byPi?->pledge_id) {
-                $txHint ??= $byPi;
-                $pledge = Pledge::find($byPi->pledge_id);
-            }
-        }
-
-        if (! $pledge && $txHint?->customer_id) {
-            $pledge = Pledge::query()
-                ->where('stripe_customer_id', $txHint->customer_id)
-                ->latest('id')
-                ->first();
-        }
-
-        // Last-ditch: if your pledge sometimes already has latest_invoice_id set, keep it.
-        if (! $pledge) {
-            $pledge = Pledge::query()
-                ->where('latest_invoice_id', $invoiceId)
-                ->latest('id')
-                ->first();
-        }
-
-        if (! $pledge) {
-            $this->dbg('invoice_payment.paid: pledge not found', [
-                'invoice_id'        => $invoiceId,
-                'payment_intent_id' => $paymentIntentId,
-                'tx_id'             => $txHint?->id,
+        // In tests we do NOT hit the network — we bind a FakeStripeClient.
+        // If no client is available (misconfigured test), bail gracefully.
+        $client = $this->stripeClient();
+        if (! $client) {
+            $this->dbg('invoice_payment.paid: stripe client unavailable; cannot retrieve invoice', [
+                'invoice_id'  => $invoiceId,
+                'unit_tests'  => app()->runningUnitTests(),
             ], 'warning');
+
             return;
         }
-
-        /** @var TransactionResolver $resolver */
-        $resolver = app(TransactionResolver::class);
-
-        /** @var TransactionInvoiceLinker $invoiceLinker */
-        $invoiceLinker = app(TransactionInvoiceLinker::class);
 
         try {
-            DB::transaction(function () use (
-                $pledge,
-                $invoiceId,
-                $paymentIntentId,
-                $paidAt,
-                $invoicePaymentId,
-                $resolver,
-                $invoiceLinker,
-                $txHint
-            ) {
-                // Prefer resolver; if it returns null, fall back to the txHint we found via metadata.
-                $tx = $resolver->resolveForInvoice($pledge, $invoiceId, $paymentIntentId) ?: $txHint;
+            $invoice = $client->invoices->retrieve($invoiceId, [
+                'expand' => [
+                    'payment_intent',
+                    'payment_intent.latest_charge',
+                    'charge',
+                    'customer',
+                    'subscription',
+                    'lines.data.price',
+                ],
+            ]);
 
-                // If resolver returned something tied to a *different* invoice, don't mutate it into this invoice.
-                if (
-                    $tx
-                    && $invoiceId
-                    && ! empty($tx->stripe_invoice_id)
-                    && (string) $tx->stripe_invoice_id !== (string) $invoiceId
-                ) {
-                    $tx = null;
-                }
-
-                if (! $tx) {
-                    // If we already have a row for this pledge+invoice, use it (prevents duplicates).
-                    $existing = Transaction::query()
-                        ->where('pledge_id', $pledge->id)
-                        ->where('stripe_invoice_id', $invoiceId)
-                        ->lockForUpdate()
-                        ->first();
-
-                    if ($existing) {
-                        $tx = $existing;
-                    } else {
-                        // Optional: if there is NO PI and NO txHint, we still can safely create because invoice_id is unique per pledge.
-                        // But we should still protect against null invoice_id.
-                        if (! $invoiceId) {
-                            $this->dbg('invoice_payment.paid: cannot create tx without invoice id', [
-                                'pledge_id' => $pledge->id,
-                                'pi'        => $paymentIntentId,
-                            ], 'warning');
-                            return;
-                        }
-
-                        $tx = Transaction::create([
-                            'user_id'           => $pledge->user_id,
-                            'pledge_id'         => $pledge->id,
-                            'attempt_id'        => $pledge->attempt_id,
-                            'subscription_id'   => $pledge->stripe_subscription_id,
-                            'stripe_invoice_id' => $invoiceId,
-                            'status'            => 'pending',
-                            'source'            => 'stripe_webhook',
-                            'type'              => 'subscription_recurring',
-                            'currency'          => $pledge->currency ?: 'usd',
-                            'amount_cents'      => $pledge->amount_cents,
-                            'metadata'          => [
-                                'stripe_invoice_id' => $invoiceId,
-                                'stage'             => 'invoice_payment_paid',
-                            ],
-                        ]);
-                    }
-                }
-
-                // Now canonicalize (this is still good)
-                $tx = $invoiceLinker->adoptOwnerIfInvoiceClaimed($tx, $pledge->id, $invoiceId);
-
-                // Update tx (avoid stomping nulls).
-                if (! $tx->stripe_invoice_id) {
-                    $tx->stripe_invoice_id = $invoiceId;
-                }
-
-                if (! $tx->payment_intent_id && $paymentIntentId) {
-                    $invoiceLinker->claimPaymentIntentId($tx, $paymentIntentId);
-                }
-
-                // Mark succeeded (this event means "paid").
-                $tx->status = 'succeeded';
-
-                if (! $tx->paid_at) {
-                    $tx->paid_at = $paidAt ?: now();
-                }
-
-                $tx->source = 'stripe_webhook';
-
-                $tx->metadata = $this->mergeMetadata($tx->metadata, array_filter([
-                    'stripe_invoice_id'         => $invoiceId,
-                    'stripe_invoice_payment_id' => $invoicePaymentId,
-                    'stage'                     => 'invoice_payment_paid',
-                ]));
-
-                $tx->save();
-
-                // ---------------------------
-                // Pledge updates (non-clobber)
-                // ---------------------------
-
-                $pledge->status = 'active';
-
-                // latest_invoice_id: set if empty OR same (never stomp a different invoice id)
-                if (empty($pledge->latest_invoice_id)) {
-                    $pledge->latest_invoice_id = $invoiceId;
-                } elseif ($pledge->latest_invoice_id !== $invoiceId) {
-                    $this->dbg('invoice_payment.paid: pledge latest_invoice_id differs; not overwriting', [
-                        'pledge_id' => $pledge->id,
-                        'existing'  => $pledge->latest_invoice_id,
-                        'incoming'  => $invoiceId,
-                    ], 'warning');
-                }
-
-                // latest_payment_intent_id: set if empty OR same (never stomp a different PI)
-                if ($paymentIntentId) {
-                    if (empty($pledge->latest_payment_intent_id)) {
-                        $pledge->latest_payment_intent_id = $paymentIntentId;
-                    } elseif ($pledge->latest_payment_intent_id !== $paymentIntentId) {
-                        $this->dbg('invoice_payment.paid: pledge latest_payment_intent_id differs; not overwriting', [
-                            'pledge_id' => $pledge->id,
-                            'existing'  => $pledge->latest_payment_intent_id,
-                            'incoming'  => $paymentIntentId,
-                        ], 'warning');
-                    }
-                }
-
-                // last_pledge_at: only move forward in time
-                if ($paidAt) {
-                    if (empty($pledge->last_pledge_at) || $paidAt->greaterThan($pledge->last_pledge_at)) {
-                        $pledge->last_pledge_at = $paidAt;
-                    }
-                }
-
-                $pledge->save();
-            }, 3);
-        } catch (QueryException $e) {
-            if (! $this->isUniqueViolation($e)) {
-                $this->dbg('invoice_payment.paid: QueryException (non-unique) swallowed', [
-                    'invoice_id' => $invoiceId,
-                    'error'      => $e->getMessage(),
-                ], 'error');
-                return;
-            }
-
-            // Recover from races: re-resolve canonical and try again (swallow all errors).
-            $this->dbg('invoice_payment.paid: unique violation; recovering', [
-                'pledge_id'  => $pledge->id,
+            // Single-writer: forward to invoice handler.
+            $this->handleInvoicePaid($invoice, 'invoice_payment.paid');
+        } catch (Throwable $e) {
+            $this->dbg('invoice_payment.paid: invoice retrieval failed; cannot forward', [
                 'invoice_id' => $invoiceId,
-                'pi'         => $paymentIntentId,
                 'error'      => $e->getMessage(),
             ], 'warning');
-
-            try {
-                DB::transaction(function () use ($pledge, $invoiceId, $paymentIntentId, $paidAt, $invoicePaymentId, $resolver, $invoiceLinker) {
-                    $tx = $resolver->resolveForInvoice($pledge, $invoiceId, $paymentIntentId);
-                    if (! $tx) {
-                        return;
-                    }
-
-                    $tx = $invoiceLinker->adoptOwnerIfInvoiceClaimed($tx, $pledge->id, $invoiceId);
-
-                    if (! $tx->payment_intent_id && $paymentIntentId) {
-                        $invoiceLinker->claimPaymentIntentId($tx, $paymentIntentId);
-                    }
-
-                    $tx->status  = 'succeeded';
-                    $tx->paid_at = $tx->paid_at ?: ($paidAt ?: now());
-                    $tx->source  = 'stripe_webhook';
-
-                    $tx->metadata = $this->mergeMetadata($tx->metadata, array_filter([
-                        'stripe_invoice_id'         => $invoiceId,
-                        'stripe_invoice_payment_id' => $invoicePaymentId,
-                        'stage'                     => 'invoice_payment_paid',
-                    ]));
-
-                    $tx->save();
-
-                    // Also try to ensure pledge latest fields are set (non-clobber)
-                    if (empty($pledge->latest_invoice_id)) {
-                        $pledge->latest_invoice_id = $invoiceId;
-                    }
-                    if ($paymentIntentId && empty($pledge->latest_payment_intent_id)) {
-                        $pledge->latest_payment_intent_id = $paymentIntentId;
-                    }
-                    if ($paidAt && (empty($pledge->last_pledge_at) || $paidAt->greaterThan($pledge->last_pledge_at))) {
-                        $pledge->last_pledge_at = $paidAt;
-                    }
-                    if ($pledge->status !== 'active') {
-                        $pledge->status = 'active';
-                    }
-
-                    $pledge->save();
-                }, 3);
-            } catch (Throwable $e2) {
-                $this->dbg('invoice_payment.paid: recovery failed (swallowed)', [
-                    'invoice_id' => $invoiceId,
-                    'error'      => $e2->getMessage(),
-                ], 'warning');
-            }
-        } catch (Throwable $e) {
-            $this->dbg('invoice_payment.paid: exception (swallowed)', [
-                'pledge_id'  => $pledge->id,
-                'invoice_id' => $invoiceId,
-                'pi'         => $paymentIntentId,
-                'error'      => $e->getMessage(),
-            ], 'error');
         }
     }
+
 
     /**
      * Find tx by invoice id (prefers the column; falls back to older metadata storage).
@@ -593,13 +424,57 @@ class StripeWebhookController extends Controller
 
     protected function handleInvoicePaid(object $invoice, string $eventType = 'invoice.paid'): void
     {
-        // This event means money moved. Our job is to record it *idempotently*.
-        // Pattern: resolve → update → (optional create) → recover on unique → never throw.
-
-        $invoiceId  = $invoice->id ?? null;
+        $invoiceId  = $this->extractId($invoice->id ?? null);
         $customerId = $this->extractId($invoice->customer ?? null);
 
         $subscriptionId = $this->resolveSubscriptionIdFromInvoice($invoice);
+
+        // ---------------------------------------------------------------------
+        // Expand thin invoice payloads (prod hits Stripe; tests use FakeStripeClient)
+        // ---------------------------------------------------------------------
+        $maybePi =
+            $this->extractId($invoice->payment_intent ?? null)
+            ?: $this->extractId(data_get($invoice, 'payment_intent.id'))
+            ?: $this->extractId(data_get($invoice, 'charges.data.0.payment_intent'));
+
+        $maybeCharge =
+            $this->extractId($invoice->charge ?? null)
+            ?: $this->extractId(data_get($invoice, 'charges.data.0.id'))
+            ?: $this->extractId(data_get($invoice, 'payment_intent.latest_charge'))
+            ?: $this->extractId(data_get($invoice, 'charges.data.0.charge'));
+
+        if (
+            ((! $maybePi) || (! $maybeCharge))
+            && $invoiceId
+            && (bool) config('services.stripe.webhook_api_fallback', true)
+        ) {
+            $client = $this->stripeClient();
+
+            if ($client) {
+                try {
+                    $invoice = $client->invoices->retrieve($invoiceId, [
+                        'expand' => [
+                            'payment_intent',
+                            'payment_intent.latest_charge',
+                            'charge',
+                            'customer',
+                            'subscription',
+                            'lines.data.price',
+                        ],
+                    ]);
+
+                    // Refresh after expansion
+                    $customerId = $customerId ?: $this->extractId($invoice->customer ?? null);
+                    $subscriptionId = $subscriptionId ?: $this->resolveSubscriptionIdFromInvoice($invoice);
+                } catch (Throwable $e) {
+                    $this->dbg('invoice.paid: invoice retrieve/expand failed; continuing with thin payload', [
+                        'invoice_id' => $invoiceId,
+                        'error'      => $e->getMessage(),
+                        'event_type' => $eventType,
+                    ], 'warning');
+                }
+            }
+        }
 
         $paymentIntentId =
             $this->extractId($invoice->payment_intent ?? null)
@@ -612,11 +487,10 @@ class StripeWebhookController extends Controller
             ?: $this->extractId(data_get($invoice, 'payment_intent.latest_charge'))
             ?: $this->extractId(data_get($invoice, 'charges.data.0.charge'));
 
-        // Optional API fallback for charge id.
+        // Optional API fallback for charge id (safe in tests with FakeStripeClient)
         if (
             ! $chargeId
             && $paymentIntentId
-            && ! app()->runningUnitTests()
             && (bool) config('services.stripe.webhook_api_fallback', true)
         ) {
             $client = $this->stripeClient();
@@ -650,6 +524,8 @@ class StripeWebhookController extends Controller
             ?: null;
 
         $billingReason = data_get($invoice, 'billing_reason');
+
+        // Stripe’s billing_reason is the best hint for initial vs recurring.
         $txType = $billingReason === 'subscription_create'
             ? 'subscription_initial'
             : 'subscription_recurring';
@@ -674,15 +550,11 @@ class StripeWebhookController extends Controller
             $txFallback = null;
 
             if ($paymentIntentId) {
-                $txFallback = Transaction::query()
-                    ->where('payment_intent_id', $paymentIntentId)
-                    ->first();
+                $txFallback = Transaction::query()->where('payment_intent_id', $paymentIntentId)->first();
             }
 
             if (! $txFallback && $chargeId) {
-                $txFallback = Transaction::query()
-                    ->where('charge_id', $chargeId)
-                    ->first();
+                $txFallback = Transaction::query()->where('charge_id', $chargeId)->first();
             }
 
             if ($txFallback) {
@@ -708,15 +580,16 @@ class StripeWebhookController extends Controller
                 'customer_id'       => $customerId,
                 'payment_intent_id' => $paymentIntentId,
                 'charge_id'         => $chargeId,
+                'event_type'        => $eventType,
             ]);
             return;
         }
 
-        // Paid-at (if present in invoice)
+        // Paid-at (Stripe invoices use unix timestamps)
         $paidAtTs = data_get($invoice, 'status_transitions.paid_at') ?: data_get($invoice, 'paid_at');
         $paidAt   = is_numeric($paidAtTs) ? Carbon::createFromTimestamp((int) $paidAtTs) : null;
 
-        // Update pledge “softly” (don’t stomp nulls)
+        // Update pledge softly (swallow errors)
         try {
             $pledgeUpdates = ['status' => 'active'];
 
@@ -762,8 +635,9 @@ class StripeWebhookController extends Controller
             'stripe_invoice_id'      => $invoiceId,
             'stripe_subscription_id' => $subscriptionId,
             'billing_reason'         => $billingReason,
-            'stage'                  => 'invoice_paid',
+            'stage'                  => 'paid',
             'event_type'             => $eventType,
+            'writer'                 => 'invoice_paid',
         ]);
 
         try {
@@ -787,7 +661,12 @@ class StripeWebhookController extends Controller
                 $invoiceLinker,
                 $baseMetadata
             ) {
-                $tx = $resolver->resolveForInvoice($pledge, $invoiceId, $paymentIntentId);
+                // -----------------------------------------------------------------
+                // 1) Resolver first (canonical tx if it already exists)
+                // -----------------------------------------------------------------
+                $tx = $resolver->resolveForInvoice($pledge, $invoiceId, $paymentIntentId, $billingReason);
+
+                // Safety: don't mutate a different invoice
                 if (
                     $tx
                     && $invoiceId
@@ -797,18 +676,74 @@ class StripeWebhookController extends Controller
                     $tx = null;
                 }
 
+                // -----------------------------------------------------------------
+                // 2) Adopt the donation_widget anchor (best path)
+                //    - initial invoice: prefer subscription_initial anchor
+                // -----------------------------------------------------------------
                 if (! $tx) {
-                    // invoice.paid without an invoice id is useless to us.
+                    $anchorQuery = Transaction::query()
+                        ->where('pledge_id', $pledge->id)
+                        ->where('attempt_id', $pledge->attempt_id)
+                        ->where('status', 'pending')
+                        ->where('created_at', '>=', now()->subHours(12))
+                        ->lockForUpdate()
+                        ->latest('id')
+                        ->where(function ($q) use ($paymentIntentId, $chargeId) {
+                            // placeholder with nothing yet
+                            $q->where(function ($qq) {
+                                $qq->whereNull('payment_intent_id')->whereNull('charge_id');
+                            });
+
+                            // OR placeholder that already has PI/charge but no invoice yet
+                            if ($paymentIntentId) {
+                                $q->orWhere(function ($qq) use ($paymentIntentId) {
+                                    $qq->where('payment_intent_id', $paymentIntentId)
+                                        ->whereNull('stripe_invoice_id');
+                                });
+                            }
+
+                            if ($chargeId) {
+                                $q->orWhere(function ($qq) use ($chargeId) {
+                                    $qq->where('charge_id', $chargeId)
+                                        ->whereNull('stripe_invoice_id');
+                                });
+                            }
+                        });
+
+                    if ($billingReason === 'subscription_create') {
+                        $anchorQuery->where('type', 'subscription_initial');
+                    } else {
+                        $anchorQuery->whereIn('type', ['subscription_initial', 'subscription_recurring']);
+                    }
+
+                    // Prefer widget-origin anchor if present
+                    $tx = (clone $anchorQuery)->where('source', 'donation_widget')->first()
+                        ?: $anchorQuery->first();
+                }
+
+                // Safety again
+                if (
+                    $tx
+                    && $invoiceId
+                    && ! empty($tx->stripe_invoice_id)
+                    && (string) $tx->stripe_invoice_id !== (string) $invoiceId
+                ) {
+                    $tx = null;
+                }
+
+                // -----------------------------------------------------------------
+                // 3) If still no tx, upsert pledge+invoice row (invoice is the key)
+                // -----------------------------------------------------------------
+                if (! $tx) {
                     if (! $invoiceId) {
                         $this->dbg('invoice.paid: missing invoice id; cannot resolve or create tx', [
-                            'pledge_id'        => $pledge->id,
-                            'payment_intent_id'=> $paymentIntentId,
-                            'charge_id'        => $chargeId,
+                            'pledge_id'         => $pledge->id,
+                            'payment_intent_id' => $paymentIntentId,
+                            'charge_id'         => $chargeId,
                         ], 'warning');
                         return;
                     }
 
-                    // Prevent duplicates: if a row already exists for this pledge+invoice, reuse it.
                     $existing = Transaction::query()
                         ->where('pledge_id', $pledge->id)
                         ->where('stripe_invoice_id', $invoiceId)
@@ -829,20 +764,35 @@ class StripeWebhookController extends Controller
                     ]);
                 }
 
-                $tx = $invoiceLinker->adoptOwnerIfInvoiceClaimed($tx, $pledge->id, $invoiceId);
+                // -----------------------------------------------------------------
+                // 4) Canonicalize + claim identifiers (invoice is the primary key)
+                // -----------------------------------------------------------------
+                $tx = $invoiceLinker->adoptOwnerIfInvoiceClaimed($tx, (int) $pledge->id, $invoiceId);
 
+                if ($invoiceId) {
+                    $tx = $invoiceLinker->claimInvoiceId($tx, (int) $pledge->id, $invoiceId);
+                }
+
+                if ($paymentIntentId) {
+                    $tx = $invoiceLinker->claimPaymentIntentId($tx, $paymentIntentId);
+                }
+
+                if ($chargeId) {
+                    $tx = $invoiceLinker->claimChargeId($tx, $chargeId);
+                }
+
+                // -----------------------------------------------------------------
+                // 5) Fill columns (non-clobber) and finalize paid state
+                // -----------------------------------------------------------------
                 $tx->attempt_id      = $tx->attempt_id ?: $pledge->attempt_id;
                 $tx->subscription_id = $tx->subscription_id ?: $subscriptionId;
-                $tx->stripe_invoice_id = $tx->stripe_invoice_id ?: $invoiceId;
 
-                if (! $tx->payment_intent_id && $paymentIntentId) {
-                    $invoiceLinker->claimPaymentIntentId($tx, $paymentIntentId);
-                }
-                if (! $tx->charge_id && $chargeId) {
-                    $invoiceLinker->claimChargeId($tx, $chargeId);
+                // Persist SetupIntent onto tx from pledge (stable subscription checkout id)
+                if (empty($tx->setup_intent_id) && ! empty($pledge->setup_intent_id)) {
+                    $tx->setup_intent_id = $pledge->setup_intent_id;
                 }
 
-                $tx->customer_id       = $tx->customer_id       ?? $customerId;
+                $tx->customer_id       = $tx->customer_id       ?? $customerId ?? $pledge->stripe_customer_id;
                 $tx->payment_method_id = $tx->payment_method_id ?? $paymentMethodId;
 
                 $tx->payer_email = $tx->payer_email ?? ($payerEmail ?: $pledge->donor_email);
@@ -852,21 +802,24 @@ class StripeWebhookController extends Controller
                 $tx->amount_cents = $amountPaid ?? $tx->amount_cents ?? $pledge->amount_cents;
                 $tx->currency     = $currency ?? $tx->currency ?? 'usd';
 
+                // invoice events mark paid
                 $tx->paid_at = $tx->paid_at ?? ($paidAt ?: now());
                 $tx->status  = 'succeeded';
-                $tx->source  = 'stripe_webhook';
+                $tx->source = $tx->source ?: 'stripe_webhook';
 
                 $tx->type = ($billingReason === 'subscription_create')
                     ? 'subscription_initial'
                     : ($tx->type ?: $txType);
 
                 $tx->metadata = $this->mergeMetadata($tx->metadata, $baseMetadata);
-                $tx->setStage('invoice_paid');
+
+                $tx->setStage('paid');
 
                 $tx->save();
 
+                // Keep pledge stage consistent
                 $pledge->setStage('active', save: true);
-            });
+            }, 3);
         } catch (QueryException $e) {
             if (! $this->isUniqueViolation($e)) {
                 $this->dbg('handleInvoicePaid: QueryException (non-unique) swallowed', [
@@ -893,50 +846,118 @@ class StripeWebhookController extends Controller
                     $currency,
                     $hostedInvoiceUrl,
                     $paidAt,
+                    $billingReason,
                     $resolver,
                     $invoiceLinker,
-                    $baseMetadata
+                    $baseMetadata,
+                    $subscriptionId,
+                    $customerId,
+                    $paymentMethodId,
+                    $payerEmail,
+                    $payerName,
+                    $txType
                 ) {
-                    $tx = $resolver->resolveForInvoice($pledge, $invoiceId, $paymentIntentId);
+                    $tx = $resolver->resolveForInvoice($pledge, $invoiceId, $paymentIntentId, $billingReason ?? null);
 
-                    // Same safety rule during recovery: don't "recover" into a different invoice tx.
                     if (
                         $tx
                         && $invoiceId
                         && ! empty($tx->stripe_invoice_id)
                         && (string) $tx->stripe_invoice_id !== (string) $invoiceId
                     ) {
-                        return;
+                        $tx = null;
+                    }
+
+                    // Adopt anchor during recovery as well
+                    if (! $tx) {
+                        $anchorQuery = Transaction::query()
+                            ->where('pledge_id', $pledge->id)
+                            ->where('attempt_id', $pledge->attempt_id)
+                            ->where('status', 'pending')
+                            ->where('created_at', '>=', now()->subHours(12))
+                            ->lockForUpdate()
+                            ->latest('id')
+                            ->where(function ($q) use ($paymentIntentId, $chargeId) {
+                                $q->where(function ($qq) {
+                                    $qq->whereNull('payment_intent_id')->whereNull('charge_id');
+                                });
+
+                                if ($paymentIntentId) {
+                                    $q->orWhere(function ($qq) use ($paymentIntentId) {
+                                        $qq->where('payment_intent_id', $paymentIntentId)
+                                            ->whereNull('stripe_invoice_id');
+                                    });
+                                }
+
+                                if ($chargeId) {
+                                    $q->orWhere(function ($qq) use ($chargeId) {
+                                        $qq->where('charge_id', $chargeId)
+                                            ->whereNull('stripe_invoice_id');
+                                    });
+                                }
+                            });
+
+                        if (($billingReason ?? null) === 'subscription_create') {
+                            $anchorQuery->where('type', 'subscription_initial');
+                        } else {
+                            $anchorQuery->whereIn('type', ['subscription_initial', 'subscription_recurring']);
+                        }
+
+                        $tx = (clone $anchorQuery)->where('source', 'donation_widget')->first()
+                            ?: $anchorQuery->first();
                     }
 
                     if (! $tx) {
                         return;
                     }
 
-                    $tx = $invoiceLinker->adoptOwnerIfInvoiceClaimed($tx, $pledge->id, $invoiceId);
+                    $tx = $invoiceLinker->adoptOwnerIfInvoiceClaimed($tx, (int) $pledge->id, $invoiceId);
 
-                    if (! $tx->payment_intent_id && $paymentIntentId) {
-                        $invoiceLinker->claimPaymentIntentId($tx, $paymentIntentId);
+                    if ($invoiceId) {
+                        $tx = $invoiceLinker->claimInvoiceId($tx, (int) $pledge->id, $invoiceId);
                     }
-                    if (! $tx->charge_id && $chargeId) {
-                        $invoiceLinker->claimChargeId($tx, $chargeId);
+
+                    if ($paymentIntentId) {
+                        $tx = $invoiceLinker->claimPaymentIntentId($tx, $paymentIntentId);
                     }
+
+                    if ($chargeId) {
+                        $tx = $invoiceLinker->claimChargeId($tx, $chargeId);
+                    }
+
+                    if (empty($tx->setup_intent_id) && ! empty($pledge->setup_intent_id)) {
+                        $tx->setup_intent_id = $pledge->setup_intent_id;
+                    }
+
+                    $tx->attempt_id      = $tx->attempt_id ?: $pledge->attempt_id;
+                    $tx->subscription_id = $tx->subscription_id ?: $subscriptionId;
+
+                    $tx->customer_id       = $tx->customer_id       ?? $customerId ?? $pledge->stripe_customer_id;
+                    $tx->payment_method_id = $tx->payment_method_id ?? $paymentMethodId;
+
+                    $tx->payer_email = $tx->payer_email ?? ($payerEmail ?: $pledge->donor_email);
+                    $tx->payer_name  = $tx->payer_name  ?? ($payerName  ?: $pledge->donor_name);
+                    $tx->receipt_url = $tx->receipt_url ?? $hostedInvoiceUrl;
 
                     $tx->amount_cents = $amountPaid ?? $tx->amount_cents ?? $pledge->amount_cents;
                     $tx->currency     = $currency ?? $tx->currency ?? 'usd';
-                    $tx->receipt_url  = $tx->receipt_url ?? $hostedInvoiceUrl;
 
                     $tx->paid_at = $tx->paid_at ?? ($paidAt ?: now());
                     $tx->status  = 'succeeded';
-                    $tx->source  = 'stripe_webhook';
+                    $tx->source = $tx->source ?: 'stripe_webhook';
+
+                    $tx->type = (($billingReason ?? null) === 'subscription_create')
+                        ? 'subscription_initial'
+                        : ($tx->type ?: $txType);
 
                     $tx->metadata = $this->mergeMetadata($tx->metadata, $baseMetadata);
-                    $tx->setStage('invoice_paid');
+
+                    $tx->setStage('paid');
 
                     $tx->save();
 
                     $pledge->setStage('active', save: true);
-                });
+                }, 3);
             } catch (Throwable $e2) {
                 $this->dbg('handleInvoicePaid: recovery failed (swallowed)', [
                     'invoice_id' => $invoiceId,
@@ -952,7 +973,6 @@ class StripeWebhookController extends Controller
             ], 'error');
         }
     }
-
 
     protected function handleInvoicePaymentFailed(object $invoice): void
     {
@@ -980,101 +1000,85 @@ class StripeWebhookController extends Controller
 
     protected function handleChargeSucceeded(object $charge): void
     {
-        $piId = $this->extractId($charge->payment_intent ?? null);
-        if (! $piId) {
-            $this->dbg('charge.succeeded missing payment_intent, ignoring', [
-                'charge_id' => $charge->id ?? null,
-            ], 'info');
-            return;
-        }
-
+        $chargeId   = $this->extractId($charge->id ?? null);
+        $piId       = $this->extractId($charge->payment_intent ?? null);
         $customerId = $this->extractId($charge->customer ?? null);
-        $invoiceId  = $this->extractId($charge->invoice ?? null);
 
-        // Canonical rule: if charge is tied to an invoice, subscription-land is handled by invoice.* events.
-        if ($invoiceId) {
-            $this->dbg('charge.succeeded: has invoice id, ignoring (invoice handler is canonical)', [
-                'charge_id'  => $charge->id ?? null,
-                'invoice_id' => $invoiceId,
-                'pi'         => $piId,
-                'customer'   => $customerId,
+        $invoiceId = $this->extractId($charge->invoice ?? null)
+            ?: $this->extractId(data_get($charge, 'invoice.id'));
+
+        if (! $piId && ! $chargeId) {
+            $this->dbg('charge.succeeded missing identifiers, ignoring', [
+                'charge_id' => $chargeId,
+                'pi'        => $piId,
             ], 'info');
             return;
         }
 
-        // One-time path: if there's NO invoice, we treat it as a one-time donation.
-        $frequency = data_get($charge, 'metadata.frequency'); // may be missing
+        // Find an existing tx to enrich (NEVER create)
+        $tx = null;
 
-        $tx = Transaction::where('payment_intent_id', $piId)->first();
+        if ($piId) {
+            $tx = Transaction::query()->where('payment_intent_id', $piId)->first();
+        }
+
+        if (! $tx && $chargeId) {
+            $tx = Transaction::query()->where('charge_id', $chargeId)->first();
+        }
+
+        // Optional but helpful: if invoice handler already set stripe_invoice_id, find by invoice too
+        if (! $tx && $invoiceId) {
+            $tx = Transaction::query()->where('stripe_invoice_id', $invoiceId)->first();
+        }
 
         if (! $tx) {
-            $tx = Transaction::query()
-                ->whereNull('payment_intent_id')
-                ->where('type', 'one_time')
-                ->where('status', 'pending')
-                ->when($customerId, fn ($q) => $q->where('customer_id', $customerId))
-                ->where('created_at', '>=', now()->subHours(6))
-                ->latest('id')
-                ->first();
-        }
-
-        // If Stripe ever sends a charge without invoice but it's actually subscription-ish,
-        // don't create a tx unless we can associate it cleanly.
-        if (! $tx && ! $frequency && ! $customerId) {
-            $this->dbg('charge.succeeded: no invoice but missing customer + no metadata; ignoring', [
-                'charge_id' => $charge->id ?? null,
-                'pi'        => $piId,
+            $this->dbg('charge.succeeded: no existing transaction to update; ignoring to prevent duplicates', [
+                'charge_id'         => $chargeId,
+                'payment_intent_id' => $piId,
+                'invoice_id'        => $invoiceId,
+                'customer_id'       => $customerId,
+                'description'       => $charge->description ?? null,
             ], 'warning');
             return;
         }
 
-        $fallbackPledge = null;
-        if (! $tx && $customerId) {
-            $fallbackPledge = Pledge::query()
-                ->where('stripe_customer_id', $customerId)
-                ->whereNull('stripe_subscription_id')
-                ->latest('id')
-                ->first();
+        /** @var \App\Support\Stripe\TransactionInvoiceLinker $linker */
+        $linker = app(\App\Support\Stripe\TransactionInvoiceLinker::class);
+
+        // Claim identifiers safely (unique-safe)
+        if ($piId) {
+            $tx = $linker->claimPaymentIntentId($tx, $piId);
+        }
+        if ($chargeId) {
+            $tx = $linker->claimChargeId($tx, $chargeId);
         }
 
-        if (! $tx) {
-            $tx = new Transaction();
-            $tx->type     = 'one_time';
-            $tx->status   = 'pending';
-            $tx->source   = 'stripe_webhook';
-            $tx->metadata = ['frequency' => 'one_time'];
-
-            if ($fallbackPledge) {
-                $tx->pledge_id  = $fallbackPledge->id;
-                $tx->user_id    = $fallbackPledge->user_id;
-                $tx->attempt_id = $fallbackPledge->attempt_id;
-            }
-        }
-
-        $tx->payment_intent_id = $tx->payment_intent_id ?: $piId;
-        $tx->charge_id         = $tx->charge_id ?? ($charge->id ?? null);
-        $tx->customer_id       = $tx->customer_id ?? $customerId;
+        // Enrich fields, non-stomp
+        $tx->customer_id       = $tx->customer_id       ?? $customerId;
         $tx->payment_method_id = $tx->payment_method_id ?? $this->extractId($charge->payment_method ?? null);
-        $tx->amount_cents      = $charge->amount ?? $tx->amount_cents;
-        $tx->currency          = $charge->currency ?? $tx->currency ?? 'usd';
-        $tx->receipt_url       = $tx->receipt_url ?? ($charge->receipt_url ?? null);
-        $tx->payer_email       = $tx->payer_email ?? data_get($charge, 'billing_details.email');
-        $tx->payer_name        = $tx->payer_name ?? data_get($charge, 'billing_details.name');
 
+        if (! $tx->amount_cents && isset($charge->amount)) {
+            $tx->amount_cents = (int) $charge->amount;
+        }
+        if (! $tx->currency && isset($charge->currency)) {
+            $tx->currency = (string) $charge->currency;
+        }
+
+        $tx->receipt_url = $tx->receipt_url ?? ($charge->receipt_url ?? null);
+        $tx->payer_email = $tx->payer_email ?? data_get($charge, 'billing_details.email');
+        $tx->payer_name  = $tx->payer_name  ?? data_get($charge, 'billing_details.name');
+
+        // IMPORTANT: charge.* never marks paid. Even for one-time, PI is your writer.
         $tx->metadata = $this->mergeMetadata($tx->metadata, array_filter([
-            'frequency' => data_get($tx->metadata, 'frequency', 'one_time'),
-            'stage' => 'charge_succeeded',
+            'event'      => 'charge.succeeded',
+            'invoice_id' => $invoiceId,
         ]));
 
         $tx->metadata = $this->mergeMetadata($tx->metadata, $this->cardMetaFromChargeObject($charge));
 
-        $tx->status   = 'succeeded';
-        $tx->paid_at  = $tx->paid_at ?? now();
-        $tx->source   = 'stripe_webhook';
-
         $tx->save();
 
-        $this->dbg('charge.succeeded: one-time tx saved', $this->txSnap($tx));
+        $this->dbg('charge.succeeded: enriched existing tx (no paid writes)', $this->txSnap($tx), 'info');
     }
 
     protected function handleChargeRefunded(object $charge): void

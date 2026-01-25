@@ -14,28 +14,30 @@ class TransactionResolver
     /**
      * Resolve the *canonical* transaction to update for an invoice-related event.
      *
-     * Priority:
-     *  1) payment_intent_id (globally unique)
-     *  2) (pledge_id, stripe_invoice_id) owner
-     *  3) pledge placeholder (same pledge, stripe_invoice_id IS NULL) — this is what fixes out-of-order delivery
-     *  4) attempt_id fallback (last resort)
+     * SUBSCRIPTION RULE:
+     *   If invoiceId exists, invoice ownership must win over payment_intent_id.
+     *
+     * Priority (invoice flows):
+     *  1) (pledge_id, stripe_invoice_id) owner
+     *  2) pledge placeholder (same pledge + attempt, invoice NULL) adopt anchor (out-of-order safe)
+     *  3) payment_intent_id match - fallback only
+     *  4) attempt_id fallback last resort
+     *
+     * Notes:
+     * - This function NEVER creates.
+     * - Uses lockForUpdate, so it must run inside a transaction (we ensure that).
      */
-    public function resolveForInvoice(Pledge $pledge, ?string $invoiceId, ?string $paymentIntentId): ?Transaction
-    {
-        $fn = function () use ($pledge, $invoiceId, $paymentIntentId) {
-            // 1) PI wins if present.
-            if ($paymentIntentId) {
-                $byPi = Transaction::query()
-                    ->where('payment_intent_id', $paymentIntentId)
-                    ->lockForUpdate()
-                    ->first();
+    public function resolveForInvoice(
+        Pledge $pledge,
+        ?string $invoiceId,
+        ?string $paymentIntentId,
+        ?string $billingReason = null, // e.g. "subscription_create"
+    ): ?Transaction {
+        $fn = function () use ($pledge, $invoiceId, $paymentIntentId, $billingReason) {
 
-                if ($byPi) {
-                    return $byPi;
-                }
-            }
-
-            // 2) Canonical invoice row for this pledge.
+            // -----------------------------------------------------------------
+            // 1) Invoice wins (canonical) when available.
+            // -----------------------------------------------------------------
             if ($invoiceId) {
                 $byInvoice = Transaction::query()
                     ->where('pledge_id', $pledge->id)
@@ -48,32 +50,94 @@ class TransactionResolver
                 }
             }
 
-            // 3) Placeholder for this pledge: no invoice yet.
-            // Prefer a true placeholder (no PI either), but allow matching PI if present.
-            $placeholder = Transaction::query()
-                ->where('pledge_id', $pledge->id)
-                ->whereNull('stripe_invoice_id')
-                ->when($paymentIntentId, function ($q) use ($paymentIntentId) {
-                    $q->where(function ($qq) use ($paymentIntentId) {
-                        $qq->whereNull('payment_intent_id')
-                           ->orWhere('payment_intent_id', $paymentIntentId);
-                    });
-                }, function ($q) {
-                    $q->whereNull('payment_intent_id');
-                })
-                ->whereIn('status', ['pending']) // adjust if you have other “in-progress” statuses
-                ->lockForUpdate()
-                ->orderByDesc('id')
-                ->first();
+            // -----------------------------------------------------------------
+            // 2) Adopt placeholder anchor for this pledge attempt.
+            //    Prefer the widget-created subscription_initial on subscription_create.
+            // -----------------------------------------------------------------
+            $attemptId = $pledge->attempt_id;
 
-            if ($placeholder) {
-                return $placeholder;
+            if ($attemptId) {
+                $anchorBase = Transaction::query()
+                    ->where('pledge_id', $pledge->id)
+                    ->where('attempt_id', $attemptId)
+                    ->whereNull('stripe_invoice_id')
+                    ->whereIn('status', ['pending']) // adjust if you have more in-progress statuses
+                    ->lockForUpdate()
+                    ->orderByDesc('id');
+
+                // Prefer a true placeholder (no PI yet) because it's the cleanest adoption.
+                $anchorBase->where(function ($q) {
+                    $q->whereNull('payment_intent_id')
+                      ->orWhere('payment_intent_id', '');
+                });
+
+                // When it's the initial invoice, strongly prefer subscription_initial.
+                if ($billingReason === 'subscription_create') {
+                    $anchorPreferred = (clone $anchorBase)
+                        ->where('type', 'subscription_initial')
+                        ->where('source', 'donation_widget')
+                        ->first();
+
+                    if ($anchorPreferred) {
+                        return $anchorPreferred;
+                    }
+
+                    $anchorFallback = (clone $anchorBase)
+                        ->where('type', 'subscription_initial')
+                        ->first();
+
+                    if ($anchorFallback) {
+                        return $anchorFallback;
+                    }
+
+                    // If we didn't find a strict initial anchor, fall through to more general anchors below.
+                }
+
+                // General (recurring or unknown): prefer widget source if available.
+                $anchorPreferred = (clone $anchorBase)
+                    ->where('source', 'donation_widget')
+                    ->first();
+
+                if ($anchorPreferred) {
+                    return $anchorPreferred;
+                }
+
+                $anchorFallback = (clone $anchorBase)->first();
+                if ($anchorFallback) {
+                    return $anchorFallback;
+                }
             }
 
-            // 4) Last resort: current attempt row.
-            if ($pledge->attempt_id) {
+            // -----------------------------------------------------------------
+            // 3) PaymentIntent fallback match (ONLY after invoice + placeholder).
+            // -----------------------------------------------------------------
+            if ($paymentIntentId) {
+                $byPi = Transaction::query()
+                    ->where('payment_intent_id', $paymentIntentId)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($byPi) {
+                    // Safety: if this tx is already tied to a different invoice, don't return it.
+                    if ($invoiceId && ! empty($byPi->stripe_invoice_id) && (string) $byPi->stripe_invoice_id !== (string) $invoiceId) {
+                        return null;
+                    }
+
+                    // Safety: if it belongs to a different pledge, don't return it.
+                    if (! empty($byPi->pledge_id) && (int) $byPi->pledge_id !== (int) $pledge->id) {
+                        return null;
+                    }
+
+                    return $byPi;
+                }
+            }
+
+            // -----------------------------------------------------------------
+            // 4) Last resort: attempt_id row (can be noisy, so keep it last).
+            // -----------------------------------------------------------------
+            if ($attemptId) {
                 return Transaction::query()
-                    ->where('attempt_id', $pledge->attempt_id)
+                    ->where('attempt_id', $attemptId)
                     ->lockForUpdate()
                     ->orderByDesc('id')
                     ->first();
@@ -82,7 +146,7 @@ class TransactionResolver
             return null;
         };
 
-        // Avoid nested transactions — if we’re already inside one, just run with the current locks.
+        // Avoid nested transactions — if we’re already inside one, just run.
         if (DB::transactionLevel() > 0) {
             return $fn();
         }
@@ -94,20 +158,28 @@ class TransactionResolver
      * Resolve or create a transaction for the invoice, handling duplicates gracefully.
      *
      * IMPORTANT:
-     * - Do NOT call resolveForInvoice() inside another transaction that itself starts a transaction.
      * - Create only when we truly found nothing sensible to update.
+     * - For invoice flows, invoice must remain the canonical identity.
      */
     public function resolveOrCreateForInvoice(
         Pledge $pledge,
         ?string $invoiceId,
         ?string $paymentIntentId,
         array $updates = [],
-        string $defaultType = 'subscription_recurring'
+        string $defaultType = 'subscription_recurring',
+        ?string $billingReason = null,
     ): Transaction {
-        $fn = function () use ($pledge, $invoiceId, $paymentIntentId, $updates, $defaultType) {
-            $tx = $this->resolveForInvoice($pledge, $invoiceId, $paymentIntentId);
+        $fn = function () use ($pledge, $invoiceId, $paymentIntentId, $updates, $defaultType, $billingReason) {
+
+            $tx = $this->resolveForInvoice($pledge, $invoiceId, $paymentIntentId, $billingReason);
 
             if (! $tx) {
+                if (! $invoiceId) {
+                    // Without an invoice id, we should not create in "invoice world".
+                    // Caller can decide what to do, but failing fast is better than duplicates.
+                    throw new \RuntimeException('resolveOrCreateForInvoice called without invoiceId; refusing to create.');
+                }
+
                 try {
                     $tx = Transaction::create(array_merge([
                         'user_id'           => $updates['user_id'] ?? $pledge->user_id,
@@ -115,11 +187,13 @@ class TransactionResolver
                         'attempt_id'        => $pledge->attempt_id,
                         'subscription_id'   => $updates['subscription_id'] ?? $pledge->stripe_subscription_id,
                         'stripe_invoice_id' => $invoiceId,
-                        'payment_intent_id' => $paymentIntentId,
+                        // NOTE: do NOT force PI here unless you are 100% sure it's correct; allow linker to claim later.
+                        'payment_intent_id' => $updates['payment_intent_id'] ?? null,
                         'type'              => $defaultType,
                         'status'            => 'pending',
                         'amount_cents'      => $updates['amount_cents'] ?? $pledge->amount_cents ?? 0,
                         'currency'          => $updates['currency'] ?? $pledge->currency ?? 'usd',
+                        'source'            => $updates['source'] ?? 'stripe_webhook',
                     ], $updates));
                 } catch (UniqueConstraintViolationException | QueryException $e) {
                     Log::warning('Transaction create failed (likely duplicate) → adopting existing', [
@@ -129,15 +203,24 @@ class TransactionResolver
                         'error'       => $e->getMessage(),
                     ]);
 
-                    // Fetch the *real* owner deterministically.
+                    // Fetch the canonical owner deterministically: invoice first.
                     $tx = Transaction::query()
-                        ->when($paymentIntentId, fn ($q) => $q->orWhere('payment_intent_id', $paymentIntentId))
-                        ->when($invoiceId, fn ($q) => $q->orWhere(function ($qq) use ($pledge, $invoiceId) {
-                            $qq->where('pledge_id', $pledge->id)->where('stripe_invoice_id', $invoiceId);
-                        }))
+                        ->where('pledge_id', $pledge->id)
+                        ->where('stripe_invoice_id', $invoiceId)
                         ->lockForUpdate()
-                        ->orderByDesc('id')
-                        ->firstOrFail();
+                        ->first();
+
+                    // Fallback to PI only if invoice lookup failed.
+                    if (! $tx && $paymentIntentId) {
+                        $tx = Transaction::query()
+                            ->where('payment_intent_id', $paymentIntentId)
+                            ->lockForUpdate()
+                            ->first();
+                    }
+
+                    if (! $tx) {
+                        throw $e;
+                    }
                 }
             }
 
@@ -151,10 +234,12 @@ class TransactionResolver
                 }
             }
 
-            // If caller passed invoiceId/paymentIntentId, do not overwrite non-null values.
+            // Invoice must be present if provided (non-stomp)
             if ($invoiceId && empty($tx->stripe_invoice_id)) {
                 $tx->stripe_invoice_id = $invoiceId;
             }
+
+            // PI is still non-stomp: only set if empty
             if ($paymentIntentId && empty($tx->payment_intent_id)) {
                 $tx->payment_intent_id = $paymentIntentId;
             }
