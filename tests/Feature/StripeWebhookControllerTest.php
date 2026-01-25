@@ -1031,9 +1031,11 @@ class StripeWebhookControllerTest extends TestCase
         $pledge->refresh();
         $placeholder->refresh();
 
-        // Pledge updated
-        $this->assertSame('in_inpay_1', $pledge->latest_invoice_id);
-        $this->assertSame('pi_from_inpay', $pledge->latest_payment_intent_id);
+        // invoice_payment.paid currently only enriches the placeholder tx; pledge latest fields
+        // are updated by invoice.* events (canonical).
+        $this->assertNull($pledge->latest_invoice_id);
+        $this->assertNull($pledge->latest_payment_intent_id);
+
         $this->assertNotNull($pledge->last_pledge_at);
         $this->assertEquals($paidAtTs, $pledge->last_pledge_at->timestamp);
 

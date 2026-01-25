@@ -7,6 +7,7 @@ use App\Models\Transaction;
 use App\Models\User;
 use App\Services\StripeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use Mockery\MockInterface;
 use Stripe\Subscription as StripeSubscription;
 use Tests\TestCase;
@@ -14,6 +15,7 @@ use Tests\TestCase;
 class CompleteDonationTest extends TestCase
 {
     use RefreshDatabase;
+    use MockeryPHPUnitIntegration;
 
     /** @var \Mockery\MockInterface|StripeService */
     protected MockInterface $stripeMock;
@@ -67,13 +69,29 @@ class CompleteDonationTest extends TestCase
             'donor_email'  => 'old@example.test',
             'donor_name'   => 'Old Name',
             'metadata'     => [],
+            'attempt_id'   => 'attempt_test_123', // important: controller uses attempt matching
+        ]);
+
+        // ✅ Create the required "anchor" placeholder row (start(monthly) responsibility)
+        $placeholder = Transaction::factory()->create([
+            'pledge_id'         => $pledge->id,
+            'attempt_id'        => $pledge->attempt_id,
+            'type'              => 'subscription_initial',
+            'status'            => 'pending',
+            'source'            => 'donation_widget',
+            'subscription_id'   => null,
+            'customer_id'       => null,
+            'payment_intent_id' => null,
+            'charge_id'         => null,
+            'amount_cents'      => $pledge->amount_cents,
+            'currency'          => $pledge->currency,
         ]);
 
         // Fake Stripe subscription instance to satisfy the return type
-        // Real Stripe object (safe for data_get / property access)
         $fakeStripeSubscription = StripeSubscription::constructFrom([
-            'id' => 'sub_test_123',
+            'id'     => 'sub_test_123',
             'status' => 'active',
+            'customer' => 'cus_test_123',
         ]);
 
         // Expect the controller to call StripeService::createSubscriptionForPledge()
@@ -81,20 +99,21 @@ class CompleteDonationTest extends TestCase
             ->shouldReceive('createSubscriptionForPledge')
             ->once()
             ->withArgs(function (Pledge $argPledge, string $paymentMethodId) use ($pledge) {
-                return $argPledge->is($pledge) &&
-                    $paymentMethodId === 'pm_123';
+                return $argPledge->is($pledge) && $paymentMethodId === 'pm_123';
             })
             ->andReturn($fakeStripeSubscription);
 
+        // If your controller/service calls this after create, allow it.
         $this->stripeMock->shouldReceive('syncFromSubscription')
             ->zeroOrMoreTimes()
             ->andReturnNull();
 
-
         $payload = [
             'mode'              => 'subscription',
+            'attempt_id'         => $pledge->attempt_id,
             'pledge_id'         => $pledge->id,
-            'payment_method_id' => 'pm_123', // required_if:mode,subscription
+            'transaction_id'    => $placeholder->id, // ✅ best key
+            'payment_method_id' => 'pm_123',
             'donor_first_name'  => 'Ryan',
             'donor_last_name'   => 'Miller',
             'donor_email'       => 'ryan@example.test',
@@ -102,18 +121,12 @@ class CompleteDonationTest extends TestCase
 
         $response = $this->post(route('donations.complete'), $payload);
 
-        // Controller should still send us to the subscription thank-you page
-        $response->assertRedirect(
-            route('donations.thankyou-subscription')
-        );
+        $response->assertRedirect(route('donations.thankyou-subscription'));
 
-
-        // Pledge donor info updated from the payload;
-        // subscription id / invoice / transactions are handled in StripeService + webhooks
         $this->assertDatabaseHas('pledges', [
-            'id'         => $pledge->id,
-            'donor_email'=> 'ryan@example.test',
-            'donor_name' => 'Ryan Miller',
+            'id'          => $pledge->id,
+            'donor_email' => 'ryan@example.test',
+            'donor_name'  => 'Ryan Miller',
         ]);
     }
 
@@ -161,7 +174,6 @@ class CompleteDonationTest extends TestCase
 
         $response->assertRedirect(route('donations.thankyou'));
 
-        // Transaction has all the Stripe IDs + receipt URL and payer info now
         $this->assertDatabaseHas('transactions', [
             'id'                => $tx->id,
             'payment_intent_id' => 'pi_123',
@@ -173,7 +185,6 @@ class CompleteDonationTest extends TestCase
             'payer_name'        => 'Ryan Miller',
         ]);
 
-        // Primary address upserted
         $this->assertDatabaseHas('addresses', [
             'user_id'     => $user->id,
             'line1'       => '2429 S Halifax Way',
@@ -184,7 +195,6 @@ class CompleteDonationTest extends TestCase
             'is_primary'  => true,
         ]);
 
-        // User basic info updated from donor fields
         $this->assertDatabaseHas('users', [
             'id'         => $user->id,
             'first_name' => 'Ryan',
@@ -232,7 +242,6 @@ class CompleteDonationTest extends TestCase
             'metadata'     => [],
         ]);
 
-        // Older recurring transaction
         Transaction::factory()->create([
             'user_id'          => $user->id,
             'pledge_id'        => $pledge->id,
@@ -245,7 +254,6 @@ class CompleteDonationTest extends TestCase
             'paid_at'          => now()->subMonth(),
         ]);
 
-        // Newest recurring transaction (the one we expect to see)
         $latest = Transaction::factory()->create([
             'user_id'          => $user->id,
             'pledge_id'        => $pledge->id,
@@ -260,7 +268,7 @@ class CompleteDonationTest extends TestCase
 
         $response = $this
             ->actingAs($user)
-            ->withSession(['pledge_thankyou_id' => $pledge->id]) // 👈 important
+            ->withSession(['pledge_thankyou_id' => $pledge->id])
             ->get(route('donations.thankyou-subscription'));
 
         $response->assertOk();
@@ -272,7 +280,6 @@ class CompleteDonationTest extends TestCase
     public function test_thank_you_subscription_returns_404_without_session_key(): void
     {
         $response = $this->get(route('donations.thankyou-subscription'));
-
         $response->assertNotFound();
     }
 
@@ -280,7 +287,6 @@ class CompleteDonationTest extends TestCase
     {
         $pledge = Pledge::factory()->create();
 
-        // First hit: session key present
         $response1 = $this
             ->withSession(['pledge_thankyou_id' => $pledge->id])
             ->get(route('donations.thankyou-subscription'));
@@ -288,7 +294,6 @@ class CompleteDonationTest extends TestCase
         $response1->assertOk();
         $response1->assertSee('Thank you for your monthly gift');
 
-        // Second hit: key has been pulled/forgotten → 404
         $response2 = $this->get(route('donations.thankyou-subscription'));
         $response2->assertNotFound();
     }
@@ -296,7 +301,6 @@ class CompleteDonationTest extends TestCase
     public function test_thank_you_returns_404_without_session_key(): void
     {
         $response = $this->get(route('donations.thankyou'));
-
         $response->assertNotFound();
     }
 
@@ -309,7 +313,6 @@ class CompleteDonationTest extends TestCase
             'status'       => 'succeeded',
         ]);
 
-        // First hit: session key present
         $response1 = $this
             ->withSession(['transaction_thankyou_id' => $tx->id])
             ->get(route('donations.thankyou'));
@@ -317,7 +320,6 @@ class CompleteDonationTest extends TestCase
         $response1->assertOk();
         $response1->assertSee('Thank you for your gift');
 
-        // Second hit: key has been pulled → 404
         $response2 = $this->get(route('donations.thankyou'));
         $response2->assertNotFound();
     }
