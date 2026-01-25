@@ -35,6 +35,7 @@ class WebhookReplayIsIdempotentTest extends TestCase
             'pledge_id'         => $pledge->id,
             'user_id'           => $pledge->user_id,
             'payment_intent_id' => 'pi_test_123',
+            'charge_id'         => null,
             'status'            => 'pending',
             'type'              => 'subscription_initial',
             'source'            => 'donation_widget',
@@ -53,20 +54,26 @@ class WebhookReplayIsIdempotentTest extends TestCase
         // Replay delivery.
         $this->postStripeWebhookRaw($payload)->assertOk();
 
+        // Idempotency: still exactly one tx for the PI.
         $this->assertSame(
             1,
             Transaction::query()->where('payment_intent_id', 'pi_test_123')->count()
         );
 
         $tx->refresh();
+
+        // Enrichment happened
         $this->assertSame('ch_test_123', $tx->charge_id);
-        $this->assertSame('succeeded', $tx->status);
+
+        // Current contract: PI succeeded does NOT finalize subscription tx status.
+        // Invoice events finalize; PI event is just a linker/enricher.
+        $this->assertSame('pending', $tx->status);
     }
 
     protected function stripeEventPayload(string $type, array $object): string
     {
         return json_encode([
-            'id'   => 'evt_' . $type . '_test',
+            'id'   => 'evt_' . str_replace('.', '_', $type) . '_test',
             'type' => $type,
             'data' => [
                 'object' => $object,

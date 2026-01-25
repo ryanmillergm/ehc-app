@@ -9,6 +9,7 @@ use App\Models\Transaction;
 use App\Services\StripeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
+use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use Stripe\StripeClient;
 use Stripe\Subscription as StripeSubscription;
 use Tests\TestCase;
@@ -16,13 +17,7 @@ use Tests\TestCase;
 class StripeServiceTest extends TestCase
 {
     use RefreshDatabase;
-
-    protected function tearDown(): void
-    {
-        // If a test errors, Mockery needs to close cleanly or PHPUnit will mark it risky.
-        Mockery::close();
-        parent::tearDown();
-    }
+    use MockeryPHPUnitIntegration;
 
     public function test_create_subscription_for_pledge_uses_existing_customer_and_price_and_creates_initial_transaction(): void
     {
@@ -150,6 +145,7 @@ class StripeServiceTest extends TestCase
             'customer_id'       => 'cus_123',
             'payment_intent_id' => null,
             'charge_id'         => null,
+            'stripe_invoice_id' => null,
             'amount_cents'      => 1500,
             'currency'          => 'usd',
             'type'              => 'subscription_recurring',
@@ -206,8 +202,11 @@ class StripeServiceTest extends TestCase
         $this->assertSame('succeeded', $pendingTx->status);
         $this->assertSame('pi_456', $pendingTx->payment_intent_id);
         $this->assertSame('ch_456', $pendingTx->charge_id);
-        $this->assertSame('stripe_webhook', $pendingTx->source);
+        $this->assertSame('donation_widget', $pendingTx->source);
         $this->assertNotNull($pendingTx->paid_at);
+
+        // If your handler sets invoice id for invoice events (recommended), assert it:
+        $this->assertSame('in_123', $pendingTx->stripe_invoice_id);
 
         $this->assertSame(
             $pendingTx->id,
@@ -304,7 +303,7 @@ class StripeServiceTest extends TestCase
             ->shouldReceive('update')
             ->once()
             ->with('sub_update', Mockery::on(function ($params) {
-                return $params['items'][0]['price'] === 'price_new';
+                return ($params['items'][0]['price'] ?? null) === 'price_new';
             }))
             ->andReturn($subscriptionUpdated);
 
@@ -384,7 +383,6 @@ class StripeServiceTest extends TestCase
                             return false;
                         }
 
-                        // allow hashed suffix (…:HASH)
                         if (! str_starts_with($key, 'refund:tx:' . $tx->id . ':')) {
                             return false;
                         }

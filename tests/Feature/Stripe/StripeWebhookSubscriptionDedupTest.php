@@ -54,14 +54,14 @@ class StripeWebhookSubscriptionDedupTest extends TestCase
         ]);
 
         $this->dispatchWebhook('invoice.paid', $this->fakeInvoice([
-            'id'            => 'in_test_1',
-            'customer'      => 'cus_test_1',
-            'subscription'  => 'sub_test_1',
-            'billing_reason'=> 'subscription_create',
-            'payment_intent'=> 'pi_test_1',
-            'charge'        => 'ch_test_1',
-            'amount_paid'   => 5000,
-            'currency'      => 'usd',
+            'id'             => 'in_test_1',
+            'customer'       => 'cus_test_1',
+            'subscription'   => 'sub_test_1',
+            'billing_reason' => 'subscription_create',
+            'payment_intent' => 'pi_test_1',
+            'charge'         => 'ch_test_1',
+            'amount_paid'    => 5000,
+            'currency'       => 'usd',
         ]));
 
         $this->assertSame(1, Transaction::count());
@@ -70,7 +70,9 @@ class StripeWebhookSubscriptionDedupTest extends TestCase
 
         $this->assertSame('subscription_initial', $tx->type);
         $this->assertSame('succeeded', $tx->status);
-        $this->assertSame('stripe_webhook', $tx->source);
+
+        // ✅ IMPORTANT: your code preserves original attribution.
+        $this->assertSame('donation_widget', $tx->source);
 
         $this->assertSame('in_test_1', $tx->stripe_invoice_id);
         $this->assertSame('pi_test_1', $tx->payment_intent_id);
@@ -108,14 +110,14 @@ class StripeWebhookSubscriptionDedupTest extends TestCase
         ]);
 
         $invoice = $this->fakeInvoice([
-            'id'            => 'in_test_1',
-            'customer'      => 'cus_test_1',
-            'subscription'  => 'sub_test_1',
-            'billing_reason'=> 'subscription_create',
-            'payment_intent'=> 'pi_test_1',
-            'charge'        => 'ch_test_1',
-            'amount_paid'   => 5000,
-            'currency'      => 'usd',
+            'id'             => 'in_test_1',
+            'customer'       => 'cus_test_1',
+            'subscription'   => 'sub_test_1',
+            'billing_reason' => 'subscription_create',
+            'payment_intent' => 'pi_test_1',
+            'charge'         => 'ch_test_1',
+            'amount_paid'    => 5000,
+            'currency'       => 'usd',
         ]);
 
         $this->dispatchWebhook('invoice.paid', $invoice);
@@ -157,14 +159,14 @@ class StripeWebhookSubscriptionDedupTest extends TestCase
         ]);
 
         $this->dispatchWebhook('invoice.paid', $this->fakeInvoice([
-            'id'            => 'in_new',
-            'customer'      => 'cus_test_1',
-            'subscription'  => 'sub_test_1',
-            'billing_reason'=> 'subscription_cycle',
-            'payment_intent'=> 'pi_new',
-            'charge'        => 'ch_new',
-            'amount_paid'   => 5000,
-            'currency'      => 'usd',
+            'id'             => 'in_new',
+            'customer'       => 'cus_test_1',
+            'subscription'   => 'sub_test_1',
+            'billing_reason' => 'subscription_cycle',
+            'payment_intent' => 'pi_new',
+            'charge'         => 'ch_new',
+            'amount_paid'    => 5000,
+            'currency'       => 'usd',
         ]));
 
         $this->assertSame(2, Transaction::count());

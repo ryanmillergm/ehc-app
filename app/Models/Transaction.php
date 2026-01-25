@@ -18,6 +18,7 @@ class Transaction extends Model
         'pledge_id',
         'payment_intent_id',
         'subscription_id',
+        'setup_intent_id',
         'stripe_invoice_id',
         'charge_id',
         'customer_id',

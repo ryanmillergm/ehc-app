@@ -6,6 +6,7 @@ use App\Models\Pledge;
 use App\Models\Transaction;
 use App\Services\StripeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use PHPUnit\Framework\Attributes\Test;
 use Stripe\SetupIntent;
 use Stripe\Subscription;
@@ -14,6 +15,7 @@ use Tests\TestCase;
 class DonationMonthlyFlowTest extends TestCase
 {
     use RefreshDatabase;
+    use MockeryPHPUnitIntegration;
 
     protected function setUp(): void
     {
@@ -51,7 +53,6 @@ class DonationMonthlyFlowTest extends TestCase
 
         $json = $res->json();
 
-        // Accept either top-level pledge_id OR nested pledge.id (or other reasonable nesting).
         $pledgeId =
             data_get($json, 'pledge_id')
             ?? data_get($json, 'pledge.id')
@@ -61,7 +62,6 @@ class DonationMonthlyFlowTest extends TestCase
 
         $this->assertNotEmpty($pledgeId, 'Response did not include a pledge id in any expected location.');
 
-        // Same idea for setup intent id + client secret
         $setupIntentId =
             data_get($json, 'setup_intent_id')
             ?? data_get($json, 'setupIntentId')
@@ -82,12 +82,12 @@ class DonationMonthlyFlowTest extends TestCase
 
         $this->assertDatabaseCount('pledges', 1);
         $this->assertDatabaseHas('pledges', [
-            'id'          => $pledgeId,
-            'amount_cents'=> 200,
-            'currency'    => 'usd',
-            'interval'    => 'month',
-            'donor_email' => 'ryan@example.com',
-            'donor_name'  => 'Ryan Miller',
+            'id'           => $pledgeId,
+            'amount_cents' => 200,
+            'currency'     => 'usd',
+            'interval'     => 'month',
+            'donor_email'  => 'ryan@example.com',
+            'donor_name'   => 'Ryan Miller',
         ]);
     }
 
@@ -96,7 +96,6 @@ class DonationMonthlyFlowTest extends TestCase
     {
         $pledge = Pledge::factory()->create();
 
-        // We still mock StripeService so nothing tries to talk to Stripe even if your app bootstraps it.
         $this->mock(StripeService::class);
 
         $res = $this->postJson(route('donations.complete'), [
@@ -111,10 +110,27 @@ class DonationMonthlyFlowTest extends TestCase
     #[Test]
     public function complete_subscription_creates_placeholder_transaction_and_calls_stripe_service(): void
     {
+        // The controller expects the placeholder to ALREADY exist (created during start()).
+        // So we create it here to match production flow.
+
         $pledge = Pledge::factory()->create([
             'stripe_subscription_id' => null,
             'status'                 => 'pending',
-            'attempt_id'             => null,
+            'attempt_id'             => 'attempt_test_1',
+        ]);
+
+        $placeholder = Transaction::factory()->create([
+            'pledge_id'         => $pledge->id,
+            'attempt_id'        => $pledge->attempt_id,
+            'type'              => 'subscription_initial',
+            'status'            => 'pending',
+            'source'            => 'donation_widget',
+            'subscription_id'   => null,
+            'customer_id'       => null,
+            'payment_intent_id' => null,
+            'charge_id'         => null,
+            'amount_cents'      => $pledge->amount_cents,
+            'currency'          => $pledge->currency,
         ]);
 
         $sub = $this->fakeSubscription('sub_test_1', 'active');
@@ -131,58 +147,61 @@ class DonationMonthlyFlowTest extends TestCase
 
                     return $sub;
                 });
+
+            $mock->shouldReceive('syncFromSubscription')
+                ->zeroOrMoreTimes()
+                ->andReturnNull();
         });
 
         $res = $this->postJson(route('donations.complete'), [
-            'mode'             => 'subscription',
-            'pledge_id'         => $pledge->id,
-            'payment_method_id' => 'pm_test_1',
-            'donor_first_name'  => 'Ryan',
-            'donor_last_name'   => 'Miller',
-            'donor_email'       => 'ryan@example.com',
+            'mode'              => 'subscription',
+            'pledge_id'          => $pledge->id,
+            'attempt_id'         => $pledge->attempt_id,
+            'transaction_id'     => $placeholder->id,   // ✅ required now
+            'payment_method_id'  => 'pm_test_1',
+            'donor_first_name'   => 'Ryan',
+            'donor_last_name'    => 'Miller',
+            'donor_email'        => 'ryan@example.com',
         ]);
 
         $res->assertOk()->assertJsonStructure(['redirect']);
 
-        // Placeholder transaction should exist (webhook will enrich later)
+        // Still exactly one placeholder row (complete should not create a second one)
+        $this->assertSame(1, Transaction::where('pledge_id', $pledge->id)->count());
+
         $this->assertDatabaseHas('transactions', [
-            'pledge_id' => $pledge->id,
-            'type'      => 'subscription_initial',
-            'status'    => 'pending',
-            'source'    => 'donation_widget',
+            'id'       => $placeholder->id,
+            'pledge_id'=> $pledge->id,
+            'type'     => 'subscription_initial',
+            'status'   => 'pending',
+            'source'   => 'donation_widget',
         ]);
 
         $pledge->refresh();
         $this->assertSame('active', $pledge->status);
         $this->assertSame('sub_test_1', $pledge->stripe_subscription_id);
 
-        $tx = Transaction::where('pledge_id', $pledge->id)->latest('id')->first();
-        $this->assertNotNull($tx);
-        $this->assertSame('subscription_initial', $tx->type);
+        $placeholder->refresh();
+        $this->assertSame('subscription_initial', $placeholder->type);
     }
 
     private function fakeSetupIntent(string $id, string $status, ?string $pmId): SetupIntent
     {
-        // stripe-php safe way (doesn't try to set id via magic setter)
         /** @var \Stripe\SetupIntent $si */
-        $si = SetupIntent::constructFrom([
-            'id' => $id,
-            'status' => $status,
+        return SetupIntent::constructFrom([
+            'id'            => $id,
+            'status'        => $status,
             'client_secret' => 'seti_cs_' . $id,
-            'payment_method' => $pmId,
+            'payment_method'=> $pmId,
         ]);
-
-        return $si;
     }
 
     private function fakeSubscription(string $id, string $status): Subscription
     {
         /** @var \Stripe\Subscription $sub */
-        $sub = Subscription::constructFrom([
-            'id' => $id,
+        return Subscription::constructFrom([
+            'id'     => $id,
             'status' => $status,
         ]);
-
-        return $sub;
     }
 }

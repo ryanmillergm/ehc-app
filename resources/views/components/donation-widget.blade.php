@@ -632,7 +632,7 @@
 
                             this.mode          = data.mode; // 'payment' or 'subscription'
                             this.clientSecret  = data.clientSecret;
-                            this.transactionId = data.transactionId || null;
+                            this.transactionId = data.transactionId || data.transaction_id || null;
                             this.pledgeId      = data.pledgeId || null;
 
                             // Server is source of truth. Persist it.

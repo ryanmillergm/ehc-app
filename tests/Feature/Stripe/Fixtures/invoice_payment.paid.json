@@ -1,0 +1,28 @@
+{
+  "id": "evt_1SszT31DPheI4KUE43HCpxr4",
+  "object": "event",
+  "api_version": "2025-06-30.basil",
+  "created": 1769232785,
+  "data": {
+    "object": {
+      "id": "inpay_1SszSm1DPheI4KUEfXgMIKjj",
+      "object": "invoice_payment",
+      "amount_paid": 113,
+      "currency": "usd",
+      "invoice": "in_1SszSl1DPheI4KUE0Qzy4hom",
+      "livemode": true,
+      "payment": {
+        "payment_intent": "pi_3SszSl1DPheI4KUE1O4FTdi8",
+        "type": "payment_intent"
+      },
+      "status": "paid"
+    }
+  },
+  "livemode": true,
+  "pending_webhooks": 0,
+  "request": {
+    "id": null,
+    "idempotency_key": null
+  },
+  "type": "invoice_payment.paid"
+}

@@ -229,14 +229,82 @@ class DonationsController extends Controller
                 $this->sdbg('start(monthly): using existing pledge', $this->pledgeSnap($pledge));
             }
 
+            // -----------------------------------------------------------
+            // Create/reuse placeholder transaction FIRST (anchor row)
+            // -----------------------------------------------------------
+            $placeholder = Transaction::query()->firstOrCreate(
+                [
+                    'pledge_id'  => $pledge->id,
+                    'attempt_id' => $attemptId,
+                    'type'       => 'subscription_initial',
+                    'source'     => 'donation_widget',
+                ],
+                [
+                    'user_id'         => $pledge->user_id,
+                    'customer_id'     => $pledge->stripe_customer_id,
+                    'subscription_id' => $pledge->stripe_subscription_id,
+                    'setup_intent_id' => $pledge->setup_intent_id,
+                    'amount_cents'    => (int) ($pledge->amount_cents ?? 0),
+                    'currency'        => $pledge->currency ?? 'usd',
+                    'status'          => 'pending',
+                    'payer_email'     => $pledge->donor_email,
+                    'payer_name'      => $pledge->donor_name,
+                    'metadata'        => [
+                        'frequency' => 'monthly',
+                        'stage'     => 'started',
+                    ],
+                ]
+            );
+
+            $this->sdbg('start(monthly): placeholder ready', $this->txSnap($placeholder));
+
+            // -----------------------------------------------------------
+            // Now create SetupIntent (Stripe call after anchor exists)
+            // -----------------------------------------------------------
             $setupIntent = $this->stripe->createSetupIntentForPledge($pledge, $donor);
+
+            // StripeService may set customer/setup_intent on pledge; refresh for the authoritative values.
+            $pledge->refresh();
+
+            // Persist setup_intent_id on BOTH pledge and placeholder (non-stomp)
+            $siId = $pledge->setup_intent_id ?: ($setupIntent->id ?? null);
+
+            $customerFromSi = is_string($setupIntent->customer ?? null)
+                ? $setupIntent->customer
+                : ($setupIntent->customer->id ?? null);
+
+            if ($customerFromSi && empty($pledge->stripe_customer_id)) {
+                $pledge->stripe_customer_id = $customerFromSi;
+                $pledge->save();
+            }
+
+            if ($siId && empty($pledge->setup_intent_id)) {
+                $pledge->setup_intent_id = $siId;
+                $pledge->save();
+            }
+
+            if ($customerFromSi && empty($placeholder->customer_id)) {
+                $placeholder->customer_id = $customerFromSi;
+            }
+
+            if ($siId && empty($placeholder->setup_intent_id)) {
+                $placeholder->setup_intent_id = $siId;
+            }
+
+            if ($customerFromSi || $siId) {
+                $placeholder->metadata = $this->mergeMetadata($placeholder->metadata, [
+                    'stage' => 'setup_intent_created',
+                ]);
+                $placeholder->save();
+            }
 
             $this->sdbg('start(monthly): setup intent ready', [
                 'pledge_id'       => $pledge->id,
                 'attempt_id'      => $attemptId,
-                'setup_intent_id' => $setupIntent->id ?? null,
+                'transaction_id'  => $placeholder->id,
+                'setup_intent_id' => $siId,
                 'si_status'       => $setupIntent->status ?? null,
-                'customer'        => is_string($setupIntent->customer ?? null) ? $setupIntent->customer : ($setupIntent->customer->id ?? null),
+                'customer'        => $customerFromSi,
             ]);
 
             return response()->json([
@@ -245,13 +313,15 @@ class DonationsController extends Controller
                 // snake_case (tests / backend)
                 'attempt_id'      => $attemptId,
                 'pledge_id'       => $pledge->id,
-                'setup_intent_id' => $setupIntent->id ?? null,
+                'transaction_id'  => $placeholder->id, // give the client the anchor
+                'setup_intent_id' => $siId,
                 'client_secret'   => $setupIntent->client_secret ?? null,
 
                 // camelCase (frontend/back-compat)
                 'attemptId'     => $attemptId,
                 'pledgeId'      => $pledge->id,
-                'setupIntentId' => $setupIntent->id ?? null,
+                'transactionId'  => $placeholder?->id,
+                'setupIntentId' => $siId,
                 'clientSecret'  => $setupIntent->client_secret ?? null,
             ]);
         } catch (Throwable $e) {
@@ -550,47 +620,102 @@ class DonationsController extends Controller
             }
             $pledge->save();
 
-            // Find-or-create the subscription_initial placeholder transaction for this pledge/attempt.
-            $placeholder = Transaction::query()
-                ->where('pledge_id', $pledge->id)
-                ->where('source', 'donation_widget')
-                ->where('type', 'subscription_initial')
-                ->where('attempt_id', $attemptId)
-                ->latest('id')
-                ->first();
+            // Find the placeholder transaction for this subscription attempt.
+            // Rule: NEVER create a new transaction row here.
+            // We must re-use the anchor row created in start(monthly).
+            $placeholder = null;
 
-            if (! $placeholder) {
-                $placeholder = Transaction::create([
-                    'attempt_id'      => $attemptId,
-                    'user_id'         => $pledge->user_id,
-                    'pledge_id'       => $pledge->id,
-                    'subscription_id' => $pledge->stripe_subscription_id,
-                    'amount_cents'    => $pledge->amount_cents ?? 0,
-                    'currency'        => $pledge->currency ?? 'usd',
-                    'type'            => 'subscription_initial',
-                    'status'          => 'pending',
-                    'source'          => 'donation_widget',
-                    'payer_email'     => $pledge->donor_email,
-                    'payer_name'      => $pledge->donor_name,
-                    'metadata'        => [
-                        'stage' => 'subscription_creation',
-                    ],
-                ]);
+            // 0) If the widget sent us a transaction_id, that's the best possible key.
+            if (! empty($data['transaction_id'])) {
+                $placeholder = Transaction::query()->whereKey((int) $data['transaction_id'])->first();
 
-                $this->sdbg('complete(subscription): placeholder created', $this->txSnap($placeholder));
-            } else {
-                $this->sdbg('complete(subscription): placeholder exists', $this->txSnap($placeholder));
+                if ($placeholder && (int) $placeholder->pledge_id !== (int) $pledge->id) {
+                    $this->sdbg('complete(subscription): transaction_id does not belong to pledge; ignoring', [
+                        'tx_id'     => $placeholder->id,
+                        'tx_pledge' => $placeholder->pledge_id,
+                        'pledge_id' => $pledge->id,
+                    ]);
+                    $placeholder = null;
+                }
             }
+
+            // 1) Fallback: pledge+attempt anchor (should almost always work now)
+            if (! $placeholder) {
+                $placeholder = Transaction::query()
+                    ->where('pledge_id', $pledge->id)
+                    ->where('attempt_id', $attemptId)
+                    ->where('type', 'subscription_initial')
+                    ->where('source', 'donation_widget')
+                    ->latest('id')
+                    ->first();
+            }
+
+            // 2) Extra fallback: setup_intent_id (unique)
+            $setupIntentIdForQuery = (string) ($data['setup_intent_id'] ?? '');
+            if (! $placeholder && $setupIntentIdForQuery !== '') {
+                $placeholder = Transaction::query()
+                    ->where('setup_intent_id', $setupIntentIdForQuery)
+                    ->latest('id')
+                    ->first();
+            }
+
+            throw_unless($placeholder, ValidationException::withMessages([
+                'transaction_id' => 'Missing subscription placeholder transaction. Please restart the pledge.',
+            ]));
 
             $placeholder->setStage('subscription_creation', save: true);
 
             $pmId = (string) ($data['payment_method_id'] ?? '');
             $this->sdbg('complete(subscription): calling createSubscriptionForPledge', [
                 'pledge_id' => $pledge->id,
+                'transaction_id'  => $placeholder?->id,
                 'pm_id'     => $pmId,
             ]);
 
             $subscription = $this->stripe->createSubscriptionForPledge($pledge, $pmId);
+
+            /**
+             * IMPORTANT:
+             * In production StripeService may persist these IDs.
+             * In tests (mocked service), nothing is persisted — so we must backfill from the returned Subscription.
+             */
+            $subCustomerId = $this->extractId($subscription->customer ?? null)
+                ?: $this->extractId(data_get($subscription, 'customer.id'));
+
+            $subId = $this->extractId($subscription->id ?? null);
+
+            $latestInvoice = $subscription->latest_invoice ?? null;
+            $subInvoiceId = $this->extractId($latestInvoice)
+                ?: $this->extractId(data_get($subscription, 'latest_invoice.id'));
+
+            $subPiId = $this->extractId(data_get($subscription, 'latest_invoice.payment_intent'))
+                ?: $this->extractId(data_get($subscription, 'latest_invoice.payment_intent.id'));
+
+            $pledgeDirty = false;
+
+            if ($subCustomerId && empty($pledge->stripe_customer_id)) {
+                $pledge->stripe_customer_id = $subCustomerId;
+                $pledgeDirty = true;
+            }
+
+            if ($subId && empty($pledge->stripe_subscription_id)) {
+                $pledge->stripe_subscription_id = $subId;
+                $pledgeDirty = true;
+            }
+
+            if ($subInvoiceId && empty($pledge->latest_invoice_id)) {
+                $pledge->latest_invoice_id = $subInvoiceId;
+                $pledgeDirty = true;
+            }
+
+            if ($subPiId && empty($pledge->latest_payment_intent_id)) {
+                $pledge->latest_payment_intent_id = $subPiId;
+                $pledgeDirty = true;
+            }
+
+            if ($pledgeDirty) {
+                $pledge->save();
+            }
 
             // StripeService syncs authoritative IDs onto the pledge (invoice/pi/sub/etc.)
             $pledge->refresh();
@@ -636,7 +761,7 @@ class DonationsController extends Controller
             // Claim invoice id safely (returns canonical owner if already owned elsewhere)
             $placeholder = $invoiceLinker->claimInvoiceId($placeholder, (int) $pledge->id, $invoiceId);
 
-            // ✅ NOW we know $placeholder is canonical: enrich without stomping.
+            // NOW we know $placeholder is canonical: enrich without stomping.
             if (empty($placeholder->subscription_id) && $subId) {
                 $placeholder->subscription_id = $subId;
             }
@@ -708,7 +833,7 @@ class DonationsController extends Controller
                 ->with('success', 'Thank you for your monthly pledge!');
 
         } catch (ValidationException $e) {
-            // ✅ CRITICAL: do not swallow validation (tests expect 422, and clients deserve it)
+            // CRITICAL: do not swallow validation (tests expect 422, and clients deserve it)
             throw $e;
 
         } catch (ModelNotFoundException $e) {
@@ -864,11 +989,15 @@ class DonationsController extends Controller
                     return redirect()->route('donations.show')->withErrors('We could not find your pledge attempt. Please try again.');
                 }
 
+                $placeholder = null;
+
                 try {
                     $si = $this->stripe->retrieveSetupIntent($siId);
 
                     if (($si->status ?? null) !== 'succeeded') {
-                        return redirect()->route('donations.show')->withErrors('Your card setup was not completed. Please try again.');
+                        return redirect()
+                            ->route('donations.show')
+                            ->withErrors('Your card setup was not completed. Please try again.');
                     }
 
                     $pmId = is_string($si->payment_method ?? null)
@@ -876,9 +1005,12 @@ class DonationsController extends Controller
                         : ($si->payment_method->id ?? null);
 
                     if (! $pmId) {
-                        return redirect()->route('donations.show')->withErrors('Missing payment method. Please try again.');
+                        return redirect()
+                            ->route('donations.show')
+                            ->withErrors('Missing payment method. Please try again.');
                     }
 
+                    // Best-effort: enrich pledge with billing details (non-fatal if it fails).
                     try {
                         $pm = $this->stripe->retrievePaymentMethod($pmId);
                         $pledge->donor_email ??= data_get($pm, 'billing_details.email');
@@ -886,25 +1018,39 @@ class DonationsController extends Controller
                         $pledge->save();
                     } catch (Throwable $e) {
                         Log::info('stripeReturn: could not read payment method billing details', [
-                            'setup_intent' => $siId,
+                            'setup_intent'   => $siId,
                             'payment_method' => $pmId,
-                            'error' => $e->getMessage(),
+                            'pledge_id'      => $pledge->id,
+                            'error'          => $e->getMessage(),
                         ]);
                     }
+
+                    // Resolve placeholder for traceability (optional, but helpful in logs)
+                    $placeholder = Transaction::query()
+                        ->where('pledge_id', $pledge->id)
+                        ->where('setup_intent_id', $siId)
+                        ->latest('id')
+                        ->first();
 
                     $this->stripe->createSubscriptionForPledge($pledge, $pmId);
 
                     $request->session()->put('pledge_thankyou_id', $pledge->id);
 
                     return redirect()->route('donations.thankyou-subscription');
+
                 } catch (Throwable $e) {
                     Log::warning('stripeReturn: subscription finalize failed', [
-                        'setup_intent' => $siId,
-                        'pledge_id' => $pledge->id,
-                        'error' => $e->getMessage(),
+                        'setup_intent'    => $siId,
+                        'pledge_id'       => $pledge->id ?? null,
+                        'transaction_id'  => $placeholder?->id,
+                        'subscription_id' => $pledge->stripe_subscription_id ?? null,
+                        'customer_id'     => $pledge->stripe_customer_id ?? null,
+                        'error'           => $e->getMessage(),
                     ]);
 
-                    return redirect()->route('donations.show')->withErrors('We could not finalize your monthly pledge. Please try again.');
+                    return redirect()
+                        ->route('donations.show')
+                        ->withErrors('We could not finalize your monthly pledge. Please try again.');
                 }
             }
 

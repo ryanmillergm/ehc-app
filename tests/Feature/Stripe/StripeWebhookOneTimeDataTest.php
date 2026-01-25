@@ -21,7 +21,7 @@ class StripeWebhookOneTimeDataTest extends TestCase
             'pledge_id'         => null,
             'type'              => 'one_time',
             'status'            => 'pending',
-            'payment_intent_id' => null,
+            'payment_intent_id' => 'pi_123', // important: handler usually finds by PI
             'charge_id'         => null,
             'customer_id'       => 'cus_abc',
             'payment_method_id' => null,
@@ -31,7 +31,7 @@ class StripeWebhookOneTimeDataTest extends TestCase
             'payer_name'        => 'Test Donor',
             'receipt_url'       => null,
             'source'            => 'donation_widget',
-            'metadata'          => ['frequency' => 'one_time'],
+            'metadata'          => ['frequency' => 'one_time', 'donation' => 'widget'],
             'created_at'        => now(),
         ]);
 
@@ -65,32 +65,41 @@ class StripeWebhookOneTimeDataTest extends TestCase
 
         (new StripeWebhookController())->handleEvent($event);
 
+        // idempotent update, no duplicates
         $this->assertDatabaseCount('transactions', 1);
 
         $placeholder->refresh();
 
-        //  preserve user_id
+        // preserve user_id
         $this->assertSame($user->id, $placeholder->user_id);
 
-        //  core fields
-        $this->assertSame('succeeded', $placeholder->status);
+        // charge.succeeded enriches, but does NOT finalize payment
+        $this->assertSame('pending', $placeholder->status);
+        $this->assertNull($placeholder->paid_at);
+
+        // core enrichment fields
         $this->assertSame('pi_123', $placeholder->payment_intent_id);
         $this->assertSame('ch_123', $placeholder->charge_id);
         $this->assertSame('cus_abc', $placeholder->customer_id);
         $this->assertSame('pm_123', $placeholder->payment_method_id);
         $this->assertSame('https://example.test/receipt/ch_123', $placeholder->receipt_url);
-        $this->assertSame('stripe_webhook', $placeholder->source);
-        $this->assertNotNull($placeholder->paid_at);
 
-        //  thank-you page metadata
+        // preserve original source (unless your handler intentionally overwrites it)
+        $this->assertSame('donation_widget', $placeholder->source);
+
+        // metadata merged (non-stomp)
         $this->assertIsArray($placeholder->metadata);
+        $this->assertSame('one_time', data_get($placeholder->metadata, 'frequency'));
+        $this->assertSame('widget', data_get($placeholder->metadata, 'donation'));
+
+        // card metadata present for thank-you UI (even if not finalized yet)
         $this->assertSame('visa', data_get($placeholder->metadata, 'card_brand'));
         $this->assertSame('4242', data_get($placeholder->metadata, 'card_last4'));
         $this->assertSame('US', data_get($placeholder->metadata, 'card_country'));
         $this->assertSame('credit', data_get($placeholder->metadata, 'card_funding'));
     }
 
-    public function test_one_time_charge_succeeded_creates_transaction_when_no_placeholder_exists(): void
+    public function test_one_time_charge_succeeded_does_not_create_transaction_when_no_placeholder_exists(): void
     {
         $event = (object) [
             'type' => 'charge.succeeded',
@@ -120,20 +129,7 @@ class StripeWebhookOneTimeDataTest extends TestCase
 
         (new StripeWebhookController())->handleEvent($event);
 
-        $this->assertDatabaseCount('transactions', 1);
-
-        $tx = Transaction::firstOrFail();
-
-        $this->assertSame('one_time', $tx->type);
-        $this->assertSame('succeeded', $tx->status);
-        $this->assertSame('pi_new', $tx->payment_intent_id);
-        $this->assertSame('ch_new', $tx->charge_id);
-        $this->assertSame('cus_new', $tx->customer_id);
-        $this->assertSame('pm_new', $tx->payment_method_id);
-        $this->assertSame('https://example.test/receipt/ch_new', $tx->receipt_url);
-        $this->assertSame('stripe_webhook', $tx->source);
-
-        $this->assertSame('visa', data_get($tx->metadata, 'card_brand'));
-        $this->assertSame('4242', data_get($tx->metadata, 'card_last4'));
+        // behavior: charge.succeeded does not create new one-time transactions
+        $this->assertDatabaseCount('transactions', 0);
     }
 }
