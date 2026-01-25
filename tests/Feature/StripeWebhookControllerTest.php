@@ -1036,6 +1036,13 @@ class StripeWebhookControllerTest extends TestCase
         $this->assertNull($pledge->latest_invoice_id);
         $this->assertNull($pledge->latest_payment_intent_id);
 
+        // invoice_payment.paid does NOT set these canonicals (invoice.* does)
+        $this->assertNull($pledge->latest_invoice_id);
+        $this->assertNull($pledge->latest_payment_intent_id);
+
+        $controller = app(StripeWebhookController::class);
+
+        // BUT it *does* set last_pledge_at from paid_at
         $this->assertNotNull($pledge->last_pledge_at);
         $this->assertEquals($paidAtTs, $pledge->last_pledge_at->timestamp);
 
