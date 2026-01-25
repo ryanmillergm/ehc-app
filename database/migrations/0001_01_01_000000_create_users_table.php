@@ -24,6 +24,8 @@ return new class extends Migration
             $table->string('full_name')->virtualAs('concat(first_name, \' \', last_name)');
             $table->string('details')->virtualAs('concat(first_name, \' \', last_name, \' \', email)');
             $table->timestamps();
+
+            $table->softDeletes();
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {
