@@ -21,10 +21,19 @@ use App\Http\Controllers\Donations\DonationsController;
 use App\Http\Controllers\EmailPreferencesController;
 use App\Http\Middleware\LogStripeWebhookHit;
 use App\Http\Controllers\EmailUnsubscribeController;
+use Laravel\Fortify\Http\Controllers\RegisteredUserController;
 
 Route::get('lang/{lang}', LanguageSwitch::class)->name('lang');
 
 Route::get('/', Home::class)->name('home');
+
+Route::middleware([
+    'guest',
+    'throttle:'.config('fortify.limiters.register', 'register'),
+])->group(function () {
+    Route::post('/register', [RegisteredUserController::class, 'store'])
+        ->name('register.store');
+});
 
 Route::view('/emails/subscribe', 'emails.subscribe')
     ->name('emails.subscribe');
