@@ -4,107 +4,66 @@ declare(strict_types=1);
 
 namespace Tests\Support\Stripe;
 
+use RuntimeException;
 use Stripe\StripeClient;
 
-/**
- * Minimal fake StripeClient for webhook tests.
- *
- * Supports:
- *  - $client->invoices->retrieve($id, [...])
- *  - $client->paymentIntents->retrieve($id, [...])
- *  - $client->charges->retrieve($id, [...])
- *
- * No network. Returns canned objects you provide.
- *
- * NOTE: We intentionally do NOT rely on Stripe's internal service classes.
- * We just provide properties with a compatible `retrieve()` signature.
- */
-class FakeStripeClient extends StripeClient
+final class FakeStripeClient extends StripeClient
 {
-    public FakeStripeInvoicesService $invoices;
-    public FakeStripePaymentIntentsService $paymentIntents;
-    public FakeStripeChargesService $charges;
+    public object $invoices;
+    public object $paymentIntents;
+    public object $charges;
 
     /**
      * @param array{
      *   invoices?: array<string, object>,
      *   payment_intents?: array<string, object>,
      *   charges?: array<string, object>,
-     * } $store
+     * } $fixtures
      */
-    public function __construct(array $store = [])
+    public function __construct(array $fixtures = [])
     {
-        // StripeClient wants an API key, but we never use it.
-        parent::__construct('sk_test_fake');
+        // Parent constructor does not “call the network” by itself.
+        // It only sets up service access.
+        parent::__construct('sk_test_fake_no_network');
 
-        $this->invoices = new FakeStripeInvoicesService($store['invoices'] ?? []);
-        $this->paymentIntents = new FakeStripePaymentIntentsService($store['payment_intents'] ?? []);
-        $this->charges = new FakeStripeChargesService($store['charges'] ?? []);
-    }
-}
+        $invoiceMap = $fixtures['invoices'] ?? [];
+        $piMap      = $fixtures['payment_intents'] ?? [];
+        $chargeMap  = $fixtures['charges'] ?? [];
 
-final class FakeStripeInvoicesService
-{
-    /** @var array<string, object> */
-    private array $invoices;
+        $this->invoices = new class($invoiceMap) {
+            public function __construct(private array $map) {}
 
-    /** @param array<string, object> $invoices */
-    public function __construct(array $invoices)
-    {
-        $this->invoices = $invoices;
-    }
+            public function retrieve(string $id, array $opts = []): object
+            {
+                if (! array_key_exists($id, $this->map)) {
+                    throw new RuntimeException("FakeStripeClient: missing invoice fixture for {$id}");
+                }
+                return $this->map[$id];
+            }
+        };
 
-    /** @param array<string, mixed> $opts */
-    public function retrieve(string $id, array $opts = []): object
-    {
-        if (! array_key_exists($id, $this->invoices)) {
-            throw new \RuntimeException("FakeStripeClient: invoice not found [{$id}]");
-        }
+        $this->paymentIntents = new class($piMap) {
+            public function __construct(private array $map) {}
 
-        return $this->invoices[$id];
-    }
-}
+            public function retrieve(string $id, array $opts = []): object
+            {
+                if (! array_key_exists($id, $this->map)) {
+                    throw new RuntimeException("FakeStripeClient: missing payment_intent fixture for {$id}");
+                }
+                return $this->map[$id];
+            }
+        };
 
-final class FakeStripePaymentIntentsService
-{
-    /** @var array<string, object> */
-    private array $pis;
+        $this->charges = new class($chargeMap) {
+            public function __construct(private array $map) {}
 
-    /** @param array<string, object> $pis */
-    public function __construct(array $pis)
-    {
-        $this->pis = $pis;
-    }
-
-    /** @param array<string, mixed> $opts */
-    public function retrieve(string $id, array $opts = []): object
-    {
-        if (! array_key_exists($id, $this->pis)) {
-            throw new \RuntimeException("FakeStripeClient: payment_intent not found [{$id}]");
-        }
-
-        return $this->pis[$id];
-    }
-}
-
-final class FakeStripeChargesService
-{
-    /** @var array<string, object> */
-    private array $charges;
-
-    /** @param array<string, object> $charges */
-    public function __construct(array $charges)
-    {
-        $this->charges = $charges;
-    }
-
-    /** @param array<string, mixed> $opts */
-    public function retrieve(string $id, array $opts = []): object
-    {
-        if (! array_key_exists($id, $this->charges)) {
-            throw new \RuntimeException("FakeStripeClient: charge not found [{$id}]");
-        }
-
-        return $this->charges[$id];
+            public function retrieve(string $id, array $opts = []): object
+            {
+                if (! array_key_exists($id, $this->map)) {
+                    throw new RuntimeException("FakeStripeClient: missing charge fixture for {$id}");
+                }
+                return $this->map[$id];
+            }
+        };
     }
 }

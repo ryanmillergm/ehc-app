@@ -31,28 +31,26 @@ class StripeWebhookController extends Controller
 
     protected function stripeClient(): ?StripeClient
     {
-        // If the container already has a StripeClient (ex: FakeStripeClient in tests),
-        // use it. This avoids hitting the network and avoids needing STRIPE_SECRET in tests.
+        // 1) Container binding wins (tests can override safely)
         if (app()->bound(StripeClient::class)) {
             $client = app(StripeClient::class);
             if ($client instanceof StripeClient) {
-                return $client;
+                return $this->stripe = $client;
             }
         }
 
-        // Existing behavior for production/local.
+        // 2) Already set (injected or previously built)
         if ($this->stripe instanceof StripeClient) {
             return $this->stripe;
         }
 
+        // 3) Normal production path: build from secret
         $secret = trim((string) config('services.stripe.secret'));
-        if ($secret === '') {
-            return null;
+        if ($secret !== '') {
+            return $this->stripe = new StripeClient($secret);
         }
 
-        $this->stripe = new StripeClient($secret);
-
-        return $this->stripe;
+        return null;
     }
 
     /**
@@ -260,22 +258,26 @@ class StripeWebhookController extends Controller
 
         // Only one-time: PI succeeded is allowed to mark paid
         if (! $isSubscriptionTx) {
-            if ($tx->status !== 'succeeded') {
-                $tx->status = 'succeeded';
-            }
-
+            $tx->status  = 'succeeded';
             $tx->paid_at = $tx->paid_at ?? now();
 
-            $tx->setStage('paid');
-
-            // Preserve historical metadata, but assert truth
-            $tx->metadata = $this->mergeMetadata($tx->metadata, [
-                'event'  => 'payment_intent.succeeded',
-                'writer' => 'payment_intent_succeeded',
+            // Build metadata (incoming wins)
+            $meta = $this->mergeMetaIncomingWins($tx->metadata, [
+                'event' => 'payment_intent.succeeded',
             ]);
+
+            // Authoritative writer truth (force)
+            $meta['stage']  = 'paid';
+            $meta['writer'] = 'payment_intent_succeeded';
+
+            $tx->metadata = $meta;
+
+            // Keep stage column/side-effects consistent if you have them
+            $tx->setStage('paid');
 
             // Do not stomp source; only fill if empty
             $tx->source = $tx->source ?: 'stripe_webhook';
+
         } else {
             // Subscription world: enrichment only (invoice.* is single writer for paid)
             $this->dbg('payment_intent.succeeded: subscription-related; enriched only (invoice is single writer)', [
@@ -287,8 +289,7 @@ class StripeWebhookController extends Controller
             ], 'info');
         }
 
-        // Ensure metadata is never lost.
-        $tx->metadata = $this->mergeMetadata($tx->metadata, array_filter([
+        $tx->metadata = $this->mergeMetaIncomingWins($tx->metadata, array_filter([
             'event'      => 'payment_intent.succeeded',
             'invoice_id' => $invoiceId,
         ]));
@@ -335,32 +336,33 @@ class StripeWebhookController extends Controller
      *   data.object.invoice = "in_..."
      *   data.object.payment.payment_intent = "pi_..."
      */
-    protected function handleInvoicePaymentPaid(object $inpay): void
-    {
-        $invoiceId = $this->extractId($inpay->invoice ?? null);
 
-        if (! $invoiceId) {
-            $this->dbg('invoice_payment.paid: missing invoice id; cannot forward to invoice handler', [
-                'invoice_payment_id' => $this->extractId($inpay->id ?? null),
-                'pi' => $this->extractId(data_get($inpay, 'payment.payment_intent'))
-                    ?: $this->extractId(data_get($inpay, 'payment_intent')),
-            ], 'warning');
+protected function handleInvoicePaymentPaid(object $inpay): void
+{
+    $invoiceId = $this->extractId($inpay->invoice ?? null);
+    $inpayId   = $this->extractId($inpay->id ?? null);
 
-            return;
-        }
+    $piId = $this->extractId(data_get($inpay, 'payment.payment_intent'))
+        ?: $this->extractId(data_get($inpay, 'payment_intent'));
 
-        // In tests we do NOT hit the network — we bind a FakeStripeClient.
-        // If no client is available (misconfigured test), bail gracefully.
-        $client = $this->stripeClient();
-        if (! $client) {
-            $this->dbg('invoice_payment.paid: stripe client unavailable; cannot retrieve invoice', [
-                'invoice_id'  => $invoiceId,
-                'unit_tests'  => app()->runningUnitTests(),
-            ], 'warning');
+    $paidAtTs = data_get($inpay, 'status_transitions.paid_at');
+    $paidAt   = is_numeric($paidAtTs) ? Carbon::createFromTimestamp((int) $paidAtTs) : null;
 
-            return;
-        }
+    if (! $invoiceId) {
+        $this->dbg('invoice_payment.paid: missing invoice id', [
+            'invoice_payment_id' => $inpayId,
+            'pi'                 => $piId,
+        ], 'warning');
+        return;
+    }
 
+    /**
+     * 1) Prefer bridging to canonical invoice handler when StripeClient exists.
+     *    In tests, this works with FakeStripeClient too.
+     */
+    $client = $this->stripeClient();
+
+    if ($client) {
         try {
             $invoice = $client->invoices->retrieve($invoiceId, [
                 'expand' => [
@@ -373,15 +375,81 @@ class StripeWebhookController extends Controller
                 ],
             ]);
 
-            // Single-writer: forward to invoice handler.
             $this->handleInvoicePaid($invoice, 'invoice_payment.paid');
+            return;
         } catch (Throwable $e) {
-            $this->dbg('invoice_payment.paid: invoice retrieval failed; cannot forward', [
+            $this->dbg('invoice_payment.paid: invoice retrieval failed; falling back to local enrich', [
                 'invoice_id' => $invoiceId,
+                'pi'         => $piId,
                 'error'      => $e->getMessage(),
             ], 'warning');
+            // continue to local fallback
         }
     }
+
+    /**
+     * 2) Local fallback (no network / no Stripe client):
+     *    - enrich placeholder tx (PI, paid_at, succeeded)
+     *    - update pledge.last_pledge_at only
+     *    - DO NOT set pledge latest_invoice_id/latest_payment_intent_id (canonical invoice does that)
+     */
+    $tx = $this->findTransactionByStripeInvoiceId($invoiceId);
+
+    if (! $tx) {
+        // Extra fallback for your "subscription_initial placeholder with invoice id stored in metadata"
+        $tx = Transaction::query()
+            ->where('type', 'subscription_initial')
+            ->whereIn('status', ['pending'])
+            ->where(function ($q) use ($invoiceId) {
+                $q->where('metadata->stripe_invoice_id', $invoiceId)
+                  ->orWhere('metadata', 'like', '%"stripe_invoice_id":"'.$invoiceId.'"%');
+            })
+            ->latest('id')
+            ->first();
+    }
+
+    if (! $tx) {
+        $this->dbg('invoice_payment.paid: no placeholder tx found for invoice', [
+            'invoice_id'         => $invoiceId,
+            'invoice_payment_id' => $inpayId,
+            'pi'                 => $piId,
+        ], 'warning');
+        return;
+    }
+
+    $meta = is_array($tx->metadata)
+        ? $tx->metadata
+        : (json_decode((string) $tx->metadata, true) ?: []);
+
+    $meta['stripe_invoice_id'] = $meta['stripe_invoice_id'] ?? $invoiceId;
+    if ($inpayId) {
+        $meta['stripe_invoice_payment_id'] = $inpayId;
+    }
+
+    if ($piId && empty($tx->payment_intent_id)) {
+        $tx->payment_intent_id = $piId;
+    }
+
+    $tx->status = 'succeeded';
+    $tx->paid_at = $tx->paid_at ?? ($paidAt ?: now());
+    $tx->metadata = $meta;
+
+    // Don't stomp source unless empty
+    $tx->source = $tx->source ?: 'stripe_webhook';
+
+    $tx->save();
+
+    // Update pledge.last_pledge_at only (matches your test expectation)
+    if ($tx->pledge_id && $paidAt) {
+        $pledge = Pledge::query()->find($tx->pledge_id);
+
+        if ($pledge && (! $pledge->last_pledge_at || $pledge->last_pledge_at->lt($paidAt))) {
+            $pledge->forceFill([
+                'last_pledge_at' => $paidAt,
+            ])->save();
+        }
+    }
+}
 
 
     /**
@@ -662,9 +730,31 @@ class StripeWebhookController extends Controller
                 $baseMetadata
             ) {
                 // -----------------------------------------------------------------
-                // 1) Resolver first (canonical tx if it already exists)
+                // 1) Find-only resolution (NO CREATION). Strong keys first.
                 // -----------------------------------------------------------------
-                $tx = $resolver->resolveForInvoice($pledge, $invoiceId, $paymentIntentId, $billingReason);
+                $tx = null;
+
+                if ($paymentIntentId) {
+                    $tx = Transaction::query()
+                        ->where('payment_intent_id', $paymentIntentId)
+                        ->lockForUpdate()
+                        ->first();
+                }
+
+                if (! $tx && $invoiceId) {
+                    $tx = Transaction::query()
+                        ->where('pledge_id', $pledge->id)
+                        ->where('stripe_invoice_id', $invoiceId)
+                        ->lockForUpdate()
+                        ->first();
+                }
+
+                if (! $tx && $chargeId) {
+                    $tx = Transaction::query()
+                        ->where('charge_id', $chargeId)
+                        ->lockForUpdate()
+                        ->first();
+                }
 
                 // Safety: don't mutate a different invoice
                 if (
@@ -678,7 +768,6 @@ class StripeWebhookController extends Controller
 
                 // -----------------------------------------------------------------
                 // 2) Adopt the donation_widget anchor (best path)
-                //    - initial invoice: prefer subscription_initial anchor
                 // -----------------------------------------------------------------
                 if (! $tx) {
                     $anchorQuery = Transaction::query()
@@ -698,14 +787,14 @@ class StripeWebhookController extends Controller
                             if ($paymentIntentId) {
                                 $q->orWhere(function ($qq) use ($paymentIntentId) {
                                     $qq->where('payment_intent_id', $paymentIntentId)
-                                        ->whereNull('stripe_invoice_id');
+                                    ->whereNull('stripe_invoice_id');
                                 });
                             }
 
                             if ($chargeId) {
                                 $q->orWhere(function ($qq) use ($chargeId) {
                                     $qq->where('charge_id', $chargeId)
-                                        ->whereNull('stripe_invoice_id');
+                                    ->whereNull('stripe_invoice_id');
                                 });
                             }
                         });
@@ -763,7 +852,6 @@ class StripeWebhookController extends Controller
                         'amount_cents'      => $amountPaid ?? $pledge->amount_cents,
                     ]);
                 }
-
                 // -----------------------------------------------------------------
                 // 4) Canonicalize + claim identifiers (invoice is the primary key)
                 // -----------------------------------------------------------------
@@ -779,6 +867,32 @@ class StripeWebhookController extends Controller
 
                 if ($chargeId) {
                     $tx = $invoiceLinker->claimChargeId($tx, $chargeId);
+                }
+
+                // -----------------------------------------------------------------
+                // 4.5) Final safety claim: if linker didn’t claim, but nobody owns it,
+                //      claim it directly on this tx (keeps placeholder stable).
+                // -----------------------------------------------------------------
+                if ($paymentIntentId && empty($tx->payment_intent_id)) {
+                    $alreadyClaimed = Transaction::query()
+                        ->where('payment_intent_id', $paymentIntentId)
+                        ->whereKeyNot($tx->id)
+                        ->exists();
+
+                    if (! $alreadyClaimed) {
+                        $tx->payment_intent_id = $paymentIntentId;
+                    }
+                }
+
+                if ($chargeId && empty($tx->charge_id)) {
+                    $alreadyClaimed = Transaction::query()
+                        ->where('charge_id', $chargeId)
+                        ->whereKeyNot($tx->id)
+                        ->exists();
+
+                    if (! $alreadyClaimed) {
+                        $tx->charge_id = $chargeId;
+                    }
                 }
 
                 // -----------------------------------------------------------------
@@ -811,11 +925,17 @@ class StripeWebhookController extends Controller
                     ? 'subscription_initial'
                     : ($tx->type ?: $txType);
 
-                $tx->metadata = $this->mergeMetadata($tx->metadata, $baseMetadata);
+                $meta = $this->mergeMetaIncomingWins($tx->metadata, $baseMetadata);
 
+                // Authoritative writer truth (force last)
+                $meta['stage']  = 'paid';
+                $meta['writer'] = 'invoice_paid';
+
+                $tx->metadata = $meta;
                 $tx->setStage('paid');
 
                 $tx->save();
+
 
                 // Keep pledge stage consistent
                 $pledge->setStage('active', save: true);
@@ -929,6 +1049,32 @@ class StripeWebhookController extends Controller
                         $tx->setup_intent_id = $pledge->setup_intent_id;
                     }
 
+                    // -----------------------------------------------------------------
+                    // 4.5) Final safety claim: if linker didn’t claim, but nobody owns it,
+                    //      claim it directly on this tx (keeps placeholder stable).
+                    // -----------------------------------------------------------------
+                    if ($paymentIntentId && empty($tx->payment_intent_id)) {
+                        $alreadyClaimed = Transaction::query()
+                            ->where('payment_intent_id', $paymentIntentId)
+                            ->whereKeyNot($tx->id)
+                            ->exists();
+
+                        if (! $alreadyClaimed) {
+                            $tx->payment_intent_id = $paymentIntentId;
+                        }
+                    }
+
+                    if ($chargeId && empty($tx->charge_id)) {
+                        $alreadyClaimed = Transaction::query()
+                            ->where('charge_id', $chargeId)
+                            ->whereKeyNot($tx->id)
+                            ->exists();
+
+                        if (! $alreadyClaimed) {
+                            $tx->charge_id = $chargeId;
+                        }
+                    }
+
                     $tx->attempt_id      = $tx->attempt_id ?: $pledge->attempt_id;
                     $tx->subscription_id = $tx->subscription_id ?: $subscriptionId;
 
@@ -950,8 +1096,13 @@ class StripeWebhookController extends Controller
                         ? 'subscription_initial'
                         : ($tx->type ?: $txType);
 
-                    $tx->metadata = $this->mergeMetadata($tx->metadata, $baseMetadata);
+                    $meta = $this->mergeMetaIncomingWins($tx->metadata, $baseMetadata);
 
+                    // Authoritative writer truth (force last)
+                    $meta['stage']  = 'paid';
+                    $meta['writer'] = 'invoice_paid';
+
+                    $tx->metadata = $meta;
                     $tx->setStage('paid');
 
                     $tx->save();
@@ -1401,5 +1552,27 @@ class StripeWebhookController extends Controller
                 'bytes' => $bytes,
             ]);
         }
+    }
+
+    protected function metaArray($value): array
+    {
+        if (is_array($value)) return $value;
+
+        if (is_string($value) && $value !== '') {
+            $decoded = json_decode($value, true);
+            if (is_array($decoded)) return $decoded;
+        }
+
+        return [];
+    }
+
+    /**
+     * Merge metadata but guarantee the NEW keys win.
+     */
+    protected function mergeMetaIncomingWins($existing, array $incoming): array
+    {
+        $base = $this->metaArray($existing);
+        // incoming last = incoming overwrites base
+        return array_merge($base, $incoming);
     }
 }
