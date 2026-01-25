@@ -25,6 +25,10 @@ return new class extends Migration {
             // Stripe identifiers
             $table->string('payment_intent_id')->nullable()->unique();   // pi_...
             $table->string('subscription_id')->nullable()->index();      // sub_...
+
+            // ✅ added here (was in later migration)
+            $table->string('stripe_invoice_id')->nullable()->index();    // in_...
+
             $table->string('charge_id')->nullable()->unique();           // ch_...
             $table->string('customer_id')->nullable()->index();          // cus_...
             $table->string('payment_method_id')->nullable()->index();    // pm_...
@@ -53,9 +57,12 @@ return new class extends Migration {
             $table->timestamps();
 
             $table->index(['created_at']);
-
             $table->index(['pledge_id', 'type', 'created_at']);
             $table->index(['subscription_id', 'type', 'created_at']);
+
+            // ✅ added here (was in later migration)
+            // Hard “no duplicates” guard for subscription-land when invoice id exists.
+            $table->unique(['pledge_id', 'stripe_invoice_id'], 'tx_unique_pledge_invoice');
         });
     }
 
