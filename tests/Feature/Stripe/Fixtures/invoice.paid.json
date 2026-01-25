@@ -1,0 +1,68 @@
+{
+  "id": "evt_1SszSo1DPheI4KUEt5L34JCk",
+  "object": "event",
+  "api_version": "2025-06-30.basil",
+  "created": 1769232770,
+  "data": {
+    "object": {
+      "id": "in_1SszSl1DPheI4KUE0Qzy4hom",
+      "object": "invoice",
+      "amount_paid": 113,
+      "currency": "usd",
+      "billing_reason": "subscription_create",
+      "customer": "cus_TpUFHUYkfaRJrq",
+      "customer_email": "ryanmillergm@gmail.com",
+      "livemode": true,
+      "lines": {
+        "object": "list",
+        "data": [
+          {
+            "id": "il_1SszSl1DPheI4KUEtT5X9HoQ",
+            "object": "line_item",
+            "amount": 113,
+            "currency": "usd",
+            "description": "1 × Recurring Donation (at $1.13 / month)",
+            "invoice": "in_1SszSl1DPheI4KUE0Qzy4hom",
+            "livemode": true,
+            "metadata": {
+              "attempt_id": "22e6acd1-3c4b-481c-a258-9418e3ff6adc",
+              "user_id": "1",
+              "pledge_id": "6",
+              "source": "donation_widget"
+            },
+            "parent": {
+              "subscription_item_details": {
+                "subscription": "sub_1SszSl1DPheI4KUEE0DIdyeV"
+              },
+              "type": "subscription_item_details"
+            }
+          }
+        ],
+        "has_more": false
+      },
+      "parent": {
+        "subscription_details": {
+          "metadata": {
+            "attempt_id": "22e6acd1-3c4b-481c-a258-9418e3ff6adc",
+            "user_id": "1",
+            "pledge_id": "6",
+            "source": "donation_widget"
+          },
+          "subscription": "sub_1SszSl1DPheI4KUEE0DIdyeV"
+        },
+        "type": "subscription_details"
+      },
+      "status": "paid",
+      "status_transitions": {
+        "paid_at": 1769232767
+      }
+    }
+  },
+  "livemode": true,
+  "pending_webhooks": 0,
+  "request": {
+    "id": "req_8pi0R3CKBwUmBw",
+    "idempotency_key": "subscription:pledge:6:6b9133a6f47b9df57d372880"
+  },
+  "type": "invoice.paid"
+}

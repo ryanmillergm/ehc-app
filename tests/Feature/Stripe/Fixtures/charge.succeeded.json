@@ -1,0 +1,29 @@
+{
+  "id": "evt_3SszSl1DPheI4KUE1L00NdfN",
+  "object": "event",
+  "api_version": "2025-06-30.basil",
+  "created": 1769232769,
+  "data": {
+    "object": {
+      "id": "ch_3SszSl1DPheI4KUE1i4XFtP7",
+      "object": "charge",
+      "amount": 113,
+      "currency": "usd",
+      "customer": "cus_TpUFHUYkfaRJrq",
+      "description": "Subscription creation",
+      "livemode": true,
+      "metadata": {},
+      "paid": true,
+      "payment_intent": "pi_3SszSl1DPheI4KUE1O4FTdi8",
+      "payment_method": "pm_1SszSj1DPheI4KUETDOApOWo",
+      "status": "succeeded"
+    }
+  },
+  "livemode": true,
+  "pending_webhooks": 0,
+  "request": {
+    "id": "req_8pi0R3CKBwUmBw",
+    "idempotency_key": "subscription:pledge:6:6b9133a6f47b9df57d372880"
+  },
+  "type": "charge.succeeded"
+}
