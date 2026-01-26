@@ -1,6 +1,6 @@
 {{-- resources/views/livewire/email-signup-form.blade.php --}}
 
-@php($tsKey = 'tsEmailSignup_' . $this->getId())
+@php($tsKey = 'tsEmailSignup_' . $this->getId() . '_' . $variant)
 
 <div>
     {{-- Flash messages --}}
@@ -53,6 +53,7 @@
     @endif
 
     @if ($variant === 'page')
+        {{-- PAGE VARIANT --}}
         <form wire:submit.prevent="submit" class="space-y-4">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -87,62 +88,75 @@
                 @error('turnstileToken') <div class="mt-1 text-sm text-rose-600">{{ $message }}</div> @enderror
             </div>
 
-            {{-- Turnstile (page variant) --}}
-            <div class="mt-2" wire:ignore
-                 x-data
-                 x-init="
-                    window.__tsWidgets = window.__tsWidgets || {};
-                    window.__tsResetListeners = window.__tsResetListeners || {};
+            {{-- Turnstile (page) --}}
+            <div
+                class="max-w-full overflow-x-auto"
+                wire:ignore
+                wire:key="{{ $tsKey }}"
+                x-data="{
+                    key: '{{ $tsKey }}',
+                    theme: 'light',
+                    ensure() {
+                        window.__tsWidgets = window.__tsWidgets || {};
 
-                    const render = () => {
-                        if (!window.turnstile) return setTimeout(render, 50);
-                        if (window.__tsWidgets['{{ $tsKey }}'] !== undefined) return;
+                        const mount = () => {
+                            if (!window.turnstile) return setTimeout(mount, 50);
 
-                        window.__tsWidgets['{{ $tsKey }}'] = turnstile.render($refs.ts, {
-                            sitekey: '{{ config('services.turnstile.key') }}',
-                            callback: (token) => { @this.set('turnstileToken', token) },
-                            'expired-callback': () => { @this.set('turnstileToken', null) },
-                            'error-callback': () => { @this.set('turnstileToken', null) },
-                            theme: 'light',
-                        });
-                    };
+                            const hasIframe = this.$refs.ts && this.$refs.ts.querySelector('iframe');
 
-                    render();
+                            if (!hasIframe) {
+                                this.$refs.ts.innerHTML = '';
 
-                    if (!window.__tsResetListeners['{{ $tsKey }}']) {
-                        window.__tsResetListeners['{{ $tsKey }}'] = true;
-
-                        window.addEventListener('turnstile-reset', (e) => {
-                            if (e?.detail?.id !== '{{ $tsKey }}') return;
-
-                            const wid = window.__tsWidgets['{{ $tsKey }}'];
-                            if (window.turnstile && wid !== undefined) {
-                                turnstile.reset(wid);
+                                window.__tsWidgets[this.key] = turnstile.render(this.$refs.ts, {
+                                    sitekey: '{{ config('services.turnstile.key') }}',
+                                    callback: (token) => { $wire.set('turnstileToken', token, true) },
+                                    'expired-callback': () => { $wire.set('turnstileToken', null, true) },
+                                    'error-callback': () => { $wire.set('turnstileToken', null, true) },
+                                    theme: this.theme,
+                                });
                             }
-                            @this.set('turnstileToken', null);
-                        });
+                        };
+
+                        mount();
+                    },
+                    reset() {
+                        window.__tsWidgets = window.__tsWidgets || {};
+                        const wid = window.__tsWidgets[this.key];
+
+                        if (window.turnstile && wid !== undefined) turnstile.reset(wid);
+                        else this.ensure();
+
+                        $wire.set('turnstileToken', null, true);
                     }
-                 "
+                }"
+                x-init="ensure()"
+                x-on:turnstile-reset.window="if ($event?.detail?.id === key) reset();"
             >
-                <div x-ref="ts"></div>
+                <div class="inline-block" x-ref="ts"></div>
             </div>
 
-            <button class="rounded-md bg-slate-900 px-5 py-2 font-semibold text-white">
-                Sign up
+            <button
+                type="submit"
+                class="rounded-md bg-slate-900 px-5 py-2 font-semibold text-white
+                       hover:bg-slate-800 active:bg-slate-900 transition"
+                wire:loading.attr="disabled"
+                wire:target="submit"
+            >
+                <span wire:loading.remove wire:target="submit">Sign up</span>
+                <span wire:loading wire:target="submit">Submitting…</span>
             </button>
         </form>
     @else
-        {{-- footer variant --}}
-        <form wire:submit.prevent="submit"
-              class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start">
-            {{-- Left column: input + turnstile stacked --}}
-            <div class="flex-1 min-w-0 space-y-2">
-                {{-- Honeypot --}}
-                <div class="hidden">
-                    <input type="text" wire:model.defer="company" tabindex="-1" autocomplete="off">
-                </div>
+        {{-- FOOTER VARIANT --}}
+        <form wire:submit.prevent="submit" class="space-y-2">
+            {{-- Honeypot --}}
+            <div class="hidden">
+                <input type="text" wire:model.defer="company" tabindex="-1" autocomplete="off">
+            </div>
 
-                <div>
+            {{-- Row 1: email + button --}}
+            <div class="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-start">
+                <div class="min-w-0">
                     <input
                         type="email"
                         wire:model.defer="email"
@@ -151,59 +165,73 @@
                                text-slate-900 placeholder:text-slate-500
                                focus:border-white/20 focus:ring-2 focus:ring-white/20"
                     />
-                    @error('email') <div class="mt-1 text-sm text-rose-300">{{ $message }}</div> @enderror
-                    @error('turnstileToken') <div class="mt-1 text-sm text-rose-300">{{ $message }}</div> @enderror
                 </div>
 
-                {{-- Turnstile (below input) --}}
-                <div wire:ignore
-                     x-data
-                     x-init="
-                        window.__tsWidgets = window.__tsWidgets || {};
-                        window.__tsResetListeners = window.__tsResetListeners || {};
-
-                        const render = () => {
-                            if (!window.turnstile) return setTimeout(render, 50);
-                            if (window.__tsWidgets['{{ $tsKey }}'] !== undefined) return;
-
-                            window.__tsWidgets['{{ $tsKey }}'] = turnstile.render($refs.ts, {
-                                sitekey: '{{ config('services.turnstile.key') }}',
-                                callback: (token) => { @this.set('turnstileToken', token) },
-                                'expired-callback': () => { @this.set('turnstileToken', null) },
-                                'error-callback': () => { @this.set('turnstileToken', null) },
-                                theme: 'dark',
-                            });
-                        };
-
-                        render();
-
-                        if (!window.__tsResetListeners['{{ $tsKey }}']) {
-                            window.__tsResetListeners['{{ $tsKey }}'] = true;
-
-                            window.addEventListener('turnstile-reset', (e) => {
-                                if (e?.detail?.id !== '{{ $tsKey }}') return;
-
-                                const wid = window.__tsWidgets['{{ $tsKey }}'];
-                                if (window.turnstile && wid !== undefined) {
-                                    turnstile.reset(wid);
-                                }
-                                @this.set('turnstileToken', null);
-                            });
-                        }
-                     "
-                >
-                    <div x-ref="ts"></div>
+                <div>
+                    <button
+                        type="submit"
+                        class="w-full sm:w-auto rounded-md bg-slate-900 px-5 py-2 font-semibold text-white
+                               hover:bg-slate-800 active:bg-slate-900 transition"
+                        wire:loading.attr="disabled"
+                        wire:target="submit"
+                    >
+                        <span wire:loading.remove wire:target="submit">Subscribe</span>
+                        <span wire:loading wire:target="submit">Submitting…</span>
+                    </button>
                 </div>
             </div>
 
-            {{-- Right column: button --}}
-            <div class="sm:ml-3 w-full sm:w-auto">
-                <button
-                    type="submit"
-                    class="w-full sm:w-auto rounded-md bg-slate-900 px-5 py-2 font-semibold text-white"
-                >
-                    Subscribe
-                </button>
+            {{-- Errors --}}
+            <div>
+                @error('email') <div class="mt-1 text-sm text-rose-300">{{ $message }}</div> @enderror
+                @error('turnstileToken') <div class="mt-1 text-sm text-rose-300">{{ $message }}</div> @enderror
+            </div>
+
+            {{-- Turnstile (footer) --}}
+            <div
+                class="max-w-full overflow-x-auto"
+                wire:ignore
+                wire:key="{{ $tsKey }}"
+                x-data="{
+                    key: '{{ $tsKey }}',
+                    theme: 'dark',
+                    ensure() {
+                        window.__tsWidgets = window.__tsWidgets || {};
+
+                        const mount = () => {
+                            if (!window.turnstile) return setTimeout(mount, 50);
+
+                            const hasIframe = this.$refs.ts && this.$refs.ts.querySelector('iframe');
+
+                            if (!hasIframe) {
+                                this.$refs.ts.innerHTML = '';
+
+                                window.__tsWidgets[this.key] = turnstile.render(this.$refs.ts, {
+                                    sitekey: '{{ config('services.turnstile.key') }}',
+                                    callback: (token) => { $wire.set('turnstileToken', token, true) },
+                                    'expired-callback': () => { $wire.set('turnstileToken', null, true) },
+                                    'error-callback': () => { $wire.set('turnstileToken', null, true) },
+                                    theme: this.theme,
+                                });
+                            }
+                        };
+
+                        mount();
+                    },
+                    reset() {
+                        window.__tsWidgets = window.__tsWidgets || {};
+                        const wid = window.__tsWidgets[this.key];
+
+                        if (window.turnstile && wid !== undefined) turnstile.reset(wid);
+                        else this.ensure();
+
+                        $wire.set('turnstileToken', null, true);
+                    }
+                }"
+                x-init="ensure()"
+                x-on:turnstile-reset.window="if ($event?.detail?.id === key) reset();"
+            >
+                <div class="inline-block" x-ref="ts"></div>
             </div>
         </form>
     @endif

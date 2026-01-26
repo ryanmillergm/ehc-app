@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\EmailList;
 use App\Models\EmailSubscriber;
 use App\Support\EmailCanonicalizer;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Livewire\Component;
@@ -12,7 +13,7 @@ use Livewire\Component;
 class EmailSignupForm extends Component
 {
     public ?string $turnstileToken = null; // token from widget
-    public string $company = '';
+    public string $company = ''; // honeypot
 
     public string $variant = 'footer'; // 'footer' or 'page'
 
@@ -22,13 +23,15 @@ class EmailSignupForm extends Component
 
     public function rules(): array
     {
-        $emailRule = app()->environment('production') ? 'email:rfc,dns' : 'email:rfc';
+        $emailRule = app()->environment('production')
+            ? 'email:rfc,dns'
+            : 'email:rfc';
 
         $rules = [
             'email' => ['required', $emailRule],
         ];
 
-        // Require Turnstile on public-facing variant(s)
+        // Require Turnstile on public-facing variants
         if (in_array($this->variant, ['footer', 'page'], true)) {
             $rules['turnstileToken'] = ['required', 'string'];
         }
@@ -46,16 +49,17 @@ class EmailSignupForm extends Component
 
     public function submit(): void
     {
-        // 1) Honeypot (fail closed, pretend success)
+        $tsKey = 'tsEmailSignup_' . $this->getId() . '_' . $this->variant;
+
+        // 1) Honeypot (fail-closed, pretend success)
         if ($this->company !== '') {
             session()->flash('email_signup_success', "Thanks! You’re signed up.");
             $this->reset('email', 'first_name', 'last_name', 'company', 'turnstileToken');
-            $this->dispatch('turnstile-reset', id: 'tsEmailSignup_' . $this->getId());
-
+            $this->dispatch('turnstile-reset', id: $tsKey);
             return;
         }
 
-        // 2) Rate limit
+        // 2) Rate limit by IP
         $key = 'email-signup:' . request()->ip();
 
         if (RateLimiter::tooManyAttempts($key, 5)) {
@@ -66,20 +70,19 @@ class EmailSignupForm extends Component
 
         RateLimiter::hit($key, 60);
 
-        // 3) Normalize input
+        // 3) Normalize
         $this->email = trim($this->email);
         $this->first_name = trim($this->first_name);
         $this->last_name  = trim($this->last_name);
 
-        // 4) Validate (includes turnstileToken required)
+        // 4) Validate
         $this->validate();
 
         // 5) Verify Turnstile
         if (! $this->verifyTurnstile((string) $this->turnstileToken)) {
             session()->flash('email_signup_info', 'Please verify you’re human and try again.');
-            $this->dispatch('turnstile-reset', id: 'tsEmailSignup_' . $this->getId());
-
             $this->turnstileToken = null;
+            $this->dispatch('turnstile-reset', id: $tsKey);
             return;
         }
 
@@ -95,21 +98,21 @@ class EmailSignupForm extends Component
         if ($subscriber && $subscriber->unsubscribed_at === null) {
             session()->flash('email_signup_info', 'You’re already subscribed — thanks for staying connected!');
             $this->reset('email', 'first_name', 'last_name', 'company', 'turnstileToken');
-            $this->dispatch('turnstile-reset', id: 'tsEmailSignup_' . $this->getId());
-
+            $this->dispatch('turnstile-reset', id: $tsKey);
             return;
         }
 
         // 7) Create or resubscribe
         if (! $subscriber) {
             $subscriber = EmailSubscriber::create([
-                'email' => $canonicalEmail,
-                'first_name' => $this->first_name ?: null,
-                'last_name' => $this->last_name ?: null,
-                'user_id' => auth()->id(),
+                'email'             => $canonicalEmail,
+                'email_canonical'   => $canonicalEmail, // if you have this column (safe if fillable)
+                'first_name'        => $this->first_name ?: null,
+                'last_name'         => $this->last_name ?: null,
+                'user_id'           => auth()->id(),
                 'unsubscribe_token' => Str::random(64),
-                'subscribed_at' => now(),
-                'unsubscribed_at' => null,
+                'subscribed_at'     => now(),
+                'unsubscribed_at'   => null,
             ]);
         } else {
             $update = [
@@ -123,6 +126,7 @@ class EmailSignupForm extends Component
             if ($this->first_name && ! $subscriber->first_name) {
                 $update['first_name'] = $this->first_name;
             }
+
             if ($this->last_name && ! $subscriber->last_name) {
                 $update['last_name'] = $this->last_name;
             }
@@ -139,10 +143,15 @@ class EmailSignupForm extends Component
                 $update['email'] = $canonicalEmail;
             }
 
+            // If you store canonical separately, keep it in sync:
+            if (isset($subscriber->email_canonical) && $subscriber->email_canonical !== $canonicalEmail) {
+                $update['email_canonical'] = $canonicalEmail;
+            }
+
             $subscriber->update($update);
         }
 
-        // 8) Subscribe to default lists
+        // 8) Subscribe to default marketing lists
         $defaultLists = EmailList::query()
             ->where('purpose', 'marketing')
             ->where('is_default', true)
@@ -153,7 +162,7 @@ class EmailSignupForm extends Component
         foreach ($defaultLists as $list) {
             $subscriber->lists()->syncWithoutDetaching([
                 $list->id => [
-                    'subscribed_at' => $now,
+                    'subscribed_at'   => $now,
                     'unsubscribed_at' => null,
                 ],
             ]);
@@ -161,21 +170,20 @@ class EmailSignupForm extends Component
 
         // 9) Reset + success
         $this->reset('email', 'first_name', 'last_name', 'company', 'turnstileToken');
-        $this->dispatch('turnstile-reset', id: 'tsEmailSignup_' . $this->getId());
-
+        $this->dispatch('turnstile-reset', id: $tsKey);
         session()->flash('email_signup_success', 'Thanks! You’re signed up.');
     }
 
     protected function verifyTurnstile(string $token): bool
     {
-        $secret = config('services.turnstile.secret');
+        $secret = (string) config('services.turnstile.secret');
 
-        if (! $secret) {
-            // If misconfigured locally, you can choose to fail-open in local only:
+        if ($secret === '') {
+            // Fail-open only in local if misconfigured
             return app()->environment('local');
         }
 
-        $response = \Illuminate\Support\Facades\Http::asForm()->post(
+        $response = Http::asForm()->post(
             'https://challenges.cloudflare.com/turnstile/v0/siteverify',
             [
                 'secret'   => $secret,
