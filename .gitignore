@@ -19,3 +19,7 @@ yarn-error.log
 /.idea
 /.vscode
 coverage
+# editor/temporary files
+*~
+.*swp
+.~tmp~
