@@ -14,6 +14,11 @@ return [
     |
     */
 
+    'mailtrap' => [
+        'api_key' => env('MAILTRAP_API_KEY'),
+        'stream' => env('MAILTRAP_STREAM', 'transactional'),
+    ],
+
     'postmark' => [
         'token' => env('POSTMARK_TOKEN'),
     ],

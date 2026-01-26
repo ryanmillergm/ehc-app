@@ -11,6 +11,8 @@ use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Filament\Models\Contracts\HasName;
 use Filament\Models\Contracts\HasTenants;
+use Illuminate\Auth\Notifications\VerifyEmail;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Jetstream\HasProfilePhoto;
@@ -212,5 +214,11 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants,
     public function assignedTeams()
     {
         return $this->belongsToMany(Team::class);
+    }
+
+    public function sendEmailVerificationNotification(): void
+    {
+        $notification = new class extends VerifyEmail implements ShouldQueue {};
+        $this->notify($notification);
     }
 }
