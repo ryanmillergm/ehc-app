@@ -36,7 +36,7 @@
         <form wire:submit.prevent="submit" class="flex flex-col gap-3 sm:flex-row sm:items-start">
             <div class="flex-1">
                 <input type="email" wire:model.defer="email" placeholder="Email address"
-                       class="w-full rounded-md border border-slate-300 px-3 py-2" />
+                       class="w-full rounded-md border border-slate-300 px-3 py-2 text-gray-700 font-medium" />
                 @error('email') <div class="mt-1 text-sm text-rose-600">{{ $message }}</div> @enderror
             </div>
 
