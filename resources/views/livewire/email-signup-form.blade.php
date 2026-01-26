@@ -1,49 +1,22 @@
-{{-- resources/views/livewire/email-signup-form.blade.php --}}
-
-@php($tsKey = 'tsEmailSignup_' . $this->getId() . '_' . $variant)
+@php($tsKey = 'tsEmailSignup_' . $this->getId() . '_' . $this->variant)
 
 <div>
-    {{-- Flash messages --}}
-    @if (session()->has('email_signup_success'))
+    @if ($bannerType && $bannerMessage)
         <div
+            wire:key="email-signup-banner-{{ $tsKey }}"
             x-data="{ show: true }"
             x-init="setTimeout(() => show = false, 5000)"
             x-show="show"
             x-transition.opacity.duration.200ms
-            class="mb-3 flex items-start justify-between gap-3 rounded-md bg-emerald-50 px-4 py-3 text-emerald-900"
+            class="mb-3 flex items-start justify-between gap-3 rounded-md px-4 py-3 text-sm
+                {{ $bannerType === 'success' ? 'bg-emerald-50 text-emerald-900' : 'bg-sky-50 text-sky-900' }}"
             role="status"
         >
-            <div class="text-sm">
-                {{ session('email_signup_success') }}
-            </div>
+            <div>{{ $bannerMessage }}</div>
 
             <button
                 type="button"
-                class="rounded-md p-1 text-emerald-900/60 hover:text-emerald-900 hover:bg-emerald-100"
-                @click="show = false"
-                aria-label="Dismiss"
-            >
-                <span class="text-lg leading-none">&times;</span>
-            </button>
-        </div>
-    @endif
-
-    @if (session()->has('email_signup_info'))
-        <div
-            x-data="{ show: true }"
-            x-init="setTimeout(() => show = false, 5000)"
-            x-show="show"
-            x-transition.opacity.duration.200ms
-            class="mb-3 flex items-start justify-between gap-3 rounded-md bg-sky-50 px-4 py-3 text-sky-900"
-            role="status"
-        >
-            <div class="text-sm">
-                {{ session('email_signup_info') }}
-            </div>
-
-            <button
-                type="button"
-                class="rounded-md p-1 text-sky-900/60 hover:text-sky-900 hover:bg-sky-100"
+                class="rounded-md p-1 opacity-60 hover:opacity-100"
                 @click="show = false"
                 aria-label="Dismiss"
             >
@@ -57,33 +30,21 @@
         <form wire:submit.prevent="submit" class="space-y-4">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                    <input
-                        type="text"
-                        wire:model.defer="first_name"
-                        placeholder="First name"
-                        class="w-full rounded-md border border-slate-300 px-3 py-2"
-                    />
+                    <input type="text" wire:model.defer="first_name" placeholder="First name"
+                        class="w-full rounded-md border border-slate-300 px-3 py-2" />
                     @error('first_name') <div class="mt-1 text-sm text-rose-600">{{ $message }}</div> @enderror
                 </div>
 
                 <div>
-                    <input
-                        type="text"
-                        wire:model.defer="last_name"
-                        placeholder="Last name"
-                        class="w-full rounded-md border border-slate-300 px-3 py-2"
-                    />
+                    <input type="text" wire:model.defer="last_name" placeholder="Last name"
+                        class="w-full rounded-md border border-slate-300 px-3 py-2" />
                     @error('last_name') <div class="mt-1 text-sm text-rose-600">{{ $message }}</div> @enderror
                 </div>
             </div>
 
             <div>
-                <input
-                    type="email"
-                    wire:model.defer="email"
-                    placeholder="Email address"
-                    class="w-full rounded-md border border-slate-300 px-3 py-2"
-                />
+                <input type="email" wire:model.defer="email" placeholder="Email address"
+                    class="w-full rounded-md border border-slate-300 px-3 py-2" />
                 @error('email') <div class="mt-1 text-sm text-rose-600">{{ $message }}</div> @enderror
                 @error('turnstileToken') <div class="mt-1 text-sm text-rose-600">{{ $message }}</div> @enderror
             </div>
@@ -146,6 +107,7 @@
                 <span wire:loading wire:target="submit">Submitting…</span>
             </button>
         </form>
+
     @else
         {{-- FOOTER VARIANT --}}
         <form wire:submit.prevent="submit" class="space-y-2">
