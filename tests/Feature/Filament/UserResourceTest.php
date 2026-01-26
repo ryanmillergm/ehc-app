@@ -294,7 +294,7 @@ class UserResourceTest extends TestCase
             'record' => $user->getRouteKey(),
         ])->callAction(PageDeleteAction::class);
 
-        $this->assertModelMissing($user);
+        $this->assertSoftDeleted('users', ['id' => $user->id]);
     }
 
     public function test_auth_user_can_delete_a_user2(): void
@@ -306,7 +306,7 @@ class UserResourceTest extends TestCase
         Livewire::test(ListUsers::class)
             ->callAction(TestAction::make('delete')->table($user));
 
-        $this->assertModelMissing($user);
+        $this->assertSoftDeleted('users', ['id' => $user->id]);
     }
 
     public function test_auth_user_without_permissions_cannot_delete_a_user(): void
@@ -374,5 +374,26 @@ class UserResourceTest extends TestCase
             'ownerRecord' => $user,
             'pageClass'   => EditUser::class,
         ])->assertCanSeeTableRecords($user->ownedTeams);
+    }
+
+    public function test_auth_user_can_restore_a_soft_deleted_user(): void
+    {
+        $this->signInAsSuperAdmin(); 
+
+        $user = User::factory()->create();
+        $user->delete();
+
+        $trashedUser = User::onlyTrashed()->findOrFail($user->id);
+
+        Livewire::test(ListUsers::class)
+            ->filterTable('trashed', ['value' => 'onlyTrashed'])
+            ->assertCanSeeTableRecords([$trashedUser])
+            ->assertActionVisible(TestAction::make('restore')->table($trashedUser))
+            ->callAction(TestAction::make('restore')->table($trashedUser));
+
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'deleted_at' => null,
+        ]);
     }
 }

@@ -47,6 +47,7 @@ class RegisterRateLimitTest extends TestCase
             'first_name' => 'Ryan',
             'last_name' => 'M',
             'email' => 'rate-limit@example.com',
+            'email_confirmation' => 'rate-limit@example.com',
             'password' => 'Password123!',              // valid-ish
             'password_confirmation' => 'Different!',   // force validation fail
             'terms' => 'on',

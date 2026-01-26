@@ -25,6 +25,17 @@
             </div>
 
             <div class="mt-4">
+                <x-label for="email_confirmation" value="{{ __('Confirm Email') }}" />
+                <x-input id="email_confirmation"
+                        class="block mt-1 w-full"
+                        type="email"
+                        name="email_confirmation"
+                        :value="old('email_confirmation')"
+                        required
+                        autocomplete="username" />
+            </div>
+
+            <div class="mt-4">
                 <x-label for="password" value="{{ __('auth.password') }}" />
                 <x-input id="password" class="block mt-1 w-full" type="password" name="password" required autocomplete="new-password" />
             </div>
