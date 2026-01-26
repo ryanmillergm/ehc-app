@@ -41,6 +41,8 @@
             @vite(['resources/css/app.css', 'resources/js/app.js'])
         @endif
 
+        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+
         @livewireStyles
     </head>
     <body class="font-sans antialiased bg-gray-100">

@@ -5,11 +5,15 @@ namespace App\Livewire;
 use App\Models\EmailList;
 use App\Models\EmailSubscriber;
 use App\Support\EmailCanonicalizer;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Livewire\Component;
 
 class EmailSignupForm extends Component
 {
+    public ?string $turnstileToken = null; // token from widget
+    public string $company = '';
+
     public string $variant = 'footer'; // 'footer' or 'page'
 
     public string $email = '';
@@ -24,6 +28,11 @@ class EmailSignupForm extends Component
             'email' => ['required', $emailRule],
         ];
 
+        // Require Turnstile on public-facing variant(s)
+        if (in_array($this->variant, ['footer', 'page'], true)) {
+            $rules['turnstileToken'] = ['required', 'string'];
+        }
+
         if ($this->variant === 'page') {
             $rules['first_name'] = ['required', 'string', 'max:255'];
             $rules['last_name']  = ['required', 'string', 'max:255'];
@@ -37,20 +46,61 @@ class EmailSignupForm extends Component
 
     public function submit(): void
     {
+        // 1) Honeypot (fail closed, pretend success)
+        if ($this->company !== '') {
+            session()->flash('email_signup_success', "Thanks! You’re signed up.");
+            $this->reset('email', 'first_name', 'last_name', 'company', 'turnstileToken');
+            $this->dispatch('turnstile-reset', id: 'tsEmailSignup_' . $this->getId());
+
+            return;
+        }
+
+        // 2) Rate limit
+        $key = 'email-signup:' . request()->ip();
+
+        if (RateLimiter::tooManyAttempts($key, 5)) {
+            $seconds = RateLimiter::availableIn($key);
+            session()->flash('email_signup_info', "Slow down, human. Try again in {$seconds} seconds.");
+            return;
+        }
+
+        RateLimiter::hit($key, 60);
+
+        // 3) Normalize input
         $this->email = trim($this->email);
         $this->first_name = trim($this->first_name);
         $this->last_name  = trim($this->last_name);
 
+        // 4) Validate (includes turnstileToken required)
         $this->validate();
 
+        // 5) Verify Turnstile
+        if (! $this->verifyTurnstile((string) $this->turnstileToken)) {
+            session()->flash('email_signup_info', 'Please verify you’re human and try again.');
+            $this->dispatch('turnstile-reset', id: 'tsEmailSignup_' . $this->getId());
+
+            $this->turnstileToken = null;
+            return;
+        }
+
+        // 6) Canonicalize + find existing
         $canonicalEmail = EmailCanonicalizer::canonicalize($this->email) ?? Str::lower($this->email);
 
-        // Prefer canonical lookup (future-proof), but keep OR email for backwards compat
         $subscriber = EmailSubscriber::query()
             ->where('email_canonical', $canonicalEmail)
             ->orWhere('email', $canonicalEmail)
             ->first();
 
+        // Already subscribed
+        if ($subscriber && $subscriber->unsubscribed_at === null) {
+            session()->flash('email_signup_info', 'You’re already subscribed — thanks for staying connected!');
+            $this->reset('email', 'first_name', 'last_name', 'company', 'turnstileToken');
+            $this->dispatch('turnstile-reset', id: 'tsEmailSignup_' . $this->getId());
+
+            return;
+        }
+
+        // 7) Create or resubscribe
         if (! $subscriber) {
             $subscriber = EmailSubscriber::create([
                 'email' => $canonicalEmail,
@@ -86,13 +136,13 @@ class EmailSignupForm extends Component
             }
 
             if ($subscriber->email !== $canonicalEmail) {
-                $update['email'] = $canonicalEmail; // keeps email + email_canonical aligned
+                $update['email'] = $canonicalEmail;
             }
 
             $subscriber->update($update);
         }
 
-        // Subscribe to default marketing lists
+        // 8) Subscribe to default lists
         $defaultLists = EmailList::query()
             ->where('purpose', 'marketing')
             ->where('is_default', true)
@@ -109,8 +159,36 @@ class EmailSignupForm extends Component
             ]);
         }
 
-        $this->reset('email', 'first_name', 'last_name');
+        // 9) Reset + success
+        $this->reset('email', 'first_name', 'last_name', 'company', 'turnstileToken');
+        $this->dispatch('turnstile-reset', id: 'tsEmailSignup_' . $this->getId());
+
         session()->flash('email_signup_success', 'Thanks! You’re signed up.');
+    }
+
+    protected function verifyTurnstile(string $token): bool
+    {
+        $secret = config('services.turnstile.secret');
+
+        if (! $secret) {
+            // If misconfigured locally, you can choose to fail-open in local only:
+            return app()->environment('local');
+        }
+
+        $response = \Illuminate\Support\Facades\Http::asForm()->post(
+            'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+            [
+                'secret'   => $secret,
+                'response' => $token,
+                'remoteip' => request()->ip(),
+            ]
+        );
+
+        if (! $response->ok()) {
+            return false;
+        }
+
+        return (bool) data_get($response->json(), 'success', false);
     }
 
     public function render()
