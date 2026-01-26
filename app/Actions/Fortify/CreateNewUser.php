@@ -27,7 +27,7 @@ class CreateNewUser implements CreatesNewUsers
 
             // - rfc: must be a syntactically valid email
             // - dns: domain must have DNS records for mail
-            'email'      => ['required', 'string', 'email:rfc,dns', 'max:255', 'unique:users'],
+            'email'      => ['required', 'string', 'email:rfc,dns', 'max:255', 'unique:users', 'confirmed'],
 
             'password'   => $this->passwordRules(),
             'terms'      => Jetstream::hasTermsAndPrivacyPolicyFeature() ? ['accepted', 'required'] : [],

@@ -154,14 +154,15 @@ class UserResource extends Resource
                 ViewAction::make(),
                 EditAction::make(),
                 DeleteAction::make(),
-                RestoreAction::make(),
-                ForceDeleteAction::make(),
+
+                RestoreAction::make('restore'),
+                ForceDeleteAction::make('forceDelete'),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
-                    RestoreBulkAction::make(),
-                    ForceDeleteBulkAction::make(),
+                    RestoreBulkAction::make('restoreBulk'),
+                    ForceDeleteBulkAction::make('forceDeleteBulk'),
                 ]),
             ]);
     }
