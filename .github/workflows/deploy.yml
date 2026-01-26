@@ -60,13 +60,13 @@ jobs:
             --exclude="node_modules/**" \
             --exclude="public/storage" \
             --exclude="storage/*.key" \
-            --exclude="storage/logs/**" \
-            --exclude="storage/framework/cache/**" \
-            --exclude="storage/framework/sessions/**" \
-            --exclude="storage/framework/views/**" \
-            --exclude="storage/framework/testing/**" \
-            --exclude="storage/app/public/**" \
-            --exclude="storage/app/livewire-tmp/**" \
+            --exclude="storage/logs" --exclude="storage/logs/**" \
+            --exclude="storage/framework/cache" --exclude="storage/framework/cache/**" \
+            --exclude="storage/framework/sessions" --exclude="storage/framework/sessions/**" \
+            --exclude="storage/framework/views" --exclude="storage/framework/views/**" \
+            --exclude="storage/framework/testing" --exclude="storage/framework/testing/**" \
+            --exclude="storage/app/public" --exclude="storage/app/public/**" \
+            --exclude="storage/app/livewire-tmp" --exclude="storage/app/livewire-tmp/**" \
             -e "ssh -o StrictHostKeyChecking=no" \
             ./ ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}
 
