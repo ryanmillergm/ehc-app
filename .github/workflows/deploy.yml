@@ -68,7 +68,7 @@ jobs:
             --exclude="storage/app/public" --exclude="storage/app/public/**" \
             --exclude="storage/app/livewire-tmp" --exclude="storage/app/livewire-tmp/**" \
             -e "ssh -o StrictHostKeyChecking=no" \
-            ./ ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}
+            ./ ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/
 
       - name: Post-deploy (migrate, cache, restart)
         env:
@@ -76,15 +76,15 @@ jobs:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} << 'SSH'
+          ssh -T -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} "DEPLOY_PATH='${DEPLOY_PATH}' bash -s" << 'SSH'
             set -euo pipefail
-            cd "${DEPLOY_PATH}"
+            cd "$DEPLOY_PATH"
 
             # Ensure runtime dirs exist
-            mkdir -p storage bootstrap/cache
+            mkdir -p storage bootstrap/cache storage/app/livewire-tmp storage/app/public
 
-            # Runtime perms: deploy owns, www-data group; setgid dirs so group sticks
-            sudo chown -R deploy:www-data storage bootstrap/cache
+            # Runtime perms: deploy user owns, www-data group; setgid dirs so group sticks
+            sudo chown -R "$(whoami)":www-data storage bootstrap/cache
             sudo find storage bootstrap/cache -type d -exec chmod 2775 {} \;
             sudo find storage bootstrap/cache -type f -exec chmod 664 {} \;
 
