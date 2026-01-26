@@ -53,14 +53,20 @@ jobs:
           rsync -rz \
             --delete-delay \
             --delay-updates \
-            --no-times --no-perms --no-owner --no-group \
+            --no-times --omit-dir-times \
+            --no-perms --no-owner --no-group \
             --exclude=".env" \
+            --exclude=".git/**" \
+            --exclude="node_modules/**" \
             --exclude="public/storage" \
             --exclude="storage/*.key" \
-            --exclude="storage/logs" \
-            --exclude="storage/framework/cache" \
-            --exclude="storage/framework/sessions" \
-            --exclude="storage/framework/views" \
+            --exclude="storage/logs/**" \
+            --exclude="storage/framework/cache/**" \
+            --exclude="storage/framework/sessions/**" \
+            --exclude="storage/framework/views/**" \
+            --exclude="storage/framework/testing/**" \
+            --exclude="storage/app/public/**" \
+            --exclude="storage/app/livewire-tmp/**" \
             -e "ssh -o StrictHostKeyChecking=no" \
             ./ ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}
 
@@ -70,13 +76,16 @@ jobs:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} << SSH
+          ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} << 'SSH'
             set -euo pipefail
             cd "${DEPLOY_PATH}"
 
-            # Runtime perms (requires NOPASSWD sudo rules)
-            sudo chown -R www-data:www-data storage bootstrap/cache
-            sudo find storage bootstrap/cache -type d -exec chmod 775 {} \;
+            # Ensure runtime dirs exist
+            mkdir -p storage bootstrap/cache
+
+            # Runtime perms: deploy owns, www-data group; setgid dirs so group sticks
+            sudo chown -R deploy:www-data storage bootstrap/cache
+            sudo find storage bootstrap/cache -type d -exec chmod 2775 {} \;
             sudo find storage bootstrap/cache -type f -exec chmod 664 {} \;
 
             php artisan optimize:clear
