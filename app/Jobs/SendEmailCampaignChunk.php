@@ -5,13 +5,13 @@ namespace App\Jobs;
 use App\Mail\EmailCampaignMail;
 use App\Models\EmailCampaign;
 use App\Models\EmailCampaignDelivery;
+use App\Services\MailtrapApiMailer;
 use App\Support\Email\EmailBodyCompiler;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Mail;
 use Throwable;
 
 class SendEmailCampaignChunk implements ShouldQueue
@@ -94,7 +94,17 @@ class SendEmailCampaignChunk implements ShouldQueue
                 $renderedHtml = $mailable->render();
 
                 // Send the already-addressed mailable
-                Mail::send($mailable);
+                app(MailtrapApiMailer::class)->sendHtml(
+                    fromEmail: (string) ($delivery->from_email ?: config('mail.from.address')),
+                    fromName:  (string) ($delivery->from_name ?: config('mail.from.name')),
+                    toEmail:   (string) $delivery->to_email,
+                    toName:    (string) $delivery->to_name,
+                    subject:   (string) $campaign->subject,
+                    html:      (string) $renderedHtml,
+                    text:      (string) ($campaign->body_text ?? ''),
+                    category:  'Email Campaign',
+                );
+
 
                 $delivery->update([
                     'subject' => (string) $campaign->subject,
