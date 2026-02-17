@@ -2,9 +2,30 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
+        @php
+            $siteName = config('app.name', 'Bread of Grace Ministries');
+            $defaultTitle = $title ?? $siteName;
+            $metaTitle = $metaTitle ?? $defaultTitle;
+            $metaDescription = $metaDescription ?? 'Bread of Grace Ministries in Sacramento, California serves people experiencing homelessness through meals, outreach, housing pathways, and Christ-centered support.';
+            $metaRobots = $metaRobots ?? 'index,follow';
+            $canonicalUrl = $canonicalUrl ?? url()->current();
+            $ogType = $ogType ?? 'website';
+            $ogTitle = $ogTitle ?? $metaTitle;
+            $ogDescription = $ogDescription ?? $metaDescription;
+            $ogImage = $ogImage ?? asset('images/sm/the-mayor.jpg');
+            $twitterCard = $twitterCard ?? 'summary_large_image';
+            $twitterTitle = $twitterTitle ?? $ogTitle;
+            $twitterDescription = $twitterDescription ?? $ogDescription;
+            $twitterImage = $twitterImage ?? $ogImage;
+            $seoJsonLd = $seoJsonLd ?? [];
+        @endphp
+
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta name="csrf-token" content="{{ csrf_token() }}">
+        <meta name="description" content="{{ $metaDescription }}">
+        <meta name="robots" content="{{ $metaRobots }}">
+        <link rel="canonical" href="{{ $canonicalUrl }}">
 
         <!-- Favicon -->
         <link rel="icon" href="{{ asset('favicon.ico') }}" type="image/x-icon">
@@ -27,7 +48,19 @@
         <meta name="msapplication-TileImage" content="{{ asset('images/favicons/ms-icon-144x144.png') }}" >
         <meta name="theme-color" content="#ffffff">
 
-        <title>{{ $title ?? 'Page Title' }}</title>
+        <title>{{ $metaTitle }}</title>
+
+        <meta property="og:type" content="{{ $ogType }}">
+        <meta property="og:site_name" content="{{ $siteName }}">
+        <meta property="og:title" content="{{ $ogTitle }}">
+        <meta property="og:description" content="{{ $ogDescription }}">
+        <meta property="og:url" content="{{ $canonicalUrl }}">
+        <meta property="og:image" content="{{ $ogImage }}">
+
+        <meta name="twitter:card" content="{{ $twitterCard }}">
+        <meta name="twitter:title" content="{{ $twitterTitle }}">
+        <meta name="twitter:description" content="{{ $twitterDescription }}">
+        <meta name="twitter:image" content="{{ $twitterImage }}">
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
@@ -42,6 +75,10 @@
         @endif
 
         <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+
+        @foreach ($seoJsonLd as $schema)
+            <script type="application/ld+json">{!! json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}</script>
+        @endforeach
 
         @livewireStyles
     </head>

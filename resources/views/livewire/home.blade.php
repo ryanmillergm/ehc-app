@@ -35,8 +35,8 @@
                     </h1>
 
                     <p class="text-lg sm:text-xl text-slate-600 leading-relaxed max-w-2xl">
-                        We reach and serve the homeless and at-risk community with the Bible, hot meals, survival supplies,
-                        mentorship/discipleship, employment support, and pathways to housing.
+                        As a homeless ministry in Sacramento, California, we feed the hungry, help the needy, and walk with people
+                        through Christ-centered mentorship, practical support, and pathways to stable housing.
                     </p>
 
                     {{-- Image --}}
@@ -408,8 +408,8 @@
                     </h2>
 
                     <p class="text-lg text-slate-600 leading-relaxed max-w-2xl">
-                        Your gift supports meals, survival supplies, discipleship, and practical next steps toward stability.
-                        Monthly giving helps us plan with confidence.
+                        Your gift helps feed the hungry and help those in need through meals, survival supplies, discipleship,
+                        and practical next steps toward stability. Monthly giving helps us plan with confidence.
                     </p>
 
                     <div class="relative h-[600px] sm:h-[400px] overflow-hidden rounded-3xl text-white p-6 sm:p-8">
@@ -541,6 +541,48 @@
                     </div>
                 </div>
 
+            </div>
+        </div>
+    </section>
+
+    {{-- FAQ (SEO + donor clarity) --}}
+    <section id="faq" class="scroll-mt-20 py-16 sm:py-20 bg-white">
+        <div class="mx-auto max-w-screen-2xl px-6 sm:px-8 lg:px-12 2xl:px-20">
+            <div class="max-w-4xl">
+                <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight">
+                    Frequently asked questions
+                </h2>
+                <p class="mt-3 text-lg text-slate-600">
+                    Common questions about helping the homeless in Sacramento through Bread of Grace Ministries.
+                </p>
+            </div>
+
+            <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                    <h3 class="font-bold text-slate-900">How are donations used?</h3>
+                    <p class="mt-2 text-slate-600">
+                        Donations support outreach essentials including hot meals, hygiene and survival supplies, bibles, discipleship,
+                        and practical housing and employment support.
+                    </p>
+                </div>
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                    <h3 class="font-bold text-slate-900">Where does outreach happen?</h3>
+                    <p class="mt-2 text-slate-600">
+                        Outreach gatherings are held in Sacramento at Township 9 Park every Thursday and Sunday at 11:00am.
+                    </p>
+                </div>
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                    <h3 class="font-bold text-slate-900">Can I volunteer if I am new?</h3>
+                    <p class="mt-2 text-slate-600">
+                        Yes. New volunteers are welcome and can help with food service, outreach support, prayer, and follow-up care.
+                    </p>
+                </div>
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                    <h3 class="font-bold text-slate-900">Can I give monthly to support long-term impact?</h3>
+                    <p class="mt-2 text-slate-600">
+                        Yes. Monthly giving helps sustain consistent ministry work with food outreach, mentorship, and future housing support.
+                    </p>
+                </div>
             </div>
         </div>
     </section>
