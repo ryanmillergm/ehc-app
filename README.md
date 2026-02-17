@@ -13,10 +13,10 @@ This repo is built to be **admin-friendly** in Filament, with access controlled 
 
 ## Tech stack
 
-- **Laravel**: v11.x
-- **PHP**: 8.2.x
+- **Laravel**: v12.x
+- **PHP**: 8.2+
 - **Database**: MySQL 8.x (recommended)
-- **Filament**: v3.x
+- **Filament**: v4.x
 - **Livewire**: v3.x
 - **Jetstream**: v5.x
 - **Testing**: PHPUnit 11.x (plus Laravel testing helpers)
@@ -72,6 +72,76 @@ General rules of thumb:
   - wrong tenant selected
   - missing permission
   - policy denying access
+
+---
+
+## Homepage CMS + SEO architecture
+
+Homepage content is now managed through database-backed CMS resources with safe fallbacks.
+
+Primary runtime components:
+
+- `App\Services\Content\HomeContentService`
+- `App\Services\Media\ImageResolver`
+
+Primary models/tables:
+
+- `HomePageContent` (`home_page_contents`)
+- `FaqItem` (`faq_items`)
+- `Image` (`images`)
+- `SiteMediaDefault` (`site_media_defaults`)
+- `ImageGroup` + `ImageGroupItem`
+- `ImageType` (`image_types`)
+- `Imageable` (`imageables`)
+- `ImageGroupable` (`image_groupables`)
+
+### Fallback behavior (high level)
+
+- Home copy and FAQ resolve by current language, then default language.
+- Image roles use fallback chains (for example `header -> featured -> site default`).
+- If CMS rows are missing, `HomeContentService` includes safe hard-coded fallbacks so the homepage still renders.
+
+### Filament resources added for CMS/media
+
+- `Images`
+- `Image Groups`
+- `Image Group Items`
+- `Image Types`
+- `Home Page Content`
+- `FAQ Items`
+- `Image Attachments`
+- `Image Group Attachments`
+
+---
+
+## Homepage CMS seed baseline
+
+The following seeders are used to restore baseline home/SEO/media data in an idempotent way:
+
+- `Database\Seeders\ImageSeeder`
+- `Database\Seeders\SiteMediaDefaultSeeder`
+- `Database\Seeders\HomePageContentSeeder`
+- `Database\Seeders\FaqItemSeeder`
+
+These use `updateOrCreate`, so they are safe to re-run in production.
+
+### Recovery / rollout commands
+
+```bash
+php artisan db:seed --class=ImageSeeder
+php artisan db:seed --class=SiteMediaDefaultSeeder
+php artisan db:seed --class=HomePageContentSeeder
+php artisan db:seed --class=FaqItemSeeder
+```
+
+Typical production sequence:
+
+```bash
+php artisan migrate
+php artisan db:seed
+```
+
+Then verify homepage content, FAQ visibility, and meta/OG tags.
 
 ---
 
@@ -366,6 +436,15 @@ Your `phpunit.xml` includes:
 
 These are good defaults for deterministic tests.
 
+### CMS / SEO tests
+
+Key test files for the new homepage CMS stack:
+
+- `tests/Feature/Database/HomeCmsSeedersTest.php`
+- `tests/Feature/Livewire/HomeCmsContentTest.php`
+- `tests/Unit/Media/ImageResolverTest.php`
+- `tests/Feature/Seo/SeoInfrastructureTest.php`
+
 ---
 
 ## Filament documentation pages
@@ -376,6 +455,7 @@ This repo includes in-panel documentation pages for admins, for example:
 - `resources/views/filament/pages/admin-documentation.blade.php`
 
 These are intended to keep operational knowledge **inside the admin panel** so staff can self-serve answers.
+The admin documentation page includes sections for homepage CMS, media library, SEO controls, seeding/recovery commands, and troubleshooting.
 
 ---
 
@@ -390,6 +470,12 @@ composer dump-autoload
 
 # Queue worker
 php artisan queue:work
+
+# Home CMS seed recovery
+php artisan db:seed --class=ImageSeeder
+php artisan db:seed --class=SiteMediaDefaultSeeder
+php artisan db:seed --class=HomePageContentSeeder
+php artisan db:seed --class=FaqItemSeeder
 
 # Run migrations fresh (local only)
 php artisan migrate:fresh --seed
