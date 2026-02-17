@@ -11,6 +11,8 @@ use Filament\Forms\Components\Toggle;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 
@@ -87,6 +89,16 @@ class PageTranslation extends Model
     public function language(): BelongsTo
     {
         return $this->belongsTo(Language::class);
+    }
+
+    public function imageables(): MorphMany
+    {
+        return $this->morphMany(Imageable::class, 'imageable');
+    }
+
+    public function imageGroupables(): MorphMany
+    {
+        return $this->morphMany(ImageGroupable::class, 'image_groupable');
     }
 
 
