@@ -105,12 +105,32 @@ Primary models/tables:
 
 - `Images`
 - `Image Groups`
-- `Image Group Items`
 - `Image Types`
 - `Home Page Content`
 - `FAQ Items`
-- `Image Attachments`
-- `Image Group Attachments`
+- `Image Relationships`
+- `Image Group Relationships`
+
+`Image Group Items` are managed from the `Image Groups` edit page via a relation manager (not as a primary sidebar workflow).
+
+### Attachable type allowlist
+
+Allowed polymorphic attach targets are controlled by:
+
+- `App\Enums\Media\ImageAttachableType`
+
+Current supported attachable models:
+
+- `PageTranslation`
+- `HomePageContent`
+
+### Image group ordering behavior
+
+`ImageGroupItem` ordering uses insertion semantics:
+
+- inserting at `sort_order = N` shifts existing items at `N+` down
+- moving/reordering adjusts surrounding rows to keep order consistent
+- deleting an item closes the gap in that group
 
 ---
 
@@ -443,6 +463,12 @@ Key test files for the new homepage CMS stack:
 - `tests/Feature/Database/HomeCmsSeedersTest.php`
 - `tests/Feature/Livewire/HomeCmsContentTest.php`
 - `tests/Unit/Media/ImageResolverTest.php`
+- `tests/Unit/Media/ImageAttachableTypeTest.php`
+- `tests/Feature/Filament/ImageResourceTest.php`
+- `tests/Feature/Filament/ImageableResourceTest.php`
+- `tests/Feature/Filament/ImageGroupableResourceTest.php`
+- `tests/Feature/Filament/ImageGroupResourceTest.php`
+- `tests/Feature/Filament/AdminDocumentationTest.php`
 - `tests/Feature/Seo/SeoInfrastructureTest.php`
 
 ---

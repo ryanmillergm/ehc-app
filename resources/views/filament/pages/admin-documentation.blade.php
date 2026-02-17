@@ -307,10 +307,10 @@ HTML;
                     <ul class="mt-2 list-disc space-y-1.5 pl-4 text-sm text-gray-800">
                         <li><span class="font-semibold">Images</span>: canonical media rows + upload + copy URL.</li>
                         <li><span class="font-semibold">Image Groups</span>: reusable sets (gallery/carousel).</li>
-                        <li><span class="font-semibold">Image Group Items</span>: group membership + ordering.</li>
+                        <li><span class="font-semibold">Image Group Items</span>: managed inside Image Groups via the relation manager.</li>
                         <li><span class="font-semibold">Image Types</span>: classify what the image is (logo, featured, gallery, etc).</li>
-                        <li><span class="font-semibold">Image Attachments</span>: polymorphic role assignment (header/featured/og/thumbnail).</li>
-                        <li><span class="font-semibold">Image Group Attachments</span>: polymorphic group assignment (gallery/carousel).</li>
+                        <li><span class="font-semibold">Image Relationships</span>: polymorphic role assignment (header/featured/og/thumbnail).</li>
+                        <li><span class="font-semibold">Image Group Relationships</span>: polymorphic group assignment (gallery/carousel).</li>
                     </ul>
                 </div>
 
@@ -325,6 +325,8 @@ HTML;
                 </div>
             </div>
 
+            {!! $callout('info', 'Attachable type safety', 'Relationship target types are controlled by a system enum allowlist. Unsupported model types are not selectable in admin forms.') !!}
+            {!! $callout('muted', 'Sort behavior', 'When you insert a group item at an occupied sort position, existing items shift down automatically to keep order consistent.') !!}
             {!! $callout('warn', 'Keep defaults set', 'Always keep global default roles populated. Missing defaults increase the chance of blank image slots on new pages/locales.') !!}
         </section>
 
@@ -413,8 +415,17 @@ HTML;
                     <div class="font-semibold text-gray-900">“Image slot is empty.”</div>
                     <ul class="mt-2 list-disc space-y-1.5 pl-4 text-sm text-gray-800">
                         <li>Verify image row is active and URL/path is valid.</li>
-                        <li>Verify role assignment exists for current or default language.</li>
+                        <li>Verify an Image Relationship exists for the current content target/language.</li>
                         <li>Verify defaults are seeded.</li>
+                    </ul>
+                </div>
+
+                <div class="rounded-xl border border-gray-200 bg-white px-4 py-3">
+                    <div class="font-semibold text-gray-900">“Image order changed after insert.”</div>
+                    <ul class="mt-2 list-disc space-y-1.5 pl-4 text-sm text-gray-800">
+                        <li>Group item sort order uses insertion behavior (existing items shift down).</li>
+                        <li>Use the Image Group relation manager reorder controls for final ordering.</li>
+                        <li>Refresh after save to confirm the updated sort sequence.</li>
                     </ul>
                 </div>
             </div>
