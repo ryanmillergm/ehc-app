@@ -2,16 +2,29 @@
 
 namespace App\Livewire;
 
+use App\Services\Content\HomeContentService;
 use Livewire\Component;
 
 class Home extends Component
 {
     public function render()
     {
+        $homeContent = app(HomeContentService::class)->build();
         $canonical = url('/');
-        $ogImage = asset('images/sm/the-mayor.jpg');
-        $seoTitle = 'Homeless Ministry in Sacramento, CA | Bread of Grace Ministries';
-        $seoDescription = 'Bread of Grace Ministries serves Sacramento through homeless outreach, hot meals, housing pathways, discipleship, and practical support. Give to help feed the hungry and support the needy.';
+        $ogImage = $homeContent['images']['seo_og'];
+        $seoTitle = $homeContent['seoTitle'];
+        $seoDescription = $homeContent['seoDescription'];
+
+        $faqSchema = $homeContent['faqItems']->map(function ($faq) {
+            return [
+                '@type' => 'Question',
+                'name' => $faq->question,
+                'acceptedAnswer' => [
+                    '@type' => 'Answer',
+                    'text' => $faq->answer,
+                ],
+            ];
+        })->values()->all();
 
         return view('livewire.home')
             ->layout('components.layouts.app', [
@@ -56,42 +69,16 @@ class Home extends Component
                     [
                         '@context' => 'https://schema.org',
                         '@type' => 'FAQPage',
-                        'mainEntity' => [
-                            [
-                                '@type' => 'Question',
-                                'name' => 'How are donations used?',
-                                'acceptedAnswer' => [
-                                    '@type' => 'Answer',
-                                    'text' => 'Donations support outreach essentials including meals, survival supplies, discipleship, and practical housing and employment support.',
-                                ],
-                            ],
-                            [
-                                '@type' => 'Question',
-                                'name' => 'Where does outreach happen?',
-                                'acceptedAnswer' => [
-                                    '@type' => 'Answer',
-                                    'text' => 'Outreach gatherings are held in Sacramento at Township 9 Park every Thursday and Sunday at 11:00am.',
-                                ],
-                            ],
-                            [
-                                '@type' => 'Question',
-                                'name' => 'Can I volunteer if I am new?',
-                                'acceptedAnswer' => [
-                                    '@type' => 'Answer',
-                                    'text' => 'Yes. New volunteers are welcome and can help with food service, outreach support, prayer, and follow-up care.',
-                                ],
-                            ],
-                            [
-                                '@type' => 'Question',
-                                'name' => 'Can I give monthly to support long-term impact?',
-                                'acceptedAnswer' => [
-                                    '@type' => 'Answer',
-                                    'text' => 'Yes. Monthly giving helps sustain consistent ministry work in housing support, food outreach, and mentorship.',
-                                ],
-                            ],
-                        ],
+                        'mainEntity' => $faqSchema,
                     ],
                 ],
+            ])
+            ->with([
+                'faqItems' => $homeContent['faqItems'],
+                'homeImages' => $homeContent['images'],
+                'heroIntro' => $homeContent['heroIntro'],
+                'meetingSchedule' => $homeContent['meetingSchedule'],
+                'meetingLocation' => $homeContent['meetingLocation'],
             ]);
     }
 }

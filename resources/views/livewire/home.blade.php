@@ -35,8 +35,7 @@
                     </h1>
 
                     <p class="text-lg sm:text-xl text-slate-600 leading-relaxed max-w-2xl">
-                        As a homeless ministry in Sacramento, California, we feed the hungry, help the needy, and walk with people
-                        through Christ-centered mentorship, practical support, and pathways to stable housing.
+                        {{ $heroIntro }}
                     </p>
 
                     {{-- Image --}}
@@ -44,7 +43,7 @@
                         <div class="relative">
                             <div class="absolute -inset-6 bg-gradient-to-tr from-rose-200/40 via-white to-sky-200/40 blur-2xl"></div>
                             <img
-                                src="{{ asset('images/sm/the-mayor.jpg') }}"
+                                src="{{ $homeImages['hero_primary'] ?? asset('images/sm/the-mayor.jpg') }}"
                                 alt="Bread of Grace outreach"
                                 class="relative w-full rounded-2xl object-cover shadow-xl ring-1 ring-slate-200"
                                 loading="eager"
@@ -105,7 +104,7 @@
                             {{-- Big image Left stack --}}
                             <div class="md:col-span-7 block">
                                 <img
-                                    src="{{ asset('images/sm/the-mayor.jpg') }}"
+                                    src="{{ $homeImages['hero_primary'] ?? asset('images/sm/the-mayor.jpg') }}"
                                     alt="Bread of Grace outreach"
                                     class="w-full aspect-[16/11] md:aspect-auto md:h-[420px] rounded-3xl object-cover shadow-xl ring-1 ring-slate-200"
                                     loading="lazy"
@@ -115,7 +114,7 @@
                             {{-- Right stack --}}
                             <div class="md:col-span-5 space-y-4">
                                 <img
-                                    src="{{ asset('images/sm/lisa-hug.jpg') }}"
+                                    src="{{ $homeImages['hero_secondary'] ?? asset('images/sm/lisa-hug.jpg') }}"
                                     alt="Love and support"
                                     class="w-full aspect-[16/10] md:aspect-auto md:h-[200px] rounded-3xl object-cover shadow-lg ring-1 ring-slate-200"
                                     loading="lazy"
@@ -135,8 +134,8 @@
                         <div class="pointer-events-none absolute -bottom-8 sm:-bottom-5 lg:-bottom-20 left-6 right-6">
                             <div class="mx-auto max-w-xl rounded-full bg-slate-900/90 text-white px-5 py-3 shadow-lg ring-1 ring-white/10 backdrop-blur">
                                 <div class="flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm">
-                                    <span class="font-semibold">Meet us: Thursday + Sunday • 11:00am</span>
-                                    <span class="text-white/80">Township 9 Park • Sacramento</span>
+                                    <span class="font-semibold">Meet us: {{ $meetingSchedule }}</span>
+                                    <span class="text-white/80">{{ $meetingLocation }}</span>
                                 </div>
                             </div>
                         </div>
@@ -502,10 +501,8 @@
                     <div class="h-1 w-24 bg-slate-900 rounded-full"></div>
 
                     <div class="space-y-1 text-lg text-slate-700 font-medium">
-                        <p>Every Thursday and Sunday at 11am</p>
-                        <p>Township 9 Park,</p>
-                        <p>Sacramento, CA</p>
-                        <p>95811</p>
+                        <p>{{ $meetingSchedule }}</p>
+                        <p>{{ $meetingLocation }}</p>
                     </div>
 
                     <div class="flex flex-col sm:flex-row gap-3">
@@ -545,47 +542,11 @@
         </div>
     </section>
 
-    {{-- FAQ (SEO + donor clarity) --}}
-    <section id="faq" class="scroll-mt-20 py-16 sm:py-20 bg-white">
-        <div class="mx-auto max-w-screen-2xl px-6 sm:px-8 lg:px-12 2xl:px-20">
-            <div class="max-w-4xl">
-                <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight">
-                    Frequently asked questions
-                </h2>
-                <p class="mt-3 text-lg text-slate-600">
-                    Common questions about helping the homeless in Sacramento through Bread of Grace Ministries.
-                </p>
-            </div>
-
-            <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                    <h3 class="font-bold text-slate-900">How are donations used?</h3>
-                    <p class="mt-2 text-slate-600">
-                        Donations support outreach essentials including hot meals, hygiene and survival supplies, bibles, discipleship,
-                        and practical housing and employment support.
-                    </p>
-                </div>
-                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                    <h3 class="font-bold text-slate-900">Where does outreach happen?</h3>
-                    <p class="mt-2 text-slate-600">
-                        Outreach gatherings are held in Sacramento at Township 9 Park every Thursday and Sunday at 11:00am.
-                    </p>
-                </div>
-                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                    <h3 class="font-bold text-slate-900">Can I volunteer if I am new?</h3>
-                    <p class="mt-2 text-slate-600">
-                        Yes. New volunteers are welcome and can help with food service, outreach support, prayer, and follow-up care.
-                    </p>
-                </div>
-                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                    <h3 class="font-bold text-slate-900">Can I give monthly to support long-term impact?</h3>
-                    <p class="mt-2 text-slate-600">
-                        Yes. Monthly giving helps sustain consistent ministry work with food outreach, mentorship, and future housing support.
-                    </p>
-                </div>
-            </div>
-        </div>
-    </section>
+    @include('partials.faq-grid', [
+        'faqItems' => $faqItems,
+        'heading' => 'Frequently asked questions',
+        'subheading' => 'Common questions about helping the homeless in Sacramento through Bread of Grace Ministries.',
+    ])
 
     {{-- FINAL CTA BAR --}}
     <x-final-cta give-href="#give-form" />
