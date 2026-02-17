@@ -6,6 +6,7 @@ use App\Livewire\EmailSignupForm;
 use App\Models\EmailList;
 use App\Models\EmailSubscriber;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -13,6 +14,20 @@ use Tests\TestCase;
 class EmailSignupFormTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config([
+            'services.turnstile.secret' => 'test-secret',
+            'services.turnstile.key' => 'test-site-key',
+        ]);
+
+        Http::fake([
+            'https://challenges.cloudflare.com/turnstile/v0/siteverify*' => Http::response(['success' => true], 200),
+        ]);
+    }
 
     private function seedDefaultList(): EmailList
     {
@@ -57,6 +72,7 @@ class EmailSignupFormTest extends TestCase
             ->set('first_name', 'Ryan')
             ->set('last_name', 'M')
             ->set('email', '  TEST@Example.COM ')
+            ->set('turnstileToken', 'token-1')
             ->call('submit')
             ->assertHasNoErrors()
             ->assertSet('email', '')
@@ -108,6 +124,7 @@ class EmailSignupFormTest extends TestCase
             ->set('first_name', 'Second')
             ->set('last_name', 'Person')
             ->set('email', 'A@B.COM')
+            ->set('turnstileToken', 'token-1')
             ->call('submit')
             ->assertHasNoErrors();
 
@@ -130,6 +147,7 @@ class EmailSignupFormTest extends TestCase
 
         Livewire::test(EmailSignupForm::class)
             ->set('email', 'u@b.com')
+            ->set('turnstileToken', 'token-1')
             ->call('submit')
             ->assertHasNoErrors();
 
@@ -152,6 +170,7 @@ class EmailSignupFormTest extends TestCase
 
         Livewire::test(EmailSignupForm::class)
             ->set('email', 'r.y.a.n+tag@googlemail.com')
+            ->set('turnstileToken', 'token-1')
             ->call('submit')
             ->assertHasNoErrors();
 
@@ -169,6 +188,7 @@ class EmailSignupFormTest extends TestCase
 
         Livewire::test(EmailSignupForm::class, ['variant' => 'footer'])
             ->set('email', 'test@example.com')
+            ->set('turnstileToken', 'token-1')
             ->call('submit')
             ->assertHasNoErrors();
 
@@ -199,6 +219,7 @@ class EmailSignupFormTest extends TestCase
 
         \Livewire\Livewire::test(\App\Livewire\EmailSignupForm::class, ['variant' => 'footer'])
             ->set('email', 'test@example.com')
+            ->set('turnstileToken', 'token-1')
             ->call('submit')
             ->assertHasNoErrors();
 
@@ -247,11 +268,236 @@ class EmailSignupFormTest extends TestCase
 
         \Livewire\Livewire::test(\App\Livewire\EmailSignupForm::class, ['variant' => 'footer'])
             ->set('email', 'me+tag@yahoo.com')
+            ->set('turnstileToken', 'token-1')
             ->call('submit')
             ->assertHasNoErrors();
 
         $this->assertDatabaseHas('email_subscribers', [
-            'email' => 'me@yahoo.com',
+            'email' => 'me+tag@yahoo.com',
+            'email_canonical' => 'me@yahoo.com',
         ]);
+    }
+
+    #[Test]
+    public function it_requires_turnstile_token_for_public_variants(): void
+    {
+        $this->seedDefaultList();
+
+        Livewire::test(EmailSignupForm::class, ['variant' => 'footer'])
+            ->set('email', 'token-required-footer@example.com')
+            ->call('submit')
+            ->assertHasErrors(['turnstileToken' => 'required']);
+
+        Livewire::test(EmailSignupForm::class, ['variant' => 'page'])
+            ->set('email', 'token-required-page@example.com')
+            ->set('first_name', 'Token')
+            ->set('last_name', 'Required')
+            ->call('submit')
+            ->assertHasErrors(['turnstileToken' => 'required']);
+    }
+
+    #[Test]
+    public function it_requires_a_new_turnstile_token_for_a_second_submission_attempt(): void
+    {
+        $this->seedDefaultList();
+
+        $component = Livewire::test(EmailSignupForm::class, ['variant' => 'footer'])
+            ->set('email', 'repeat@example.com')
+            ->set('turnstileToken', 'token-1')
+            ->call('submit')
+            ->assertHasNoErrors()
+            ->assertSet('turnstileToken', null);
+
+        $component
+            ->set('email', 'repeat@example.com')
+            ->call('submit')
+            ->assertHasErrors(['turnstileToken' => 'required']);
+
+        $component
+            ->set('turnstileToken', 'token-2')
+            ->call('submit')
+            ->assertHasNoErrors();
+
+        $this->assertSame(1, EmailSubscriber::query()->where('email', 'repeat@example.com')->count());
+    }
+
+    #[Test]
+    public function it_resets_turnstile_token_after_submit_and_allows_retry_with_new_token(): void
+    {
+        $this->seedDefaultList();
+
+        $component = Livewire::test(EmailSignupForm::class, ['variant' => 'footer'])
+            ->set('email', 'turnstile-retry@example.com')
+            ->set('turnstileToken', 'token-1')
+            ->call('submit')
+            ->assertHasNoErrors()
+            ->assertSet('turnstileToken', null);
+
+        $this->assertContains($component->get('bannerType'), ['success', 'info']);
+
+        $component
+            ->set('email', 'turnstile-retry@example.com')
+            ->set('turnstileToken', 'token-2')
+            ->call('submit')
+            ->assertHasNoErrors()
+            ->assertSet('turnstileToken', null);
+
+        $this->assertDatabaseHas('email_subscribers', [
+            'email' => 'turnstile-retry@example.com',
+        ]);
+    }
+
+    #[Test]
+    public function it_clears_previous_validation_and_banner_state_between_attempts(): void
+    {
+        $this->seedDefaultList();
+
+        $component = Livewire::test(EmailSignupForm::class, ['variant' => 'footer'])
+            ->set('email', '')
+            ->call('submit')
+            ->assertHasErrors(['email' => 'required']);
+
+        $component
+            ->set('email', 'state-reset@example.com')
+            ->set('turnstileToken', 'token-1')
+            ->call('submit')
+            ->assertHasNoErrors()
+            ->assertSet('bannerType', 'success');
+
+        $component
+            ->set('email', 'new-address@example.com')
+            ->assertSet('bannerType', null)
+            ->assertSet('bannerMessage', null);
+    }
+
+    #[Test]
+    public function submit_shows_info_banner_and_creates_no_subscriber_when_turnstile_secret_is_missing(): void
+    {
+        $this->seedDefaultList();
+        config(['services.turnstile.secret' => '']);
+
+        Livewire::test(EmailSignupForm::class, ['variant' => 'footer'])
+            ->set('email', 'missing-secret@example.com')
+            ->set('turnstileToken', 'token-any')
+            ->call('submit')
+            ->assertHasNoErrors()
+            ->assertSet('bannerType', 'info')
+            ->assertSet('turnstileToken', null)
+            ->assertSet('turnstileReady', false);
+
+        $this->assertDatabaseMissing('email_subscribers', [
+            'email' => 'missing-secret@example.com',
+        ]);
+    }
+
+    #[Test]
+    public function honeypot_submission_returns_success_banner_without_creating_a_subscriber(): void
+    {
+        $this->seedDefaultList();
+
+        Livewire::test(EmailSignupForm::class, ['variant' => 'footer'])
+            ->set('email', 'bot@example.com')
+            ->set('company', 'Evil Bot Inc')
+            ->call('submit')
+            ->assertHasNoErrors()
+            ->assertSet('bannerType', 'success')
+            ->assertSet('turnstileToken', null)
+            ->assertSet('turnstileReady', false);
+
+        $this->assertDatabaseMissing('email_subscribers', [
+            'email' => 'bot@example.com',
+        ]);
+    }
+
+    #[Test]
+    public function page_variant_requires_a_new_turnstile_token_for_second_submission_attempt(): void
+    {
+        $this->seedDefaultList();
+
+        $component = Livewire::test(EmailSignupForm::class, ['variant' => 'page'])
+            ->set('first_name', 'Page')
+            ->set('last_name', 'User')
+            ->set('email', 'page-repeat@example.com')
+            ->set('turnstileToken', 'token-page-1')
+            ->call('submit')
+            ->assertHasNoErrors()
+            ->assertSet('turnstileToken', null);
+
+        $component
+            ->set('first_name', 'Page')
+            ->set('last_name', 'User')
+            ->set('email', 'page-repeat@example.com')
+            ->call('submit')
+            ->assertHasErrors(['turnstileToken' => 'required']);
+    }
+
+    #[Test]
+    public function repeated_submissions_do_not_create_duplicate_subscribers_for_the_same_canonical_email(): void
+    {
+        $this->seedDefaultList();
+
+        $component = Livewire::test(EmailSignupForm::class, ['variant' => 'footer']);
+
+        foreach ([1, 2, 3] as $attempt) {
+            $component
+                ->set('email', 'RaCe.Test+tag@GMAIL.com')
+                ->set('turnstileToken', 'token-race-' . $attempt)
+                ->call('submit')
+                ->assertHasNoErrors();
+        }
+
+        $this->assertSame(
+            1,
+            EmailSubscriber::query()->where('email_canonical', 'racetest@gmail.com')->count()
+        );
+    }
+
+    #[Test]
+    public function rate_limit_blocks_the_sixth_valid_attempt_and_prevents_new_rows(): void
+    {
+        $this->seedDefaultList();
+
+        $component = Livewire::test(EmailSignupForm::class, ['variant' => 'footer']);
+
+        for ($i = 1; $i <= 5; $i++) {
+            $component
+                ->set('email', 'rate-limit@example.com')
+                ->set('turnstileToken', 'token-rate-' . $i)
+                ->call('submit')
+                ->assertHasNoErrors();
+        }
+
+        $component
+            ->set('email', 'rate-limit@example.com')
+            ->set('turnstileToken', 'token-rate-6')
+            ->call('submit')
+            ->assertHasNoErrors()
+            ->assertSet('bannerType', 'info');
+
+        $this->assertStringContainsString('Slow down, human.', (string) $component->get('bannerMessage'));
+        $this->assertSame(1, EmailSubscriber::query()->where('email', 'rate-limit@example.com')->count());
+    }
+
+    #[Test]
+    public function invalid_submissions_do_not_consume_rate_limit_budget(): void
+    {
+        $this->seedDefaultList();
+
+        $component = Livewire::test(EmailSignupForm::class, ['variant' => 'footer']);
+
+        for ($i = 1; $i <= 6; $i++) {
+            $component
+                ->set('email', 'not-an-email')
+                ->set('turnstileToken', 'token-invalid-' . $i)
+                ->call('submit')
+                ->assertHasErrors(['email' => 'email']);
+        }
+
+        $component
+            ->set('email', 'not-rate-limited@example.com')
+            ->set('turnstileToken', 'token-valid')
+            ->call('submit')
+            ->assertHasNoErrors()
+            ->assertSet('bannerType', 'success');
     }
 }

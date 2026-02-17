@@ -14,7 +14,9 @@ use Livewire\Component;
 class EmailSignupForm extends Component
 {
     public ?string $turnstileToken = null; // token from widget
+    public bool $turnstileReady = false;
     public string $company = ''; // honeypot
+    public int $bannerNonce = 0;
 
     public string $variant = 'footer'; // 'footer' | 'page'
 
@@ -58,14 +60,18 @@ class EmailSignupForm extends Component
     {
         $this->bannerType = $type;
         $this->bannerMessage = $message;
+        $this->bannerNonce++;
     }
 
     public function submit(): void
     {
-        $tsKey = $this->tsKey();
+        $this->bannerType = null;
+        $this->bannerMessage = null;
 
-        // Clear old banner
-        $this->banner(null, null);
+        $this->resetErrorBag();
+        $this->resetValidation();
+
+        $tsKey = $this->tsKey();
 
         Log::info('EmailSignupForm submit start', [
             'variant' => $this->variant,
@@ -77,6 +83,7 @@ class EmailSignupForm extends Component
         // Honeypot
         if ($this->company !== '') {
             $this->reset('email', 'first_name', 'last_name', 'company', 'turnstileToken');
+            $this->turnstileReady = false;
             $this->banner('success', "Thanks! You’re signed up.");
             $this->dispatch('turnstile-reset', id: $tsKey);
             return;
@@ -90,8 +97,6 @@ class EmailSignupForm extends Component
             $this->banner('info', "Slow down, human. Try again in {$seconds} seconds.");
             return;
         }
-
-        RateLimiter::hit($rateKey, 60);
 
         // Normalize
         $email = Str::lower(trim($this->email));
@@ -109,9 +114,12 @@ class EmailSignupForm extends Component
         if (! $this->verifyTurnstile((string) $this->turnstileToken)) {
             $this->banner('info', 'Please verify you’re human and try again.');
             $this->turnstileToken = null;
+            $this->turnstileReady = false;
             $this->dispatch('turnstile-reset', id: $tsKey);
             return;
         }
+
+        RateLimiter::hit($rateKey, 60);
 
         // Lookup canonical
         $canonical = EmailCanonicalizer::canonicalize($email) ?? $email;
@@ -124,6 +132,7 @@ class EmailSignupForm extends Component
         // Already subscribed
         if ($subscriber && $subscriber->unsubscribed_at === null) {
             $this->reset('email', 'first_name', 'last_name', 'company', 'turnstileToken');
+            $this->turnstileReady = false;
             $this->banner('info', 'You’re already subscribed — thanks for staying connected!');
             $this->dispatch('turnstile-reset', id: $tsKey);
             return;
@@ -192,6 +201,7 @@ class EmailSignupForm extends Component
 
         // Reset form
         $this->reset('email', 'first_name', 'last_name', 'company', 'turnstileToken');
+        $this->turnstileReady = false;
 
         // Set banner AFTER reset
         $this->banner('success', "Thanks! You’re signed up.");
@@ -240,6 +250,24 @@ class EmailSignupForm extends Component
         }
 
         return true;
+    }
+
+    public function updatedEmail(): void
+    {
+        $this->bannerType = null;
+        $this->bannerMessage = null;
+    }
+
+    public function updatedFirstName(): void
+    {
+        $this->bannerType = null;
+        $this->bannerMessage = null;
+    }
+
+    public function updatedLastName(): void
+    {
+        $this->bannerType = null;
+        $this->bannerMessage = null;
     }
 
     public function render()
