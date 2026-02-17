@@ -7,8 +7,8 @@ use App\Models\EmailCampaign;
 use App\Models\EmailCampaignDelivery;
 use App\Models\EmailList;
 use App\Models\EmailSubscriber;
+use App\Services\MailtrapApiMailer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -23,7 +23,28 @@ class EmailCampaignSendingTest extends TestCase
         config(['queue.default' => 'sync']);
         config(['mail.from.address' => 'admin@example.com']);
         config(['mail.from.name' => 'Admin']);
-        Mail::fake();
+
+        $fakeMailer = new class {
+            /** @var array<int,array{from_email:string,to_email:string}> */
+            public array $sent = [];
+
+            public function sendHtml(
+                string $fromEmail,
+                ?string $fromName,
+                string $toEmail,
+                ?string $toName,
+                string $subject,
+                string $html,
+                ?string $text = null,
+                ?string $category = null,
+            ): void {
+                $this->sent[] = [
+                    'from_email' => $fromEmail,
+                    'to_email' => $toEmail,
+                ];
+            }
+        };
+        $this->app->instance(MailtrapApiMailer::class, $fakeMailer);
 
         $list = EmailList::create([
             'key' => 'newsletter',
@@ -70,5 +91,6 @@ class EmailCampaignSendingTest extends TestCase
         $this->assertSame('Hello world', $delivery->subject);
         $this->assertNotNull($delivery->body_html);
         $this->assertSame('admin@example.com', $delivery->from_email);
+        $this->assertCount(2, $fakeMailer->sent);
     }
 }

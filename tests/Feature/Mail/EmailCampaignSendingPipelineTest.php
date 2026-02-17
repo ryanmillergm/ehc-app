@@ -8,9 +8,9 @@ use App\Models\EmailCampaign;
 use App\Models\EmailCampaignDelivery;
 use App\Models\EmailList;
 use App\Models\EmailSubscriber;
+use App\Services\MailtrapApiMailer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
-use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -52,40 +52,48 @@ class EmailCampaignSendingPipelineTest extends TestCase
         ]);
     }
 
-    private function restoreMail(): void
+    private function fakeMailtrap(?string $throwForEmail = null, string $message = 'Kaboom'): object
     {
-        // Restore the real mail manager after we swap it in a test.
-        Mail::swap(app('mail.manager'));
-    }
+        $fake = new class($throwForEmail, $message) {
+            /** @var array<int,array{from_email:string,from_name:string,to_email:string,to_name:string,subject:string,html:string,text:string,category:string}> */
+            public array $sent = [];
 
-    private function swapMailToThrowFor(string $badEmail, string $message = 'Kaboom'): void
-    {
-        Mail::swap(new class($badEmail, $message) {
             public function __construct(
-                private string $badEmail,
+                private ?string $throwForEmail,
                 private string $message,
             ) {}
 
-            public function to($email, $name = null)
+            public function sendHtml(
+                string $fromEmail,
+                ?string $fromName,
+                string $toEmail,
+                ?string $toName,
+                string $subject,
+                string $html,
+                ?string $text = null,
+                ?string $category = null,
+            ): void
             {
-                return new class((string) $email, $this->badEmail, $this->message) {
-                    public function __construct(
-                        private string $email,
-                        private string $badEmail,
-                        private string $message,
-                    ) {}
+                if ($this->throwForEmail !== null && $toEmail === $this->throwForEmail) {
+                    throw new \RuntimeException($this->message);
+                }
 
-                    public function send($mailable): void
-                    {
-                        if ($this->email === $this->badEmail) {
-                            throw new \RuntimeException($this->message);
-                        }
-
-                        // success no-op
-                    }
-                };
+                $this->sent[] = [
+                    'from_email' => $fromEmail,
+                    'from_name' => (string) ($fromName ?? ''),
+                    'to_email' => $toEmail,
+                    'to_name' => (string) ($toName ?? ''),
+                    'subject' => $subject,
+                    'html' => $html,
+                    'text' => (string) ($text ?? ''),
+                    'category' => (string) ($category ?? ''),
+                ];
             }
-        });
+        };
+
+        $this->app->instance(MailtrapApiMailer::class, $fake);
+
+        return $fake;
     }
 
     private function runJob(object $job): void
@@ -165,7 +173,7 @@ class EmailCampaignSendingPipelineTest extends TestCase
     public function chunk_job_skips_if_unsubscribed_after_queuing_and_does_not_send(): void
     {
         Bus::fake([SendEmailCampaignChunk::class]);
-        Mail::fake();
+        $fakeMailer = $this->fakeMailtrap();
 
         [$list, $subs] = $this->makeListWithSubscribers(1);
         $campaign = $this->makeCampaign($list);
@@ -187,14 +195,14 @@ class EmailCampaignSendingPipelineTest extends TestCase
         $this->assertNull($delivery->sent_at);
         $this->assertNull($delivery->failed_at);
 
-        Mail::assertNothingSent();
+        $this->assertCount(0, $fakeMailer->sent);
     }
 
     #[Test]
     public function chunk_job_marks_delivery_sent_on_success_and_stores_rendered_html(): void
     {
         Bus::fake([SendEmailCampaignChunk::class]);
-        Mail::fake();
+        $fakeMailer = $this->fakeMailtrap();
 
         [$list, $subs] = $this->makeListWithSubscribers(1);
         $campaign = $this->makeCampaign($list);
@@ -213,7 +221,7 @@ class EmailCampaignSendingPipelineTest extends TestCase
         $this->assertTrue($delivery->attempts >= 1);
         $this->assertNotNull($delivery->body_html);
 
-        Mail::assertSentCount(1);
+        $this->assertCount(1, $fakeMailer->sent);
     }
 
     #[Test]
@@ -240,13 +248,8 @@ class EmailCampaignSendingPipelineTest extends TestCase
         (new QueueEmailCampaignSend($campaign->id))->handle();
         $delivery = EmailCampaignDelivery::query()->firstOrFail();
 
-        $this->swapMailToThrowFor($badEmail, 'Kaboom');
-
-        try {
-            $this->runJob(new SendEmailCampaignChunk($campaign->id, [$delivery->id]));
-        } finally {
-            $this->restoreMail();
-        }
+        $this->fakeMailtrap($badEmail, 'Kaboom');
+        $this->runJob(new SendEmailCampaignChunk($campaign->id, [$delivery->id]));
 
         $delivery->refresh();
 
@@ -260,7 +263,7 @@ class EmailCampaignSendingPipelineTest extends TestCase
     public function campaign_finishes_sent_when_all_deliveries_succeed(): void
     {
         Bus::fake([SendEmailCampaignChunk::class]);
-        Mail::fake();
+        $this->fakeMailtrap();
 
         [$list, $subs] = $this->makeListWithSubscribers(2);
         $campaign = $this->makeCampaign($list);
@@ -320,13 +323,8 @@ class EmailCampaignSendingPipelineTest extends TestCase
             ->orderBy('id')
             ->get();
 
-        $this->swapMailToThrowFor($badEmail, 'Kaboom');
-
-        try {
-            $this->runJob(new SendEmailCampaignChunk($campaign->id, $deliveries->pluck('id')->all()));
-        } finally {
-            $this->restoreMail();
-        }
+        $this->fakeMailtrap($badEmail, 'Kaboom');
+        $this->runJob(new SendEmailCampaignChunk($campaign->id, $deliveries->pluck('id')->all()));
 
         $campaign->refresh();
 

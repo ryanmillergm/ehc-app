@@ -3,13 +3,12 @@
 namespace Tests\Feature\Mail;
 
 use App\Jobs\SendEmailCampaignChunk;
-use App\Mail\EmailCampaignMail;
 use App\Models\EmailCampaign;
 use App\Models\EmailCampaignDelivery;
 use App\Models\EmailList;
 use App\Models\EmailSubscriber;
+use App\Services\MailtrapApiMailer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -25,7 +24,24 @@ class SendEmailCampaignChunkExtraTest extends TestCase
     #[Test]
     public function it_skips_deliveries_already_marked_sent_and_does_not_send_again(): void
     {
-        Mail::fake();
+        $fakeMailer = new class {
+            /** @var array<int,array{from_email:string,to_email:string}> */
+            public array $sent = [];
+
+            public function sendHtml(
+                string $fromEmail,
+                ?string $fromName,
+                string $toEmail,
+                ?string $toName,
+                string $subject,
+                string $html,
+                ?string $text = null,
+                ?string $category = null,
+            ): void {
+                $this->sent[] = ['from_email' => $fromEmail, 'to_email' => $toEmail];
+            }
+        };
+        $this->app->instance(MailtrapApiMailer::class, $fakeMailer);
 
         $list = EmailList::factory()->create(['purpose' => 'marketing']);
 
@@ -68,7 +84,7 @@ class SendEmailCampaignChunkExtraTest extends TestCase
         $campaign->refresh();
 
         $this->assertSame(0, (int) $delivery->attempts);
-        Mail::assertNothingSent();
+        $this->assertCount(0, $fakeMailer->sent);
 
         // Because pending_chunks decremented to 0, it will finalize campaign
         $this->assertSame(EmailCampaign::STATUS_SENT, $campaign->status);
@@ -78,7 +94,28 @@ class SendEmailCampaignChunkExtraTest extends TestCase
     #[Test]
     public function it_uses_delivery_from_email_when_present(): void
     {
-        Mail::fake();
+        $fakeMailer = new class {
+            /** @var array<int,array{from_email:string,from_name:string,to_email:string}> */
+            public array $sent = [];
+
+            public function sendHtml(
+                string $fromEmail,
+                ?string $fromName,
+                string $toEmail,
+                ?string $toName,
+                string $subject,
+                string $html,
+                ?string $text = null,
+                ?string $category = null,
+            ): void {
+                $this->sent[] = [
+                    'from_email' => $fromEmail,
+                    'from_name' => (string) ($fromName ?? ''),
+                    'to_email' => $toEmail,
+                ];
+            }
+        };
+        $this->app->instance(MailtrapApiMailer::class, $fakeMailer);
 
         $list = EmailList::factory()->create(['purpose' => 'marketing']);
 
@@ -120,13 +157,9 @@ class SendEmailCampaignChunkExtraTest extends TestCase
 
         $this->assertSame(EmailCampaignDelivery::STATUS_SENT, $delivery->status);
 
-        Mail::assertSent(EmailCampaignMail::class, function (EmailCampaignMail $mail) {
-            $from = $mail->envelope()->from;
-
-            return $from
-                && $from->address === 'special-from@example.com'
-                && $from->name === 'Special From';
-        });
+        $this->assertCount(1, $fakeMailer->sent);
+        $this->assertSame('special-from@example.com', $fakeMailer->sent[0]['from_email']);
+        $this->assertSame('Special From', $fakeMailer->sent[0]['from_name']);
     }
 
     #[Test]
