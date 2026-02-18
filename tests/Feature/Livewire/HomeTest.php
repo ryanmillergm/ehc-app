@@ -46,7 +46,10 @@ class HomeTest extends TestCase
             ->assertSee('Give now')
 
             // VISIT
-            ->assertSee('Visit us');
+            ->assertSee('Visit us')
+
+            // FINAL CTA BAR
+            ->assertSee('Visit →');
     }
 
     #[Test]

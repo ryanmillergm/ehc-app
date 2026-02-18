@@ -4,11 +4,13 @@ namespace Tests\Feature\Database;
 
 use App\Models\FaqItem;
 use App\Models\HomePageContent;
+use App\Models\HomeSection;
 use App\Models\Image;
 use App\Models\Language;
 use App\Models\SiteMediaDefault;
 use Database\Seeders\FaqItemSeeder;
 use Database\Seeders\HomePageContentSeeder;
+use Database\Seeders\HomeSectionSeeder;
 use Database\Seeders\ImageSeeder;
 use Database\Seeders\SiteMediaDefaultSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -25,6 +27,7 @@ class HomeCmsSeedersTest extends TestCase
         $this->seed([
             ImageSeeder::class,
             HomePageContentSeeder::class,
+            HomeSectionSeeder::class,
         ]);
 
         $english = Language::query()->where('iso_code', 'en')->firstOrFail();
@@ -40,6 +43,35 @@ class HomeCmsSeedersTest extends TestCase
         $this->assertNotNull($content->hero_image_id);
         $this->assertNotNull($content->featured_image_id);
         $this->assertNotNull($content->og_image_id);
+
+        $heroSection = HomeSection::query()
+            ->where('language_id', $english->id)
+            ->where('section_key', 'hero')
+            ->firstOrFail();
+
+        $this->assertSame('Bread of Grace Ministries', $heroSection->eyebrow);
+        $this->assertSame('Help restore lives through God\'s Word and practical support.', $heroSection->heading);
+        $this->assertNotEmpty($heroSection->items);
+
+        $preGiveCta = HomeSection::query()
+            ->where('language_id', $english->id)
+            ->where('section_key', 'pre_give_cta')
+            ->firstOrFail();
+
+        $this->assertSame('Next step', $preGiveCta->eyebrow);
+        $this->assertSame('Ready to make a real difference today?', $preGiveCta->heading);
+        $this->assertSame('Jump to donation form →', $preGiveCta->cta_primary_label);
+        $this->assertSame('#give-form', $preGiveCta->cta_primary_url);
+
+        $finalCta = HomeSection::query()
+            ->where('language_id', $english->id)
+            ->where('section_key', 'final_cta')
+            ->firstOrFail();
+
+        $this->assertSame('Next step', $finalCta->eyebrow);
+        $this->assertSame('Ready to make a real difference today?', $finalCta->heading);
+        $this->assertSame('Jump to donation form →', $finalCta->cta_primary_label);
+        $this->assertSame('#give-form', $finalCta->cta_primary_url);
     }
 
     #[Test]
@@ -87,6 +119,7 @@ class HomeCmsSeedersTest extends TestCase
             ImageSeeder::class,
             SiteMediaDefaultSeeder::class,
             HomePageContentSeeder::class,
+            HomeSectionSeeder::class,
             FaqItemSeeder::class,
         ]);
 
@@ -94,6 +127,7 @@ class HomeCmsSeedersTest extends TestCase
             'images' => Image::query()->count(),
             'defaults' => SiteMediaDefault::query()->count(),
             'home' => HomePageContent::query()->count(),
+            'home_sections' => HomeSection::query()->count(),
             'faq' => FaqItem::query()->where('context', 'home')->count(),
         ];
 
@@ -101,6 +135,7 @@ class HomeCmsSeedersTest extends TestCase
             ImageSeeder::class,
             SiteMediaDefaultSeeder::class,
             HomePageContentSeeder::class,
+            HomeSectionSeeder::class,
             FaqItemSeeder::class,
         ]);
 
@@ -108,6 +143,7 @@ class HomeCmsSeedersTest extends TestCase
             'images' => Image::query()->count(),
             'defaults' => SiteMediaDefault::query()->count(),
             'home' => HomePageContent::query()->count(),
+            'home_sections' => HomeSection::query()->count(),
             'faq' => FaqItem::query()->where('context', 'home')->count(),
         ];
 
