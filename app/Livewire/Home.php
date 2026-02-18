@@ -79,6 +79,7 @@ class Home extends Component
                 'heroIntro' => $homeContent['heroIntro'],
                 'meetingSchedule' => $homeContent['meetingSchedule'],
                 'meetingLocation' => $homeContent['meetingLocation'],
+                'sections' => $homeContent['sections'],
             ]);
     }
 }
