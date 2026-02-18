@@ -57,4 +57,9 @@ class HomePageContent extends Model
     {
         return $this->morphMany(ImageGroupable::class, 'image_groupable');
     }
+
+    public function videoables(): MorphMany
+    {
+        return $this->morphMany(Videoable::class, 'videoable');
+    }
 }

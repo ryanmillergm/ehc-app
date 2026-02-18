@@ -7,22 +7,26 @@
     @endif
 
     @if ($translation)
-        <article
-            class="prose prose-slate max-w-none"
-            @if(optional($translation->language)->right_to_left)
-                dir="rtl"
-            @endif
-        >
-            <h1 class="mb-2">{{ $translation->title }}</h1>
+        @includeIf('livewire.pages.templates.' . $template, ['page' => $pageView])
 
-            <p class="text-lg text-slate-600">
-                {{ $translation->description }}
-            </p>
+        @if (!view()->exists('livewire.pages.templates.' . $template))
+            <article
+                class="prose prose-slate max-w-none"
+                @if(optional($translation->language)->right_to_left)
+                    dir="rtl"
+                @endif
+            >
+                <h1 class="mb-2">{{ $translation->title }}</h1>
 
-            <div class="mt-4">
-                {!! $translation->content !!}
-            </div>
-        </article>
+                <p class="text-lg text-slate-600">
+                    {{ $translation->description }}
+                </p>
+
+                <div class="mt-4">
+                    {!! $translation->content !!}
+                </div>
+            </article>
+        @endif
     @else
         {{-- During Livewire re-resolve / redirect --}}
         <div class="text-center text-slate-500 py-10">

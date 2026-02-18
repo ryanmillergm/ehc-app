@@ -33,7 +33,25 @@ class PageTranslation extends Model
         'slug',
         'description',
         'content',
-        'is_active'
+        'template',
+        'theme',
+        'hero_mode',
+        'hero_title',
+        'hero_subtitle',
+        'hero_cta_text',
+        'hero_cta_url',
+        'layout_data',
+        'seo_title',
+        'seo_description',
+        'seo_og_image',
+        'is_active',
+        'published_at',
+    ];
+
+    protected $casts = [
+        'layout_data' => 'array',
+        'is_active' => 'boolean',
+        'published_at' => 'datetime',
     ];
 
     public static function getForm($pageId = null): array
@@ -70,6 +88,45 @@ class PageTranslation extends Model
             Textarea::make('content')
                 ->required()
                 ->columnSpanFull(),
+            Select::make('template')
+                ->options([
+                    'standard' => 'Standard',
+                    'campaign' => 'Campaign',
+                    'story' => 'Story',
+                ])
+                ->default('standard')
+                ->required(),
+            Select::make('theme')
+                ->options([
+                    'default' => 'Default',
+                    'warm' => 'Warm',
+                    'slate' => 'Slate',
+                ])
+                ->default('default')
+                ->required(),
+            Select::make('hero_mode')
+                ->options([
+                    'none' => 'None',
+                    'image' => 'Image',
+                    'video' => 'Video',
+                    'slider' => 'Slider',
+                ])
+                ->default('none')
+                ->required(),
+            TextInput::make('hero_title')
+                ->maxLength(255),
+            Textarea::make('hero_subtitle')
+                ->columnSpanFull(),
+            TextInput::make('hero_cta_text')
+                ->maxLength(255),
+            TextInput::make('hero_cta_url')
+                ->maxLength(500),
+            TextInput::make('seo_title')
+                ->maxLength(255),
+            Textarea::make('seo_description')
+                ->columnSpanFull(),
+            TextInput::make('seo_og_image')
+                ->maxLength(500),
             Toggle::make('is_active')
                 ->required(),
         ];
@@ -99,6 +156,11 @@ class PageTranslation extends Model
     public function imageGroupables(): MorphMany
     {
         return $this->morphMany(ImageGroupable::class, 'image_groupable');
+    }
+
+    public function videoables(): MorphMany
+    {
+        return $this->morphMany(Videoable::class, 'videoable');
     }
 
 

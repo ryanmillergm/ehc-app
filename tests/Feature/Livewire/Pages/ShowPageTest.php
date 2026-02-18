@@ -3,9 +3,16 @@
 namespace Tests\Feature\Livewire\Pages;
 
 use App\Livewire\Pages\ShowPage;
+use App\Models\Image;
+use App\Models\Imageable;
+use App\Models\ImageGroup;
+use App\Models\ImageGroupItem;
+use App\Models\ImageGroupable;
 use App\Models\Language;
 use App\Models\Page;
 use App\Models\PageTranslation;
+use App\Models\Video;
+use App\Models\Videoable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
@@ -248,5 +255,297 @@ class ShowPageTest extends TestCase
         $lw->dispatch('language-switched', code: 'es')
             ->assertSee('Privacy')
             ->assertSee('English only');
+    }
+
+    #[Test]
+    public function unpublished_translation_is_not_publicly_rendered(): void
+    {
+        $page = Page::factory()->create(['is_active' => true]);
+
+        $translation = PageTranslation::factory()->create([
+            'page_id' => $page->id,
+            'language_id' => $this->en->id,
+            'slug' => 'future-page-en',
+            'title' => 'Future Page',
+            'is_active' => true,
+            'published_at' => now()->addDay(),
+        ]);
+
+        $this->get('/pages/' . $translation->slug)
+            ->assertRedirect('/pages');
+    }
+
+    #[Test]
+    public function unknown_template_falls_back_to_standard_template(): void
+    {
+        $page = Page::factory()->create(['is_active' => true]);
+
+        $translation = PageTranslation::factory()->create([
+            'page_id' => $page->id,
+            'language_id' => $this->en->id,
+            'slug' => 'template-fallback-en',
+            'title' => 'Template Fallback',
+            'description' => 'Description',
+            'content' => '<p>Body</p>',
+            'template' => 'not-a-real-template',
+            'hero_mode' => 'none',
+            'is_active' => true,
+        ]);
+
+        $this->get('/pages/' . $translation->slug)
+            ->assertOk()
+            ->assertSee('Template Fallback')
+            ->assertSee('bg-white text-slate-900', false);
+    }
+
+    #[Test]
+    public function hero_video_mode_renders_video_when_assignment_exists(): void
+    {
+        $page = Page::factory()->create(['is_active' => true]);
+
+        $translation = PageTranslation::factory()->create([
+            'page_id' => $page->id,
+            'language_id' => $this->en->id,
+            'slug' => 'hero-video-en',
+            'title' => 'Hero Video',
+            'hero_mode' => 'video',
+            'is_active' => true,
+        ]);
+
+        $video = Video::factory()->embed()->create([
+            'embed_url' => 'https://www.youtube.com/embed/abc123xyz',
+        ]);
+
+        Videoable::factory()->create([
+            'video_id' => $video->id,
+            'videoable_type' => PageTranslation::class,
+            'videoable_id' => $translation->id,
+            'role' => 'hero_video',
+            'is_active' => true,
+        ]);
+
+        $this->get('/pages/' . $translation->slug)
+            ->assertOk()
+            ->assertSee('<iframe', false)
+            ->assertSee('youtube.com/embed/abc123xyz');
+    }
+
+    #[Test]
+    public function hero_video_mode_falls_back_when_no_video_assignment_exists(): void
+    {
+        $page = Page::factory()->create(['is_active' => true]);
+
+        $translation = PageTranslation::factory()->create([
+            'page_id' => $page->id,
+            'language_id' => $this->en->id,
+            'slug' => 'hero-video-missing-en',
+            'title' => 'Hero Video Missing',
+            'hero_mode' => 'video',
+            'is_active' => true,
+        ]);
+
+        $this->get('/pages/' . $translation->slug)
+            ->assertOk()
+            ->assertDontSee('<iframe', false)
+            ->assertDontSee('<video', false);
+    }
+
+    #[Test]
+    public function hero_video_mode_renders_featured_video_when_hero_video_is_missing(): void
+    {
+        $page = Page::factory()->create(['is_active' => true]);
+
+        $translation = PageTranslation::factory()->create([
+            'page_id' => $page->id,
+            'language_id' => $this->en->id,
+            'slug' => 'hero-video-featured-fallback-en',
+            'title' => 'Hero Video Featured Fallback',
+            'hero_mode' => 'video',
+            'is_active' => true,
+        ]);
+
+        $video = Video::factory()->embed()->create([
+            'embed_url' => 'https://www.youtube.com/embed/fallback123',
+        ]);
+
+        Videoable::factory()->create([
+            'video_id' => $video->id,
+            'videoable_type' => PageTranslation::class,
+            'videoable_id' => $translation->id,
+            'role' => 'featured_video',
+            'is_active' => true,
+        ]);
+
+        $this->get('/pages/' . $translation->slug)
+            ->assertOk()
+            ->assertSee('<iframe', false)
+            ->assertSee('youtube.com/embed/fallback123');
+    }
+
+    #[Test]
+    public function hero_video_mode_does_not_render_when_only_featured_video_is_inactive(): void
+    {
+        $page = Page::factory()->create(['is_active' => true]);
+
+        $translation = PageTranslation::factory()->create([
+            'page_id' => $page->id,
+            'language_id' => $this->en->id,
+            'slug' => 'hero-video-featured-inactive-en',
+            'title' => 'Hero Video Featured Inactive',
+            'hero_mode' => 'video',
+            'is_active' => true,
+        ]);
+
+        $video = Video::factory()->embed()->create([
+            'embed_url' => 'https://www.youtube.com/embed/inactiveFeatured123',
+        ]);
+
+        Videoable::factory()->create([
+            'video_id' => $video->id,
+            'videoable_type' => PageTranslation::class,
+            'videoable_id' => $translation->id,
+            'role' => 'featured_video',
+            'is_active' => false,
+        ]);
+
+        $this->get('/pages/' . $translation->slug)
+            ->assertOk()
+            ->assertDontSee('<iframe', false)
+            ->assertDontSee('<video', false);
+    }
+
+    #[Test]
+    public function seo_fields_override_defaults_in_page_meta(): void
+    {
+        $page = Page::factory()->create(['is_active' => true]);
+
+        $translation = PageTranslation::factory()->create([
+            'page_id' => $page->id,
+            'language_id' => $this->en->id,
+            'slug' => 'seo-override-en',
+            'title' => 'Base Title',
+            'description' => 'Base Description',
+            'seo_title' => 'SEO Override Title',
+            'seo_description' => 'SEO Override Description',
+            'seo_og_image' => 'https://cdn.example.org/seo-override.jpg',
+            'is_active' => true,
+        ]);
+
+        $this->get('/pages/' . $translation->slug)
+            ->assertOk()
+            ->assertSee('<title>SEO Override Title</title>', false)
+            ->assertSee('<meta name="description" content="SEO Override Description">', false)
+            ->assertSee('<meta property="og:image" content="https://cdn.example.org/seo-override.jpg">', false);
+    }
+
+    #[Test]
+    public function page_meta_falls_back_to_title_and_description_when_seo_fields_missing(): void
+    {
+        $page = Page::factory()->create(['is_active' => true]);
+
+        $translation = PageTranslation::factory()->create([
+            'page_id' => $page->id,
+            'language_id' => $this->en->id,
+            'slug' => 'seo-fallback-en',
+            'title' => 'Fallback Title',
+            'description' => 'Fallback Description',
+            'seo_title' => null,
+            'seo_description' => null,
+            'seo_og_image' => null,
+            'is_active' => true,
+        ]);
+
+        $this->get('/pages/' . $translation->slug)
+            ->assertOk()
+            ->assertSee('<title>Fallback Title</title>', false)
+            ->assertSee('<meta name="description" content="Fallback Description">', false);
+    }
+
+    #[Test]
+    public function hero_slider_mode_falls_back_to_header_image_when_slider_has_no_items(): void
+    {
+        $page = Page::factory()->create(['is_active' => true]);
+
+        $translation = PageTranslation::factory()->create([
+            'page_id' => $page->id,
+            'language_id' => $this->en->id,
+            'slug' => 'slider-fallback-image-en',
+            'title' => 'Slider Fallback Image',
+            'template' => 'standard',
+            'hero_mode' => 'slider',
+            'is_active' => true,
+        ]);
+
+        $header = Image::factory()->create();
+
+        Imageable::factory()->create([
+            'image_id' => $header->id,
+            'imageable_type' => PageTranslation::class,
+            'imageable_id' => $translation->id,
+            'role' => 'header',
+            'is_active' => true,
+        ]);
+
+        Livewire::test(ShowPage::class, ['slug' => $translation->slug])
+            ->assertSee($header->public_url);
+    }
+
+    #[Test]
+    public function hero_slider_mode_stays_hidden_when_no_slider_items_and_no_header_image(): void
+    {
+        $page = Page::factory()->create(['is_active' => true]);
+
+        $translation = PageTranslation::factory()->create([
+            'page_id' => $page->id,
+            'language_id' => $this->en->id,
+            'slug' => 'slider-fallback-none-en',
+            'title' => 'Slider Fallback None',
+            'template' => 'standard',
+            'hero_mode' => 'slider',
+            'is_active' => true,
+        ]);
+
+        $group = ImageGroup::factory()->create();
+
+        ImageGroupable::factory()->create([
+            'image_group_id' => $group->id,
+            'image_groupable_type' => PageTranslation::class,
+            'image_groupable_id' => $translation->id,
+            'role' => 'hero_slider',
+            'is_active' => true,
+        ]);
+
+        $inactiveSlideImage = Image::factory()->create();
+        ImageGroupItem::factory()->create([
+            'image_group_id' => $group->id,
+            'image_id' => $inactiveSlideImage->id,
+            'is_active' => false,
+        ]);
+
+        Livewire::test(ShowPage::class, ['slug' => $translation->slug])
+            ->assertDontSee($inactiveSlideImage->public_url)
+            ->assertDontSee('<iframe')
+            ->assertDontSee('<video');
+    }
+
+    #[Test]
+    public function hero_image_mode_stays_hidden_when_header_image_is_missing(): void
+    {
+        $page = Page::factory()->create(['is_active' => true]);
+
+        $translation = PageTranslation::factory()->create([
+            'page_id' => $page->id,
+            'language_id' => $this->en->id,
+            'slug' => 'image-fallback-none-en',
+            'title' => 'Image Fallback None',
+            'template' => 'standard',
+            'hero_mode' => 'image',
+            'is_active' => true,
+        ]);
+
+        Livewire::test(ShowPage::class, ['slug' => $translation->slug])
+            ->assertSee('Image Fallback None')
+            ->assertDontSee('<iframe')
+            ->assertDontSee('<video');
     }
 }
