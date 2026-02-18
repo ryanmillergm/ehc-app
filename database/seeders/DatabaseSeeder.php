@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
             ImageSeeder::class,
             SiteMediaDefaultSeeder::class,
             HomePageContentSeeder::class,
+            HomeSectionSeeder::class,
             FaqItemSeeder::class,
             // PageSeeder::class,
             // PageTranslationSeeder::class,

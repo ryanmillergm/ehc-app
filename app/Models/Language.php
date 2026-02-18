@@ -40,4 +40,9 @@ class Language extends Model
     {
         return $this->hasMany(HomePageContent::class);
     }
+
+    public function homeSections(): HasMany
+    {
+        return $this->hasMany(HomeSection::class);
+    }
 }
