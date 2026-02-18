@@ -261,7 +261,7 @@ HTML;
 
             <p class="text-sm text-gray-700">
                 The homepage now loads core content from the database. Admin updates happen in Filament without code deploys.
-                The most important resources are <span class="font-semibold">Home Page Content</span> and <span class="font-semibold">FAQ Items</span>.
+                The most important resources are <span class="font-semibold">Home Page Content</span>, <span class="font-semibold">Home Sections</span>, and <span class="font-semibold">FAQ Items</span>.
             </p>
 
             <div class="grid gap-4 lg:grid-cols-2">
@@ -269,8 +269,8 @@ HTML;
                     <div class="font-semibold text-gray-900">What is DB-driven now</div>
                     <ul class="mt-2 list-disc space-y-1.5 pl-4 text-sm text-gray-800">
                         <li>SEO title + SEO description</li>
-                        <li>Hero intro copy</li>
-                        <li>Meeting schedule + location</li>
+                        <li>Section copy + CTA labels/links from Home Sections</li>
+                        <li>Hero intro + meeting schedule/location fallback fields</li>
                         <li>FAQ question/answer grid</li>
                         <li>Homepage OG image (when configured)</li>
                     </ul>
@@ -279,7 +279,8 @@ HTML;
                 <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
                     <div class="font-semibold text-gray-900">Safe edit sequence</div>
                     <ol class="mt-2 list-decimal space-y-1.5 pl-5 text-sm text-gray-800">
-                        <li>Edit <span class="font-semibold">Home Page Content</span> for the target language.</li>
+                        <li>Edit <span class="font-semibold">Home Sections</span> for target language sections like <code class="rounded bg-white px-1.5 py-0.5 text-xs">pre_give_cta</code> and <code class="rounded bg-white px-1.5 py-0.5 text-xs">final_cta</code>.</li>
+                        <li>Edit <span class="font-semibold">Home Page Content</span> for SEO/fallback fields.</li>
                         <li>Edit <span class="font-semibold">FAQ Items</span> for context <code class="rounded bg-white px-1.5 py-0.5 text-xs">home</code>.</li>
                         <li>Confirm <code class="rounded bg-white px-1.5 py-0.5 text-xs">is_active</code> is enabled.</li>
                         <li>Load homepage and verify copy + meta tags.</li>
@@ -288,6 +289,7 @@ HTML;
             </div>
 
             {!! $callout('info', 'Language fallback', 'If no active row exists for the current language, the app falls back to default language content. Keep English complete even if you manage other locales.') !!}
+            {!! $callout('muted', 'CTA section ownership', 'Use <code class="rounded bg-white px-1.5 py-0.5 text-[0.7rem]">pre_give_cta</code> for the mid-page bridge above Give, and <code class="rounded bg-white px-1.5 py-0.5 text-[0.7rem]">final_cta</code> for the bottom CTA component near the footer.') !!}
         </section>
 
         {{-- Media Library --}}
@@ -369,6 +371,7 @@ HTML;
                     <code class="block whitespace-pre-wrap">php artisan db:seed --class=ImageSeeder</code>
                     <code class="block whitespace-pre-wrap">php artisan db:seed --class=SiteMediaDefaultSeeder</code>
                     <code class="block whitespace-pre-wrap">php artisan db:seed --class=HomePageContentSeeder</code>
+                    <code class="block whitespace-pre-wrap">php artisan db:seed --class=HomeSectionSeeder</code>
                     <code class="block whitespace-pre-wrap">php artisan db:seed --class=FaqItemSeeder</code>
                 </div>
             </div>

@@ -107,6 +107,7 @@ Primary models/tables:
 - `Image Groups`
 - `Image Types`
 - `Home Page Content`
+- `Home Sections`
 - `FAQ Items`
 - `Image Relationships`
 - `Image Group Relationships`
@@ -141,9 +142,11 @@ The following seeders are used to restore baseline home/SEO/media data in an ide
 - `Database\Seeders\ImageSeeder`
 - `Database\Seeders\SiteMediaDefaultSeeder`
 - `Database\Seeders\HomePageContentSeeder`
+- `Database\Seeders\HomeSectionSeeder`
 - `Database\Seeders\FaqItemSeeder`
 
 These use `updateOrCreate`, so they are safe to re-run in production.
+`HomePageContentSeeder` restores SEO/fallback fields, while `HomeSectionSeeder` restores section-level homepage blocks (including `pre_give_cta` and `final_cta`).
 
 ### Recovery / rollout commands
 
@@ -151,6 +154,7 @@ These use `updateOrCreate`, so they are safe to re-run in production.
 php artisan db:seed --class=ImageSeeder
 php artisan db:seed --class=SiteMediaDefaultSeeder
 php artisan db:seed --class=HomePageContentSeeder
+php artisan db:seed --class=HomeSectionSeeder
 php artisan db:seed --class=FaqItemSeeder
 ```
 
@@ -501,6 +505,7 @@ php artisan queue:work
 php artisan db:seed --class=ImageSeeder
 php artisan db:seed --class=SiteMediaDefaultSeeder
 php artisan db:seed --class=HomePageContentSeeder
+php artisan db:seed --class=HomeSectionSeeder
 php artisan db:seed --class=FaqItemSeeder
 
 # Run migrations fresh (local only)
