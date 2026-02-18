@@ -20,6 +20,8 @@ class MediaSchemaSmokeTest extends TestCase
         $this->assertTrue(Schema::hasTable('image_group_items'));
         $this->assertTrue(Schema::hasTable('imageables'));
         $this->assertTrue(Schema::hasTable('image_groupables'));
+        $this->assertTrue(Schema::hasTable('videos'));
+        $this->assertTrue(Schema::hasTable('videoables'));
 
         $this->assertTrue(Schema::hasColumns('images', [
             'image_type_id',
@@ -42,6 +44,25 @@ class MediaSchemaSmokeTest extends TestCase
             'image_group_id',
             'image_groupable_type',
             'image_groupable_id',
+            'role',
+            'is_active',
+            'deleted_at',
+        ]));
+
+        $this->assertTrue(Schema::hasColumns('videos', [
+            'source_type',
+            'embed_url',
+            'disk',
+            'path',
+            'poster_image_id',
+            'is_active',
+            'deleted_at',
+        ]));
+
+        $this->assertTrue(Schema::hasColumns('videoables', [
+            'video_id',
+            'videoable_type',
+            'videoable_id',
             'role',
             'is_active',
             'deleted_at',
