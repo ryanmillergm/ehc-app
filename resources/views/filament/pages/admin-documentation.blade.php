@@ -2,6 +2,7 @@
     @php
         $emailHelpUrl = \App\Filament\Pages\EmailSystemHelp::getUrl();
         $homeSectionsHelpUrl = \App\Filament\Pages\HomeSectionsDocumentation::getUrl();
+        $videoHelpUrl = \App\Filament\Pages\VideoSystemHelp::getUrl();
 
         // $donationsHelpUrl = \App\Filament\Pages\DonationsSystemHelp::getUrl();
 
@@ -13,7 +14,7 @@
             ['id' => 'addresses', 'label' => 'Addresses'],
             ['id' => 'pages', 'label' => 'Pages & Translations'],
             ['id' => 'homepage-cms', 'label' => 'Homepage CMS'],
-            ['id' => 'media-library', 'label' => 'Images'],
+            ['id' => 'media-library', 'label' => 'Media Library'],
             ['id' => 'seo-management', 'label' => 'SEO Management'],
             ['id' => 'seed-data', 'label' => 'Seed Data / Recovery'],
             ['id' => 'cms-troubleshooting', 'label' => 'CMS Troubleshooting'],
@@ -118,6 +119,14 @@ HTML;
                     color="gray"
                 >
                     Open Home Sections Documentation
+                </x-filament::button>
+                <x-filament::button
+                    tag="a"
+                    :href="$videoHelpUrl"
+                    icon="heroicon-o-film"
+                    color="gray"
+                >
+                    Open Video System Help
                 </x-filament::button>
             </div>
         </header>
@@ -313,11 +322,11 @@ HTML;
         <section id="media-library" class="scroll-mt-24 rounded-2xl border border-gray-200/80 bg-white p-5 shadow-sm shadow-gray-100 space-y-4">
             <div class="flex items-center justify-between gap-2">
                 <h2 class="text-sm font-semibold tracking-tight text-gray-900">Media Library</h2>
-                {!! $sectionBadge('Images') !!}
+                {!! $sectionBadge('Images + Videos') !!}
             </div>
 
             <p class="text-sm text-gray-700">
-                Images are now managed in CMS resources. You can upload media, organize groups, assign roles, and copy public URLs for content usage.
+                Media is managed through image and video resources. You can upload assets, assign polymorphic relationships, and control page-level fallbacks by role.
             </p>
 
             <div class="grid gap-4 lg:grid-cols-2">
@@ -325,10 +334,12 @@ HTML;
                     <div class="font-semibold text-gray-900">Resources</div>
                     <ul class="mt-2 list-disc space-y-1.5 pl-4 text-sm text-gray-800">
                         <li><span class="font-semibold">Images</span>: canonical media rows + upload + copy URL.</li>
+                        <li><span class="font-semibold">Videos</span>: upload/embed source + metadata for page/home content video playback.</li>
                         <li><span class="font-semibold">Image Groups</span>: reusable sets (gallery/carousel).</li>
                         <li><span class="font-semibold">Image Group Items</span>: managed inside Image Groups via the relation manager.</li>
                         <li><span class="font-semibold">Image Types</span>: classify what the image is (logo, featured, gallery, etc).</li>
                         <li><span class="font-semibold">Image Relationships</span>: polymorphic role assignment (header/featured/og/thumbnail).</li>
+                        <li><span class="font-semibold">Video Relationships</span>: polymorphic role assignment (hero/featured/inline video).</li>
                         <li><span class="font-semibold">Image Group Relationships</span>: polymorphic group assignment (gallery/carousel).</li>
                     </ul>
                 </div>
@@ -341,6 +352,24 @@ HTML;
                         <li>If no assignment resolves, the app checks <span class="font-semibold">Site Media Defaults</span>.</li>
                         <li>If still missing, the view may hide that image block or use hard fallback asset.</li>
                     </ul>
+                </div>
+            </div>
+
+            <div class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                <div class="font-semibold">Header background video setup (Pages)</div>
+                <ol class="mt-2 list-decimal space-y-1.5 pl-5">
+                    <li>Create/select a <span class="font-semibold">Video</span>.</li>
+                    <li>Create a <span class="font-semibold">Video Relationship</span>.</li>
+                    <li>Set <span class="font-semibold">Related Type</span> to <span class="font-semibold">Page Translation</span>.</li>
+                    <li>Set role to <span class="font-semibold">Hero Video</span> (Featured Video is fallback).</li>
+                    <li>Ensure both the video and relationship are active.</li>
+                    <li>Ensure the target page translation hero mode is set to video.</li>
+                </ol>
+                <div class="mt-2">
+                    Need full step-by-step details? Open
+                    <a href="{{ $videoHelpUrl }}" class="font-semibold underline underline-offset-2">
+                        Video System Help
+                    </a>.
                 </div>
             </div>
 
