@@ -1,6 +1,7 @@
 <x-filament-panels::page>
     @php
         $emailHelpUrl = \App\Filament\Pages\EmailSystemHelp::getUrl();
+        $homeSectionsHelpUrl = \App\Filament\Pages\HomeSectionsDocumentation::getUrl();
 
         // $donationsHelpUrl = \App\Filament\Pages\DonationsSystemHelp::getUrl();
 
@@ -109,6 +110,14 @@ HTML;
                     color="gray"
                 >
                     Open Email System Help (Quick Start)
+                </x-filament::button>
+                <x-filament::button
+                    tag="a"
+                    :href="$homeSectionsHelpUrl"
+                    icon="heroicon-o-book-open"
+                    color="gray"
+                >
+                    Open Home Sections Documentation
                 </x-filament::button>
             </div>
         </header>
@@ -264,6 +273,14 @@ HTML;
                 The most important resources are <span class="font-semibold">Home Page Content</span>, <span class="font-semibold">Home Sections</span>, and <span class="font-semibold">FAQ Items</span>.
             </p>
 
+            <div class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                Need field-level guidance? Use the dedicated
+                <a href="{{ $homeSectionsHelpUrl }}" class="font-semibold underline underline-offset-2">
+                    Home Sections Documentation
+                </a>
+                page for section key definitions, item key mapping, and workflow checklists.
+            </div>
+
             <div class="grid gap-4 lg:grid-cols-2">
                 <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
                     <div class="font-semibold text-gray-900">What is DB-driven now</div>
@@ -391,7 +408,8 @@ HTML;
                     <div class="font-semibold text-gray-900">“Homepage still shows old copy.”</div>
                     <ul class="mt-2 list-disc space-y-1.5 pl-4 text-sm text-gray-800">
                         <li>Confirm the correct language row exists in Home Page Content.</li>
-                        <li>Confirm <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">is_active</code> is true.</li>
+                        <li>Confirm the matching Home Sections row exists for the section key you are editing (for example <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">hero</code>, <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">pre_give_cta</code>, <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">final_cta</code>).</li>
+                        <li>Confirm both rows are active (<code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">is_active = true</code>).</li>
                         <li>Clear cache in non-local environments if needed.</li>
                     </ul>
                 </div>

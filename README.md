@@ -114,6 +114,20 @@ Primary models/tables:
 
 `Image Group Items` are managed from the `Image Groups` edit page via a relation manager (not as a primary sidebar workflow).
 
+### Home Sections documentation page
+
+A dedicated admin guide exists for homepage section editing:
+
+- `App\Filament\Pages\HomeSectionsDocumentation`
+- View: `resources/views/filament/pages/home-sections-documentation.blade.php`
+
+How to access it in Filament:
+
+- From `Home Sections` list page via the `Home Sections Docs` header button
+- From `Admin Documentation` via `Open Home Sections Documentation`
+
+This page documents section keys, field behavior, item key mappings, fallback logic, troubleshooting, and QA steps.
+
 ### Attachable type allowlist
 
 Allowed polymorphic attach targets are controlled by:
@@ -166,6 +180,7 @@ php artisan db:seed
 ```
 
 Then verify homepage content, FAQ visibility, and meta/OG tags.
+If homepage copy appears stale, verify both `home_page_contents` and `home_sections` rows for the active language are present and active.
 
 ---
 

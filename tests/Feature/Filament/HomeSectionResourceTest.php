@@ -3,8 +3,10 @@
 namespace Tests\Feature\Filament;
 
 use App\Enums\HomeSectionKey;
+use App\Filament\Pages\HomeSectionsDocumentation;
 use App\Filament\Resources\HomeSections\Pages\CreateHomeSection;
 use App\Filament\Resources\HomeSections\Pages\EditHomeSection;
+use App\Filament\Resources\HomeSections\HomeSectionResource;
 use App\Filament\Resources\HomeSections\RelationManagers\ItemsRelationManager;
 use App\Models\HomeSection;
 use App\Models\HomeSectionItem;
@@ -124,5 +126,13 @@ class HomeSectionResourceTest extends TestCase
             'section_key' => HomeSectionKey::PreGiveCta->value,
             'heading' => 'Pre Give CTA',
         ]);
+    }
+
+    public function test_home_sections_index_shows_docs_header_action(): void
+    {
+        $this->get(HomeSectionResource::getUrl('index'))
+            ->assertOk()
+            ->assertSee('Home Sections Docs')
+            ->assertSee(HomeSectionsDocumentation::getUrl());
     }
 }

@@ -33,7 +33,5 @@ class AdminDocumentation extends Page
 
         // Spatie Permissions
         return $user->can('admin.panel');
-
-        return true;
     }
 }
