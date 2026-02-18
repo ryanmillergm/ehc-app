@@ -2,8 +2,10 @@
 
 namespace Tests\Feature\Filament;
 
+use App\Filament\Pages\VideoSystemHelp;
 use App\Filament\Resources\Videos\Pages\CreateVideo;
 use App\Filament\Resources\Videos\Pages\EditVideo;
+use App\Filament\Resources\Videos\Pages\ListVideos;
 use App\Models\User;
 use App\Models\Video;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -21,6 +23,24 @@ class VideoResourceTest extends TestCase
 
         $this->seed('PermissionSeeder');
         $this->signInWithPermissions(null, ['admin.panel']);
+    }
+
+    public function test_list_page_shows_help_link_to_video_system_help(): void
+    {
+        Livewire::actingAs(User::first())
+            ->test(ListVideos::class)
+            ->assertSee('Help')
+            ->assertSee('href="' . VideoSystemHelp::getUrl() . '"', false);
+    }
+
+    public function test_edit_page_shows_help_link_to_video_system_help(): void
+    {
+        $video = Video::factory()->create();
+
+        Livewire::actingAs(User::first())
+            ->test(EditVideo::class, ['record' => $video->getRouteKey()])
+            ->assertSee('Help')
+            ->assertSee('href="' . VideoSystemHelp::getUrl() . '"', false);
     }
 
     public function test_create_form_shows_video_upload_helper_copy(): void

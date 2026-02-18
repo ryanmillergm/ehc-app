@@ -2,7 +2,9 @@
 
 namespace Tests\Feature\Filament;
 
+use App\Filament\Pages\VideoSystemHelp;
 use App\Filament\Resources\Videoables\Pages\CreateVideoable;
+use App\Filament\Resources\Videoables\Pages\EditVideoable;
 use App\Filament\Resources\Videoables\Pages\ListVideoables;
 use App\Models\HomePageContent;
 use App\Models\PageTranslation;
@@ -23,6 +25,30 @@ class VideoableResourceTest extends TestCase
 
         $this->seed('PermissionSeeder');
         $this->signInWithPermissions(null, ['admin.panel']);
+    }
+
+    public function test_list_page_shows_help_link_to_video_system_help(): void
+    {
+        Livewire::actingAs(User::first())
+            ->test(ListVideoables::class)
+            ->assertSee('Help')
+            ->assertSee('href="' . VideoSystemHelp::getUrl() . '"', false);
+    }
+
+    public function test_edit_page_shows_help_link_to_video_system_help(): void
+    {
+        $video = Video::factory()->create();
+        $target = HomePageContent::factory()->create();
+        $videoable = Videoable::factory()->create([
+            'video_id' => $video->id,
+            'videoable_type' => HomePageContent::class,
+            'videoable_id' => $target->id,
+        ]);
+
+        Livewire::actingAs(User::first())
+            ->test(EditVideoable::class, ['record' => $videoable->getRouteKey()])
+            ->assertSee('Help')
+            ->assertSee('href="' . VideoSystemHelp::getUrl() . '"', false);
     }
 
     public function test_videoable_id_rejects_negative_values(): void
