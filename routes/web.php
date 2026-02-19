@@ -4,12 +4,14 @@ use App\Livewire\Home;
 use App\Livewire\Pages\ShowPage;
 use App\Livewire\Pages\IndexPage;
 use App\Livewire\Volunteers\Apply;
-use App\Models\PageTranslation;
 use App\Http\Middleware\Localization;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Seo\RobotsController;
 use App\Http\Controllers\LanguageSwitch;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\TeamController;
+use App\Http\Controllers\Seo\SitemapController;
+use App\Http\Controllers\EmailSubscribeController;
 use App\Http\Controllers\GivingController;
 use App\Http\Controllers\AddressController;
 use App\Http\Controllers\Admin\EmailAssetController;
@@ -28,40 +30,8 @@ Route::get('lang/{lang}', LanguageSwitch::class)->name('lang');
 
 Route::get('/', Home::class)->name('home');
 
-Route::get('/sitemap.xml', function () {
-    $baseUrl = rtrim(config('app.url'), '/');
-
-    $urls = collect([
-        $baseUrl . '/',
-        $baseUrl . '/give',
-        $baseUrl . '/emails/subscribe',
-        $baseUrl . '/pages',
-    ])->merge(
-        PageTranslation::query()
-            ->where('is_active', true)
-            ->whereHas('page', fn ($query) => $query->where('is_active', true))
-            ->pluck('slug')
-            ->map(fn (string $slug) => $baseUrl . '/pages/' . ltrim($slug, '/'))
-    )->unique()->values();
-
-    $items = $urls->map(function (string $url) {
-        return "<url><loc>{$url}</loc></url>";
-    })->implode('');
-
-    $xml = '<?xml version="1.0" encoding="UTF-8"?>'
-        . '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
-        . $items
-        . '</urlset>';
-
-    return response($xml, 200, ['Content-Type' => 'application/xml']);
-})->name('sitemap');
-
-Route::get('/robots.txt', function () {
-    $sitemapUrl = rtrim(config('app.url'), '/') . '/sitemap.xml';
-    $content = "User-agent: *\nDisallow:\nSitemap: {$sitemapUrl}\n";
-
-    return response($content, 200, ['Content-Type' => 'text/plain']);
-})->name('robots');
+Route::get('/sitemap.xml', SitemapController::class)->name('sitemap');
+Route::get('/robots.txt', RobotsController::class)->name('robots');
 
 Route::middleware([
     'guest',
@@ -71,7 +41,7 @@ Route::middleware([
         ->name('register.store');
 });
 
-Route::view('/emails/subscribe', 'emails.subscribe')
+Route::get('/emails/subscribe', EmailSubscribeController::class)
     ->name('emails.subscribe');
 
 Route::get('/unsubscribe/{token}', EmailUnsubscribeController::class)
@@ -198,5 +168,5 @@ Route::middleware([
 | Public pages (Livewire)
 |--------------------------------------------------------------------------
 */
-Route::get('/pages/{slug}', ShowPage::class);
-Route::get('/pages', IndexPage::class);
+Route::get('/pages/{slug}', ShowPage::class)->name('pages.show');
+Route::get('/pages', IndexPage::class)->name('pages.index');

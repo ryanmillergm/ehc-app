@@ -4,6 +4,8 @@ namespace App\Livewire\Pages;
 
 use App\Models\Language;
 use App\Models\Page;
+use App\Models\RouteSeo;
+use App\Services\Seo\RouteSeoResolver;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -87,8 +89,31 @@ class IndexPage extends Component
 
     public function render()
     {
+        $seo = app(RouteSeoResolver::class)->resolve(RouteSeo::ROUTE_PAGES_INDEX);
+
         return view('livewire.pages.index-page', [
             'items' => $this->items,
+        ])->layout('components.layouts.app', [
+            'title' => $seo['title'],
+            'metaTitle' => $seo['metaTitle'],
+            'metaDescription' => $seo['metaDescription'],
+            'canonicalUrl' => $seo['canonicalUrl'],
+            'ogType' => $seo['ogType'],
+            'ogTitle' => $seo['ogTitle'],
+            'ogDescription' => $seo['ogDescription'],
+            'ogImage' => $seo['ogImage'],
+            'twitterTitle' => $seo['twitterTitle'],
+            'twitterDescription' => $seo['twitterDescription'],
+            'twitterImage' => $seo['twitterImage'],
+            'seoJsonLd' => [
+                [
+                    '@context' => 'https://schema.org',
+                    '@type' => 'CollectionPage',
+                    'name' => $seo['metaTitle'],
+                    'description' => $seo['metaDescription'],
+                    'url' => $seo['canonicalUrl'],
+                ],
+            ],
         ]);
     }
 }

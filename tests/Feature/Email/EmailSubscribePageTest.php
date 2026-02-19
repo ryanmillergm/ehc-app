@@ -15,6 +15,8 @@ class EmailSubscribePageTest extends TestCase
     {
         $this->get(route('emails.subscribe'))
             ->assertOk()
-            ->assertSee('Stay connected');
+            ->assertSee('Stay connected')
+            ->assertSee('<meta name="robots" content="index,follow">', false)
+            ->assertSee('<link rel="canonical" href="' . url('/emails/subscribe') . '">', false);
     }
 }

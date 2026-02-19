@@ -1,4 +1,16 @@
-<x-layouts.app title="Give">
+<x-layouts.app
+    :title="$seo['title']"
+    :meta-title="$seo['metaTitle']"
+    :meta-description="$seo['metaDescription']"
+    :canonical-url="$seo['canonicalUrl']"
+    :og-type="$seo['ogType']"
+    :og-title="$seo['ogTitle']"
+    :og-description="$seo['ogDescription']"
+    :og-image="$seo['ogImage']"
+    :twitter-title="$seo['twitterTitle']"
+    :twitter-description="$seo['twitterDescription']"
+    :twitter-image="$seo['twitterImage']"
+>
     <main class="bg-white text-slate-900">
         {{-- Simple hero header --}}
         <section class="relative overflow-hidden">

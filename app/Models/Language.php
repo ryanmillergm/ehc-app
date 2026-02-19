@@ -45,4 +45,9 @@ class Language extends Model
     {
         return $this->hasMany(HomeSection::class);
     }
+
+    public function routeSeos(): HasMany
+    {
+        return $this->hasMany(RouteSeo::class);
+    }
 }
