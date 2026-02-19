@@ -5,6 +5,9 @@ namespace Tests\Feature\Seo;
 use App\Models\Language;
 use App\Models\Page;
 use App\Models\PageTranslation;
+use App\Models\EmailSubscriber;
+use App\Models\Pledge;
+use App\Models\Transaction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -23,6 +26,7 @@ class SeoInfrastructureTest extends TestCase
             ->assertSee('<meta name="description"', false)
             ->assertSee('<meta property="og:title"', false)
             ->assertSee('<meta name="twitter:card"', false)
+            ->assertSee('<meta name="robots" content="index,follow">', false)
             ->assertSee('<link rel="canonical"', false)
             ->assertSee('type="application/ld+json"', false)
             ->assertSee('id="give-form"', false)
@@ -81,7 +85,69 @@ class SeoInfrastructureTest extends TestCase
 
         $response->assertOk()
             ->assertSee('User-agent: *')
-            ->assertSee('Disallow:')
+            ->assertSee('Disallow: /')
             ->assertSee('Sitemap: ' . rtrim(config('app.url'), '/') . '/sitemap.xml');
+    }
+
+    #[Test]
+    public function indexable_public_routes_render_indexable_robots_meta(): void
+    {
+        $this->get('/give')
+            ->assertOk()
+            ->assertSee('<meta name="robots" content="index,follow">', false)
+            ->assertSee('<link rel="canonical" href="' . url('/give') . '">', false);
+
+        $this->get('/emails/subscribe')
+            ->assertOk()
+            ->assertSee('<meta name="robots" content="index,follow">', false)
+            ->assertSee('<link rel="canonical" href="' . url('/emails/subscribe') . '">', false);
+    }
+
+    #[Test]
+    public function tokenized_and_thank_you_routes_render_noindex_robots_meta(): void
+    {
+        $subscriber = EmailSubscriber::create([
+            'email' => 'test@example.com',
+            'unsubscribe_token' => str_repeat('x', 64),
+            'subscribed_at' => now(),
+        ]);
+
+        $this->get(route('emails.unsubscribe', ['token' => $subscriber->unsubscribe_token]))
+            ->assertOk()
+            ->assertSee('<meta name="robots" content="noindex,nofollow">', false);
+
+        $this->get(route('emails.preferences', ['token' => $subscriber->unsubscribe_token]))
+            ->assertOk()
+            ->assertSee('<meta name="robots" content="noindex,nofollow">', false);
+
+        $transaction = Transaction::factory()->create([
+            'type' => 'one_time',
+            'status' => 'succeeded',
+        ]);
+
+        $this->withSession(['transaction_thankyou_id' => $transaction->id])
+            ->get(route('donations.thankyou'))
+            ->assertOk()
+            ->assertSee('<meta name="robots" content="noindex,nofollow">', false);
+
+        $pledge = Pledge::factory()->create();
+
+        $this->withSession(['pledge_thankyou_id' => $pledge->id])
+            ->get(route('donations.thankyou-subscription'))
+            ->assertOk()
+            ->assertSee('<meta name="robots" content="noindex,nofollow">', false);
+    }
+
+    #[Test]
+    public function it_renders_google_verification_and_ga4_tags_when_configured(): void
+    {
+        config()->set('seo.google_site_verification', 'test-verification-token');
+        config()->set('seo.ga4_measurement_id', 'G-TEST123456');
+
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('<meta name="google-site-verification" content="test-verification-token">', false)
+            ->assertSee('https://www.googletagmanager.com/gtag/js?id=G-TEST123456', false)
+            ->assertSee("gtag('config', 'G-TEST123456'", false);
     }
 }

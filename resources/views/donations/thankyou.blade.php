@@ -1,4 +1,10 @@
-<x-layouts.app title="Thank you">
+<x-layouts.app
+    title="Thank you"
+    meta-title="Donation Receipt | Bread of Grace Ministries"
+    meta-description="Thank you for supporting Bread of Grace Ministries."
+    :canonical-url="url('/donations/thank-you')"
+    :meta-robots="config('seo.robots.noindex')"
+>
     @php
         $amount = number_format($transaction->amount_dollars, 2);
 

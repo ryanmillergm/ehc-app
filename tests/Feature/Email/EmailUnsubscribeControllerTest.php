@@ -43,7 +43,8 @@ class EmailUnsubscribeControllerTest extends TestCase
         $subscriber = $this->makeSubscriber();
 
         $this->get(route('emails.unsubscribe', ['token' => $subscriber->unsubscribe_token]))
-            ->assertOk();
+            ->assertOk()
+            ->assertSee('<meta name="robots" content="noindex,nofollow">', false);
 
         $subscriber->refresh();
 

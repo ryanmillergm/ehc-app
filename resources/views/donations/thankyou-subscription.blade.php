@@ -1,5 +1,11 @@
 {{-- resources/views/donations/thankyou-subscription.blade.php --}}
-<x-layouts.app title="Thank you">
+<x-layouts.app
+    title="Thank you"
+    meta-title="Monthly Donation Receipt | Bread of Grace Ministries"
+    meta-description="Thank you for becoming a monthly partner with Bread of Grace Ministries."
+    :canonical-url="url('/donations/thank-you-subscription')"
+    :meta-robots="config('seo.robots.noindex')"
+>
     @php
         $amount = number_format($pledge->amount_dollars ?? ($pledge->amount_cents / 100), 2);
 
