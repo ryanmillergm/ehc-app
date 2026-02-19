@@ -490,6 +490,35 @@ Key test files for the new homepage CMS stack:
 - `tests/Feature/Filament/AdminDocumentationTest.php`
 - `tests/Feature/Seo/SeoInfrastructureTest.php`
 
+### Search Console + GA4 monitoring
+
+This app supports production verification/analytics tags via environment variables:
+
+```env
+SEO_GOOGLE_SITE_VERIFICATION=your-google-verification-token
+SEO_GA4_MEASUREMENT_ID=G-XXXXXXXXXX
+```
+
+The tags are rendered from `resources/views/components/seo/head.blade.php` and apply to pages using the shared layouts.
+
+Monitoring and operations checklist:
+
+- `docs/seo-monitoring.md`
+
+### Route-level SEO CMS
+
+Indexable marketing routes now use DB-managed SEO metadata via `route_seos`:
+
+- `donations.show` (`/give`)
+- `pages.index` (`/pages`)
+- `emails.subscribe` (`/emails/subscribe`)
+
+Managed in Filament through the `Route SEO` resource with per-language rows and fallback logic.
+
+Details and fallback rules:
+
+- `docs/route-seo.md`
+
 ---
 
 ## Filament documentation pages
