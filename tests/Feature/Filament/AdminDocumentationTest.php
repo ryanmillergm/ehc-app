@@ -4,6 +4,7 @@ namespace Tests\Feature\Filament;
 
 use App\Filament\Pages\AdminDocumentation;
 use App\Filament\Pages\HomeSectionsDocumentation;
+use App\Filament\Pages\SeoDocumentation;
 use App\Filament\Pages\VideoSystemHelp;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -61,5 +62,14 @@ class AdminDocumentationTest extends TestCase
             ->assertSee('Page Translation')
             ->assertSee('Hero Video')
             ->assertSee('Featured Video is fallback');
+    }
+
+    public function test_admin_documentation_links_to_seo_documentation(): void
+    {
+        $this->get(AdminDocumentation::getUrl())
+            ->assertOk()
+            ->assertSee('Open SEO Documentation')
+            ->assertSee(SeoDocumentation::getUrl())
+            ->assertSee('Route SEO resource');
     }
 }

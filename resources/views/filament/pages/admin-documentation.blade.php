@@ -3,6 +3,7 @@
         $emailHelpUrl = \App\Filament\Pages\EmailSystemHelp::getUrl();
         $homeSectionsHelpUrl = \App\Filament\Pages\HomeSectionsDocumentation::getUrl();
         $videoHelpUrl = \App\Filament\Pages\VideoSystemHelp::getUrl();
+        $seoHelpUrl = \App\Filament\Pages\SeoDocumentation::getUrl();
 
         // $donationsHelpUrl = \App\Filament\Pages\DonationsSystemHelp::getUrl();
 
@@ -127,6 +128,14 @@ HTML;
                     color="gray"
                 >
                     Open Video System Help
+                </x-filament::button>
+                <x-filament::button
+                    tag="a"
+                    :href="$seoHelpUrl"
+                    icon="heroicon-o-magnifying-glass-circle"
+                    color="gray"
+                >
+                    Open SEO Documentation
                 </x-filament::button>
             </div>
         </header>
@@ -386,18 +395,27 @@ HTML;
             </div>
 
             <p class="text-sm text-gray-700">
-                Homepage SEO is now controlled by a mix of DB content and layout defaults. Update title/description in Home Page Content,
-                and OG image via image assignment/defaults.
+                SEO now follows a mixed model: indexable marketing routes are DB-managed, while system/tokenized routes remain
+                code-controlled for safety.
             </p>
 
+            <div class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                Need full field-level instructions and fallback behavior? Open
+                <a href="{{ $seoHelpUrl }}" class="font-semibold underline underline-offset-2">
+                    SEO Documentation
+                </a>.
+            </div>
+
             <ul class="list-disc space-y-1.5 pl-4 text-sm text-gray-800">
-                <li><span class="font-semibold">Meta title</span>: from Home Page Content SEO title.</li>
-                <li><span class="font-semibold">Meta description</span>: from Home Page Content SEO description.</li>
-                <li><span class="font-semibold">OpenGraph/Twitter image</span>: resolved from homepage OG image then fallbacks.</li>
-                <li><span class="font-semibold">FAQ JSON-LD</span>: generated from active home FAQ rows.</li>
+                <li><span class="font-semibold">Route SEO resource</span> manages indexable route metadata for <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">/give</code>, <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">/pages</code>, and <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">/emails/subscribe</code>.</li>
+                <li><span class="font-semibold">Page Translations</span> manage SEO for detail pages <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">/pages/{slug}</code>.</li>
+                <li><span class="font-semibold">Home Page Content</span> manages homepage title/description + OG behavior.</li>
+                <li><span class="font-semibold">Noindex system routes</span> remain code-controlled: donation thank-you and tokenized email preference/unsubscribe pages.</li>
+                <li><span class="font-semibold">Google integrations</span> are environment-driven via <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">SEO_GOOGLE_SITE_VERIFICATION</code> and <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">SEO_GA4_MEASUREMENT_ID</code>.</li>
             </ul>
 
-            {!! $callout('info', 'Social cache', 'Facebook/LinkedIn/X can cache old OG images. After updates, use their debugging tools to force a refresh.') !!}
+            {!! $callout('info', 'Resolver fallback order', 'Route SEO resolves in order: current language active row → default language active row → safe defaults. Keep English complete as the fallback language.') !!}
+            {!! $callout('warn', 'Noindex safety', 'Do not move tokenized/system pages into DB-managed SEO. They are intentionally code-controlled to prevent accidental indexing.') !!}
         </section>
 
         {{-- Seed Data / Recovery --}}

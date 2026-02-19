@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Filament;
 
+use App\Filament\Pages\SeoDocumentation;
 use App\Filament\Resources\PageTranslationResource;
 use App\Filament\Resources\PageTranslationResource\Pages\CreatePageTranslation;
 use App\Filament\Resources\PageTranslationResource\Pages\ListPageTranslations;
@@ -83,6 +84,16 @@ class PageTranslationResourceTest extends TestCase
         $this->get(PageTranslationResource::getUrl('create'))->assertSuccessful();
     }
 
+    public function test_page_translation_index_shows_docs_header_action(): void
+    {
+        $this->signInWithPermissions(null, ['pages.read', 'admin.panel']);
+
+        $this->get(PageTranslationResource::getUrl('index'))
+            ->assertOk()
+            ->assertSee('SEO Docs')
+            ->assertSee(SeoDocumentation::getUrl());
+    }
+
     /**
      * Test an authenticated user with permissions can create a page resource
      */
@@ -154,4 +165,3 @@ class PageTranslationResourceTest extends TestCase
         ]);
     }
 }
-
