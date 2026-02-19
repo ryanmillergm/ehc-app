@@ -514,6 +514,16 @@ Indexable marketing routes now use DB-managed SEO metadata via `route_seos`:
 - `emails.subscribe` (`/emails/subscribe`)
 
 Managed in Filament through the `Route SEO` resource with per-language rows and fallback logic.
+For day-to-day usage guidance in admin, use the dedicated in-panel SEO guide:
+
+- `app/Filament/Pages/SeoDocumentation.php`
+- `resources/views/filament/pages/seo-documentation.blade.php`
+
+Quick access buttons labeled **SEO Docs** are available on:
+
+- Route SEO
+- Home Page Content
+- Page Translations
 
 Details and fallback rules:
 
@@ -527,6 +537,7 @@ This repo includes in-panel documentation pages for admins, for example:
 
 - `resources/views/filament/pages/email-system-help.blade.php`
 - `resources/views/filament/pages/admin-documentation.blade.php`
+- `resources/views/filament/pages/seo-documentation.blade.php`
 
 These are intended to keep operational knowledge **inside the admin panel** so staff can self-serve answers.
 The admin documentation page includes sections for homepage CMS, media library, SEO controls, seeding/recovery commands, and troubleshooting.
