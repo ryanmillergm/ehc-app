@@ -20,10 +20,6 @@ return new class extends Migration
 
             $table->json('layout_data')->nullable()->after('hero_cta_url');
 
-            $table->string('seo_title')->nullable()->after('layout_data');
-            $table->text('seo_description')->nullable()->after('seo_title');
-            $table->string('seo_og_image')->nullable()->after('seo_description');
-
             $table->timestamp('published_at')->nullable()->after('is_active');
         });
     }
@@ -40,9 +36,6 @@ return new class extends Migration
                 'hero_cta_text',
                 'hero_cta_url',
                 'layout_data',
-                'seo_title',
-                'seo_description',
-                'seo_og_image',
                 'published_at',
             ]);
         });

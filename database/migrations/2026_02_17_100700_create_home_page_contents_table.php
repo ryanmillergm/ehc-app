@@ -13,8 +13,6 @@ return new class extends Migration
         Schema::create('home_page_contents', function (Blueprint $table) {
             $table->id();
             $table->foreignIdFor(Language::class)->nullable()->constrained()->nullOnDelete();
-            $table->string('seo_title')->nullable();
-            $table->text('seo_description')->nullable();
             $table->text('hero_intro')->nullable();
             $table->string('meeting_schedule')->nullable();
             $table->string('meeting_location')->nullable();
