@@ -11,6 +11,7 @@
             ['id' => 'route-seo', 'label' => 'Route SEO CMS'],
             ['id' => 'page-translation', 'label' => 'Page Translation SEO'],
             ['id' => 'home-seo', 'label' => 'Homepage SEO'],
+            ['id' => 'keyword-pages', 'label' => 'Keyword Pages'],
             ['id' => 'fallbacks', 'label' => 'Fallback Rules'],
             ['id' => 'google', 'label' => 'Google Setup'],
             ['id' => 'noindex', 'label' => 'Noindex Policy'],
@@ -87,11 +88,11 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200">
-                        <tr><td class="px-3 py-2"><code>/give</code></td><td class="px-3 py-2">Route SEO resource (<code>donations.show</code>)</td><td class="px-3 py-2">index,follow</td><td class="px-3 py-2">Per-language with fallback.</td></tr>
-                        <tr><td class="px-3 py-2"><code>/pages</code></td><td class="px-3 py-2">Route SEO resource (<code>pages.index</code>)</td><td class="px-3 py-2">index,follow</td><td class="px-3 py-2">Per-language with fallback.</td></tr>
-                        <tr><td class="px-3 py-2"><code>/emails/subscribe</code></td><td class="px-3 py-2">Route SEO resource (<code>emails.subscribe</code>)</td><td class="px-3 py-2">index,follow</td><td class="px-3 py-2">Per-language with fallback.</td></tr>
-                        <tr><td class="px-3 py-2"><code>/pages/{slug}</code></td><td class="px-3 py-2">Page Translation SEO fields</td><td class="px-3 py-2">index,follow</td><td class="px-3 py-2">Uses translation-level SEO fields.</td></tr>
-                        <tr><td class="px-3 py-2"><code>/</code></td><td class="px-3 py-2">Home Page Content + service fallback</td><td class="px-3 py-2">index,follow</td><td class="px-3 py-2">Includes JSON-LD output.</td></tr>
+                        <tr><td class="px-3 py-2"><code>/give</code></td><td class="px-3 py-2">Route SEO resource (<code>donations.show</code>)</td><td class="px-3 py-2">index,follow</td><td class="px-3 py-2">Stored in unified <code>seo_meta</code> with language fallback.</td></tr>
+                        <tr><td class="px-3 py-2"><code>/pages</code></td><td class="px-3 py-2">Route SEO resource (<code>pages.index</code>)</td><td class="px-3 py-2">index,follow</td><td class="px-3 py-2">Stored in unified <code>seo_meta</code> with language fallback.</td></tr>
+                        <tr><td class="px-3 py-2"><code>/emails/subscribe</code></td><td class="px-3 py-2">Route SEO resource (<code>emails.subscribe</code>)</td><td class="px-3 py-2">index,follow</td><td class="px-3 py-2">Stored in unified <code>seo_meta</code> with language fallback.</td></tr>
+                        <tr><td class="px-3 py-2"><code>/pages/{slug}</code></td><td class="px-3 py-2">Page Translation + SEO relation</td><td class="px-3 py-2">index,follow</td><td class="px-3 py-2">Falls back to translation title/description if SEO row missing.</td></tr>
+                        <tr><td class="px-3 py-2"><code>/</code></td><td class="px-3 py-2">Home Page Content + SEO relation</td><td class="px-3 py-2">index,follow</td><td class="px-3 py-2">Falls back to service defaults and includes JSON-LD output.</td></tr>
                         <tr><td class="px-3 py-2"><code>/donations/thank-you*</code></td><td class="px-3 py-2">Code</td><td class="px-3 py-2">noindex,nofollow</td><td class="px-3 py-2">Intentional system-page protection.</td></tr>
                         <tr><td class="px-3 py-2"><code>/unsubscribe/{token}</code>, <code>/email-preferences/{token}</code></td><td class="px-3 py-2">Code</td><td class="px-3 py-2">noindex,nofollow</td><td class="px-3 py-2">Tokenized user-specific routes.</td></tr>
                     </tbody>
@@ -114,8 +115,8 @@
         <section id="page-translation" class="scroll-mt-24 rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
             <h2 class="text-sm font-semibold tracking-tight text-gray-900">Page Translation SEO Guide</h2>
             <ul class="list-disc space-y-1.5 pl-4 text-sm text-gray-800">
-                <li>Use <code>seo_title</code>, <code>seo_description</code>, and <code>seo_og_image</code> on each translation.</li>
-                <li>If SEO fields are empty, the app falls back to translation title/description.</li>
+                <li>Page translation SEO is resolved from related <code>seo_meta</code> rows for that translation/language.</li>
+                <li>If SEO row is missing, the app falls back to translation title/description automatically.</li>
                 <li>Canonical URL uses the resolved active translation slug.</li>
             </ul>
         </section>
@@ -123,19 +124,38 @@
         <section id="home-seo" class="scroll-mt-24 rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
             <h2 class="text-sm font-semibold tracking-tight text-gray-900">Homepage SEO Guide</h2>
             <ul class="list-disc space-y-1.5 pl-4 text-sm text-gray-800">
-                <li>Home title/description managed via <span class="font-semibold">Home Page Content</span>.</li>
+                <li>Home SEO is resolved from related <code>seo_meta</code> rows on <span class="font-semibold">Home Page Content</span>.</li>
+                <li>If missing, the app falls back to home defaults and global SEO config.</li>
                 <li>Homepage OG image uses content assignment with fallback.</li>
                 <li>Organization/WebSite/FAQ JSON-LD is output from homepage rendering pipeline.</li>
             </ul>
         </section>
 
+        <section id="keyword-pages" class="scroll-mt-24 rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
+            <h2 class="text-sm font-semibold tracking-tight text-gray-900">Keyword Page Playbook</h2>
+            <p class="text-sm text-gray-700">
+                Dedicated SEO keyword pages are managed in <span class="font-semibold">Page Translations</span>.
+                The seeded baseline page is <code>/pages/homeless-ministry-sacramento</code>, owned by
+                <code>Database\Seeders\HomelessMinistrySacramentoPageSeeder</code>.
+            </p>
+            <ol class="list-decimal space-y-1.5 pl-5 text-sm text-gray-800">
+                <li>Keep slug stable once indexed unless a redirect strategy exists.</li>
+                <li>Use one primary keyword in <code>seo_title</code>, plus natural variants in body copy.</li>
+                <li>Keep <code>seo_description</code> concise (about 140-160 chars) with local intent.</li>
+                <li>Set a clear conversion CTA (for this page: donation CTA to <code>/give</code>).</li>
+                <li>Add at least two internal links from authoritative pages (home and give are already wired).</li>
+                <li>To restore this page only, run <code>php artisan db:seed --class=HomelessMinistrySacramentoPageSeeder</code>.</li>
+            </ol>
+        </section>
+
         <section id="fallbacks" class="scroll-mt-24 rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
             <h2 class="text-sm font-semibold tracking-tight text-gray-900">Fallback and Resolution Rules</h2>
-            <p class="text-sm text-gray-700">Route SEO resolves in this order:</p>
+            <p class="text-sm text-gray-700">SEO resolves in this order:</p>
             <ol class="list-decimal space-y-1.5 pl-5 text-sm text-gray-800">
-                <li>Active row for current language.</li>
-                <li>Active row for default language.</li>
-                <li>Safe hardcoded defaults in resolver.</li>
+                <li>Active <code>seo_meta</code> row for current language.</li>
+                <li>Active <code>seo_meta</code> row for default language.</li>
+                <li>Model content fallback (<code>title</code>/<code>description</code>) where applicable.</li>
+                <li>Safe hardcoded/config defaults in resolver.</li>
             </ol>
         </section>
 

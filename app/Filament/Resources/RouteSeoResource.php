@@ -7,7 +7,8 @@ use App\Filament\Resources\RouteSeoResource\Pages\CreateRouteSeo;
 use App\Filament\Resources\RouteSeoResource\Pages\EditRouteSeo;
 use App\Filament\Resources\RouteSeoResource\Pages\ListRouteSeos;
 use App\Filament\Resources\RouteSeoResource\Pages\ViewRouteSeo;
-use App\Models\RouteSeo;
+use App\Models\SeoMeta;
+use App\Support\Seo\RouteSeoTarget;
 use BackedEnum;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -23,10 +24,11 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class RouteSeoResource extends Resource
 {
-    protected static ?string $model = RouteSeo::class;
+    protected static ?string $model = SeoMeta::class;
     protected static string|BackedEnum|null $navigationIcon = Heroicon::MagnifyingGlassCircle;
     protected static string|\UnitEnum|null $navigationGroup = NavigationGroup::Pages;
     protected static ?string $navigationLabel = 'Route SEO';
@@ -35,9 +37,9 @@ class RouteSeoResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
-            Select::make('route_key')
+            Select::make('target_key')
                 ->label('Route')
-                ->options(RouteSeo::routeOptions())
+                ->options(RouteSeoTarget::options())
                 ->required(),
             Select::make('language_id')
                 ->label('Language')
@@ -66,10 +68,9 @@ class RouteSeoResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('route_key')
+                TextColumn::make('target_key')
                     ->label('Route')
-                    ->searchable()
-                    ->sortable(),
+                    ->state(fn (SeoMeta $record): string => RouteSeoTarget::options()[$record->target_key] ?? $record->target_key),
                 TextColumn::make('language.title')
                     ->label('Language')
                     ->sortable(),
@@ -101,5 +102,12 @@ class RouteSeoResource extends Resource
             'view' => ViewRouteSeo::route('/{record}'),
             'edit' => EditRouteSeo::route('/{record}/edit'),
         ];
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->where('seoable_type', 'route')
+            ->where('seoable_id', 0);
     }
 }

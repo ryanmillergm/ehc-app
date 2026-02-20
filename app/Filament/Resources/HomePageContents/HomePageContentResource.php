@@ -25,7 +25,7 @@ class HomePageContentResource extends Resource
     protected static string|\UnitEnum|null $navigationGroup = NavigationGroup::Pages;
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-home';
     protected static ?string $navigationLabel = 'Home Page Content';
-    protected static ?string $recordTitleAttribute = 'seo_title';
+    protected static ?string $recordTitleAttribute = 'hero_intro';
 
     public static function form(Schema $schema): Schema
     {
@@ -73,7 +73,7 @@ class HomePageContentResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('language.title')->label('Language')->sortable(),
-                TextColumn::make('seo_title')->limit(60)->searchable(),
+                TextColumn::make('seo_title')->label('SEO Title')->limit(60),
                 IconColumn::make('is_active')->boolean(),
                 TextColumn::make('updated_at')->dateTime()->sortable(),
             ])

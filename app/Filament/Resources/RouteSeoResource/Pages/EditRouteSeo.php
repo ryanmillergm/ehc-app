@@ -11,6 +11,14 @@ class EditRouteSeo extends EditRecord
 {
     protected static string $resource = RouteSeoResource::class;
 
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        $data['seoable_type'] = 'route';
+        $data['seoable_id'] = 0;
+
+        return $data;
+    }
+
     protected function getHeaderActions(): array
     {
         return [
