@@ -2,6 +2,7 @@
     :title="$seo['title']"
     :meta-title="$seo['metaTitle']"
     :meta-description="$seo['metaDescription']"
+    :meta-robots="$seo['metaRobots']"
     :canonical-url="$seo['canonicalUrl']"
     :og-type="$seo['ogType']"
     :og-title="$seo['ogTitle']"

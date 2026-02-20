@@ -9,6 +9,7 @@ use App\Models\Image;
 use App\Models\HomeSection;
 use App\Models\Language;
 use App\Services\Media\ImageResolver;
+use App\Services\Seo\SeoMetaResolver;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 
@@ -16,6 +17,7 @@ class HomeContentService
 {
     public function __construct(
         private readonly ImageResolver $imageResolver,
+        private readonly SeoMetaResolver $seoMetaResolver,
     ) {
     }
 
@@ -64,10 +66,19 @@ class HomeContentService
         }
 
         $sectionPayload = $this->buildSectionPayload($sections, $content);
+        $seo = $content
+            ? $this->seoMetaResolver->forModel($content, $language?->id, [
+                'title' => 'Homeless Ministry in Sacramento, CA | Bread of Grace Ministries',
+                'description' => 'Bread of Grace Ministries serves Sacramento through homeless outreach, hot meals, housing pathways, discipleship, and practical support. Give to help feed the hungry and support the needy.',
+            ])
+            : [
+                'metaTitle' => 'Homeless Ministry in Sacramento, CA | Bread of Grace Ministries',
+                'metaDescription' => 'Bread of Grace Ministries serves Sacramento through homeless outreach, hot meals, housing pathways, discipleship, and practical support. Give to help feed the hungry and support the needy.',
+            ];
 
         return [
-            'seoTitle' => $content?->seo_title ?: 'Homeless Ministry in Sacramento, CA | Bread of Grace Ministries',
-            'seoDescription' => $content?->seo_description ?: 'Bread of Grace Ministries serves Sacramento through homeless outreach, hot meals, housing pathways, discipleship, and practical support. Give to help feed the hungry and support the needy.',
+            'seoTitle' => (string) ($seo['metaTitle'] ?? 'Homeless Ministry in Sacramento, CA | Bread of Grace Ministries'),
+            'seoDescription' => (string) ($seo['metaDescription'] ?? 'Bread of Grace Ministries serves Sacramento through homeless outreach, hot meals, housing pathways, discipleship, and practical support. Give to help feed the hungry and support the needy.'),
             'heroIntro' => $sectionPayload['hero']['intro'],
             'meetingSchedule' => $sectionPayload['hero']['meeting_schedule'],
             'meetingLocation' => $sectionPayload['hero']['meeting_location'],

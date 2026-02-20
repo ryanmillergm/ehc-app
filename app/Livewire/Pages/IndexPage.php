@@ -4,8 +4,8 @@ namespace App\Livewire\Pages;
 
 use App\Models\Language;
 use App\Models\Page;
-use App\Models\RouteSeo;
 use App\Services\Seo\RouteSeoResolver;
+use App\Support\Seo\RouteSeoTarget;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -89,7 +89,7 @@ class IndexPage extends Component
 
     public function render()
     {
-        $seo = app(RouteSeoResolver::class)->resolve(RouteSeo::ROUTE_PAGES_INDEX);
+        $seo = app(RouteSeoResolver::class)->resolve(RouteSeoTarget::PAGES_INDEX);
 
         return view('livewire.pages.index-page', [
             'items' => $this->items,
@@ -97,6 +97,7 @@ class IndexPage extends Component
             'title' => $seo['title'],
             'metaTitle' => $seo['metaTitle'],
             'metaDescription' => $seo['metaDescription'],
+            'metaRobots' => $seo['metaRobots'],
             'canonicalUrl' => $seo['canonicalUrl'],
             'ogType' => $seo['ogType'],
             'ogTitle' => $seo['ogTitle'],

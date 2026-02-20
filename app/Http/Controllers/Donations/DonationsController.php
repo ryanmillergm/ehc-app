@@ -6,10 +6,10 @@ use Throwable;
 use App\Http\Controllers\Controller;
 use App\Models\Address;
 use App\Models\Pledge;
-use App\Models\RouteSeo;
 use App\Models\Transaction;
 use App\Services\StripeService;
 use App\Services\Seo\RouteSeoResolver;
+use App\Support\Seo\RouteSeoTarget;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -28,7 +28,7 @@ class DonationsController extends Controller
 
     public function show()
     {
-        $seo = app(RouteSeoResolver::class)->resolve(RouteSeo::ROUTE_DONATIONS_SHOW);
+        $seo = app(RouteSeoResolver::class)->resolve(RouteSeoTarget::DONATIONS_SHOW);
 
         return view('donations.give', [
             'seo' => $seo,

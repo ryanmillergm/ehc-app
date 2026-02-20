@@ -6,6 +6,7 @@ use App\Models\Language;
 use App\Models\PageTranslation;
 use App\Services\Media\ImageResolver;
 use App\Services\Media\VideoResolver;
+use App\Services\Seo\SeoMetaResolver;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -114,10 +115,20 @@ class ShowPage extends Component
     public function render()
     {
         $template = $this->resolvedTemplate();
-        $metaTitle = $this->translation?->seo_title ?: $this->translation?->title;
-        $metaDescription = $this->translation?->seo_description ?: $this->translation?->description;
+        $resolvedSeo = $this->translation
+            ? app(SeoMetaResolver::class)->forModel($this->translation, $this->translation->language_id, [
+                'title' => $this->translation->title,
+                'description' => $this->translation->description,
+            ])
+            : [
+                'metaTitle' => 'Page',
+                'metaDescription' => 'Page details',
+                'ogImage' => null,
+            ];
+        $metaTitle = $resolvedSeo['metaTitle'] ?? ($this->translation?->title ?: 'Page');
+        $metaDescription = $resolvedSeo['metaDescription'] ?? ($this->translation?->description ?: 'Page details');
         $canonicalUrl = $this->translation ? url('/pages/' . $this->translation->slug) : url('/pages');
-        $ogImage = $this->translation?->seo_og_image ?: $this->resolvedOgImage();
+        $ogImage = $resolvedSeo['ogImage'] ?: $this->resolvedOgImage();
 
         return view('livewire.pages.show-page', [
             'translation' => $this->translation,
@@ -220,11 +231,61 @@ class ShowPage extends Component
             'hero_image' => $heroImage,
             'hero_video' => $heroVideo,
             'hero_slides' => $heroSlides,
-            'layout_data' => $this->translation->layout_data ?: [],
+            'layout_data' => $this->normalizedLayoutData(),
             'title' => $this->translation->title,
             'description' => $this->translation->description,
             'content' => $this->translation->content,
             'right_to_left' => (bool) optional($this->translation->language)->right_to_left,
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function normalizedLayoutData(): array
+    {
+        $layout = $this->translation?->layout_data;
+        if (! is_array($layout)) {
+            $layout = [];
+        }
+
+        $layout['eyebrow'] = (string) ($layout['eyebrow'] ?? '');
+        $layout['cta_secondary_text'] = (string) ($layout['cta_secondary_text'] ?? '');
+        $layout['cta_secondary_url'] = (string) ($layout['cta_secondary_url'] ?? '');
+        $layout['faq_teaser_title'] = (string) ($layout['faq_teaser_title'] ?? '');
+        $layout['faq_teaser_body'] = (string) ($layout['faq_teaser_body'] ?? '');
+
+        $layout['trust_badges'] = collect($layout['trust_badges'] ?? [])
+            ->filter(fn ($badge) => is_string($badge) && filled(trim($badge)))
+            ->values()
+            ->all();
+
+        $layout['quick_facts'] = collect($layout['quick_facts'] ?? [])
+            ->filter(fn ($fact) => is_string($fact) && filled(trim($fact)))
+            ->values()
+            ->all();
+
+        $layout['impact_stats'] = collect($layout['impact_stats'] ?? [])
+            ->map(function ($item) {
+                if (! is_array($item)) {
+                    return null;
+                }
+
+                $label = trim((string) ($item['label'] ?? ''));
+                $value = trim((string) ($item['value'] ?? ''));
+                if ($label === '' && $value === '') {
+                    return null;
+                }
+
+                return [
+                    'label' => $label,
+                    'value' => $value,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+
+        return $layout;
     }
 }
