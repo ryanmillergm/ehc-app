@@ -48,6 +48,13 @@
                         {{ $heroIntro }}
                     </p>
 
+                    <p class="text-sm text-slate-600">
+                        Learn more about our
+                        <a href="{{ url('/pages/homeless-ministry-sacramento') }}" class="font-semibold text-rose-700 hover:text-rose-800 underline underline-offset-2">
+                            homeless ministry in Sacramento
+                        </a>.
+                    </p>
+
                     {{-- Image --}}
                     <div class="md:hidden">
                         <div class="relative">
