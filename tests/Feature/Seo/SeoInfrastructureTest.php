@@ -7,7 +7,9 @@ use App\Models\Page;
 use App\Models\PageTranslation;
 use App\Models\EmailSubscriber;
 use App\Models\Pledge;
+use App\Models\SeoMeta;
 use App\Models\Transaction;
+use App\Support\Seo\RouteSeoTarget;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -139,6 +141,34 @@ class SeoInfrastructureTest extends TestCase
     }
 
     #[Test]
+    public function tokenized_and_thank_you_routes_stay_noindex_even_when_route_seo_exists(): void
+    {
+        $language = Language::factory()->english()->create();
+
+        SeoMeta::factory()->routeTarget(RouteSeoTarget::DONATIONS_SHOW)->create([
+            'language_id' => $language->id,
+            'seo_title' => 'Give Indexable',
+            'seo_description' => 'Should not affect token pages',
+            'robots' => 'index,follow',
+            'is_active' => true,
+        ]);
+
+        $subscriber = EmailSubscriber::create([
+            'email' => 'test2@example.com',
+            'unsubscribe_token' => str_repeat('y', 64),
+            'subscribed_at' => now(),
+        ]);
+
+        $this->get(route('emails.unsubscribe', ['token' => $subscriber->unsubscribe_token]))
+            ->assertOk()
+            ->assertSee('<meta name="robots" content="noindex,nofollow">', false);
+
+        $this->get(route('emails.preferences', ['token' => $subscriber->unsubscribe_token]))
+            ->assertOk()
+            ->assertSee('<meta name="robots" content="noindex,nofollow">', false);
+    }
+
+    #[Test]
     public function it_renders_google_verification_and_ga4_tags_when_configured(): void
     {
         config()->set('seo.google_site_verification', 'test-verification-token');
@@ -149,5 +179,38 @@ class SeoInfrastructureTest extends TestCase
             ->assertSee('<meta name="google-site-verification" content="test-verification-token">', false)
             ->assertSee('https://www.googletagmanager.com/gtag/js?id=G-TEST123456', false)
             ->assertSee("gtag('config', 'G-TEST123456'", false);
+    }
+
+    #[Test]
+    public function dedicated_keyword_page_is_listed_in_sitemap_when_active_and_published(): void
+    {
+        $language = Language::factory()->english()->create();
+        $page = Page::factory()->create(['is_active' => true]);
+
+        PageTranslation::factory()
+            ->forLanguage($language)
+            ->forPage($page)
+            ->state([
+                'slug' => 'homeless-ministry-sacramento',
+                'is_active' => true,
+                'published_at' => now()->subHour(),
+            ])
+            ->create();
+
+        $this->get('/sitemap.xml')
+            ->assertOk()
+            ->assertSee(url('/pages/homeless-ministry-sacramento'), false);
+    }
+
+    #[Test]
+    public function home_and_give_pages_link_to_keyword_landing_page(): void
+    {
+        $this->get('/')
+            ->assertOk()
+            ->assertSee(url('/pages/homeless-ministry-sacramento'), false);
+
+        $this->get('/give')
+            ->assertOk()
+            ->assertSee(url('/pages/homeless-ministry-sacramento'), false);
     }
 }

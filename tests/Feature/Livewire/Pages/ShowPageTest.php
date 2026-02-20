@@ -462,6 +462,34 @@ class ShowPageTest extends TestCase
     }
 
     #[Test]
+    public function dedicated_keyword_page_renders_expected_canonical_and_indexable_meta(): void
+    {
+        $page = Page::factory()->create([
+            'title' => 'Homeless Ministry Sacramento',
+            'is_active' => true,
+        ]);
+
+        $translation = PageTranslation::factory()->create([
+            'page_id' => $page->id,
+            'language_id' => $this->en->id,
+            'slug' => 'homeless-ministry-sacramento',
+            'title' => 'Homeless Ministry in Sacramento',
+            'description' => 'Serving people experiencing homelessness in Sacramento.',
+            'seo_title' => 'Homeless Ministry in Sacramento, CA | Bread of Grace Ministries',
+            'seo_description' => 'Homeless ministry in Sacramento providing meals, outreach, discipleship, and practical support.',
+            'is_active' => true,
+            'published_at' => now()->subMinute(),
+        ]);
+
+        $this->get('/pages/' . $translation->slug)
+            ->assertOk()
+            ->assertSee('<title>Homeless Ministry in Sacramento, CA | Bread of Grace Ministries</title>', false)
+            ->assertSee('<meta name="description" content="Homeless ministry in Sacramento providing meals, outreach, discipleship, and practical support.">', false)
+            ->assertSee('<meta name="robots" content="index,follow">', false)
+            ->assertSee('<link rel="canonical" href="' . url('/pages/homeless-ministry-sacramento') . '">', false);
+    }
+
+    #[Test]
     public function hero_slider_mode_falls_back_to_header_image_when_slider_has_no_items(): void
     {
         $page = Page::factory()->create(['is_active' => true]);
