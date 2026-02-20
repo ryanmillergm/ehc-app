@@ -507,13 +507,16 @@ Monitoring and operations checklist:
 
 ### Route-level SEO CMS
 
-Indexable marketing routes now use DB-managed SEO metadata via `route_seos`:
+Indexable marketing routes now use DB-managed SEO metadata via unified `seo_meta` rows (`seoable_type=route`):
 
 - `donations.show` (`/give`)
 - `pages.index` (`/pages`)
 - `emails.subscribe` (`/emails/subscribe`)
 
 Managed in Filament through the `Route SEO` resource with per-language rows and fallback logic.
+Implementation uses a single persistence model: `App\\Models\\SeoMeta` (no route-specific SEO model).
+Supported route targets are centralized in `App\\Support\\Seo\\RouteSeoTarget`.
+If no SEO row exists for a page/route, runtime falls back to model content (`title`/`description`) and then `config/seo.php` defaults.
 For day-to-day usage guidance in admin, use the dedicated in-panel SEO guide:
 
 - `app/Filament/Pages/SeoDocumentation.php`
@@ -528,6 +531,26 @@ Quick access buttons labeled **SEO Docs** are available on:
 Details and fallback rules:
 
 - `docs/route-seo.md`
+
+### Dedicated keyword landing page
+
+A seeded, CMS-editable keyword page is included for local-intent SEO targeting:
+
+- URL: `/pages/homeless-ministry-sacramento`
+- Source model: `page_translations`
+- Dedicated seeder: `Database\\Seeders\\HomelessMinistrySacramentoPageSeeder`
+- Primary conversion CTA: `/give`
+
+Run only this page seed if needed:
+
+```bash
+php artisan db:seed --class=HomelessMinistrySacramentoPageSeeder
+```
+
+Internal link support is included from:
+
+- Homepage (`resources/views/livewire/home.blade.php`)
+- Give page (`resources/views/donations/give.blade.php`)
 
 ---
 

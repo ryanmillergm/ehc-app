@@ -8,7 +8,7 @@ This project uses DB-managed SEO metadata for selected indexable marketing route
 - `pages.index` -> `/pages`
 - `emails.subscribe` -> `/emails/subscribe`
 
-Data is stored in `route_seos` and managed via Filament resource:
+Data is stored in unified `seo_meta` rows (`seoable_type=route`) and managed via Filament resource:
 
 - `Route SEO`
 
@@ -18,13 +18,18 @@ In-panel end-to-end guide:
 
 Fields:
 
-- `route_key`
+- `target_key` (selected as `Route` in Filament; values are route names)
 - `language_id`
 - `seo_title`
 - `seo_description`
 - `seo_og_image`
 - `canonical_path` (optional override path)
+- `robots`
 - `is_active`
+
+Route key constants are centralized in:
+
+- `App\\Support\\Seo\\RouteSeoTarget`
 
 ## Fallback behavior
 
@@ -33,6 +38,8 @@ For a given route key, resolver order is:
 1. Active row for current language (`session('language_id')` / locale)
 2. Active row for default language (`Language::first()`)
 3. Safe hardcoded defaults in `RouteSeoResolver`
+
+If no SEO row exists for a route/language, metadata still resolves from route defaults and global `config/seo.php` values.
 
 ## Routes intentionally code-controlled
 
