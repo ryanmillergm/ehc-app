@@ -98,6 +98,141 @@ class HomeCmsContentTest extends TestCase
     }
 
     #[Test]
+    public function home_renders_sanitized_hero_heading_html_from_primary_column(): void
+    {
+        $language = Language::factory()->english()->create();
+        session(['language_id' => $language->id]);
+
+        HomeSection::factory()->create([
+            'language_id' => $language->id,
+            'section_key' => 'hero',
+            'heading' => 'Help restore lives through <span class="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-rose-700">God\'s Word</span> and practical support.',
+        ]);
+
+        $response = $this->get('/');
+
+        $response->assertOk()
+            ->assertSee('bg-gradient-to-r from-rose-500 to-rose-700')
+            ->assertSee('and practical support.');
+    }
+
+    #[Test]
+    public function home_section_heading_html_removes_script_tags_when_saved(): void
+    {
+        $language = Language::factory()->english()->create();
+
+        $section = HomeSection::factory()->create([
+            'language_id' => $language->id,
+            'section_key' => 'hero',
+            'heading' => '<script>alert("x")</script><span class="text-transparent">Safe text</span>',
+        ]);
+
+        $this->assertStringNotContainsString('<script', (string) $section->heading);
+        $this->assertStringContainsString('class="text-transparent"', (string) $section->heading);
+    }
+
+    #[Test]
+    public function section_fields_fall_back_to_defaults_when_primary_values_are_blank(): void
+    {
+        $language = Language::factory()->english()->create();
+        session(['language_id' => $language->id]);
+
+        HomeSection::factory()->create([
+            'language_id' => $language->id,
+            'section_key' => 'about',
+            'heading' => '',
+            'body' => null,
+            'note' => '',
+        ]);
+
+        $response = $this->get('/');
+
+        $response->assertOk()
+            ->assertSee('A simple path to restoration.')
+            ->assertSee('We believe transformation is spiritual and practical.')
+            ->assertSee("What you'll see in our outreach", false);
+    }
+
+    #[Test]
+    public function home_section_body_html_allows_safe_links_and_blocks_javascript_links(): void
+    {
+        $language = Language::factory()->english()->create();
+
+        $section = HomeSection::factory()->create([
+            'language_id' => $language->id,
+            'section_key' => 'about',
+            'body' => '<a href="javascript:alert(1)" class="text-rose-600">Bad</a><a href="https://example.org" class="underline">Good</a>',
+        ]);
+
+        $bodyHtml = (string) $section->body;
+
+        $this->assertStringNotContainsString('javascript:', $bodyHtml);
+        $this->assertStringContainsString('https://example.org', $bodyHtml);
+        $this->assertStringContainsString('class="underline"', $bodyHtml);
+    }
+
+    #[Test]
+    public function home_renders_pre_give_cta_html_from_primary_columns(): void
+    {
+        $language = Language::factory()->english()->create();
+        session(['language_id' => $language->id]);
+
+        HomeSection::factory()->create([
+            'language_id' => $language->id,
+            'section_key' => 'pre_give_cta',
+            'heading' => 'Ready to <span class="text-rose-700">change lives</span> today?',
+            'body' => 'Custom <strong>bridge copy</strong> for pre-give.',
+        ]);
+
+        $response = $this->get('/');
+
+        $response->assertOk()
+            ->assertSee('text-rose-700')
+            ->assertSee('bridge copy');
+    }
+
+    #[Test]
+    public function home_renders_final_cta_html_from_primary_columns(): void
+    {
+        $language = Language::factory()->english()->create();
+        session(['language_id' => $language->id]);
+
+        HomeSection::factory()->create([
+            'language_id' => $language->id,
+            'section_key' => 'final_cta',
+            'eyebrow' => '<span class="tracking-widest">HTML Eyebrow</span>',
+            'heading' => 'Final <span class="text-rose-300">HTML Heading</span>',
+            'body' => 'Final body with <strong>safe emphasis</strong>.',
+        ]);
+
+        $response = $this->get('/');
+
+        $response->assertOk()
+            ->assertSee('HTML Eyebrow')
+            ->assertSee('text-rose-300')
+            ->assertSee('safe emphasis');
+    }
+
+    #[Test]
+    public function home_renders_give_scripture_html_from_primary_column(): void
+    {
+        $language = Language::factory()->english()->create();
+        session(['language_id' => $language->id]);
+
+        HomeSection::factory()->create([
+            'language_id' => $language->id,
+            'section_key' => 'give',
+            'subheading' => '<span class="italic text-white/95">Custom scripture override</span>',
+        ]);
+
+        $response = $this->get('/');
+
+        $response->assertOk()
+            ->assertSee('Custom scripture override')
+            ->assertSee('italic text-white/95');
+    }
+
+    #[Test]
     public function home_renders_final_cta_component_with_database_content(): void
     {
         $language = Language::factory()->english()->create();
@@ -199,5 +334,48 @@ class HomeCmsContentTest extends TestCase
             ->assertSee('href="#only-final-cta"', false)
             ->assertSee('Ready to make a real difference today?')
             ->assertSee('Jump to donation form →');
+    }
+
+    #[Test]
+    public function home_ignores_meta_heading_html_override_when_primary_heading_is_present(): void
+    {
+        $language = Language::factory()->english()->create();
+        session(['language_id' => $language->id]);
+
+        HomeSection::factory()->create([
+            'language_id' => $language->id,
+            'section_key' => 'hero',
+            'heading' => 'Primary heading from heading column',
+            'meta' => [
+                'heading_html' => '<span class="text-rose-700">Legacy meta heading</span>',
+            ],
+        ]);
+
+        $response = $this->get('/');
+
+        $response->assertOk()
+            ->assertSee('Primary heading from heading column')
+            ->assertDontSee('Legacy meta heading');
+    }
+
+    #[Test]
+    public function home_cta_url_is_escaped_in_href_attribute_output(): void
+    {
+        $language = Language::factory()->english()->create();
+        session(['language_id' => $language->id]);
+
+        HomeSection::factory()->create([
+            'language_id' => $language->id,
+            'section_key' => 'hero',
+            'cta_primary_url' => '#give-form" onclick="alert(1)',
+            'cta_primary_label' => 'Give safely',
+        ]);
+
+        $response = $this->get('/');
+
+        $response->assertOk()
+            ->assertSee('Give safely')
+            ->assertDontSee('href="#give-form" onclick="alert(1)"', false)
+            ->assertSee('href="#give-form&quot; onclick=&quot;alert(1)"', false);
     }
 }

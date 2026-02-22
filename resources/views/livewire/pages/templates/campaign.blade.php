@@ -17,16 +17,16 @@
         <section class="grid gap-8 lg:grid-cols-12 lg:items-center">
             <div class="space-y-6 lg:col-span-7">
                 <div class="inline-flex items-center gap-2 rounded-full bg-rose-100 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-rose-800">
-                    {{ $eyebrow }}
+                    {!! $eyebrow !!}
                 </div>
 
                 <h1 class="text-4xl font-black leading-tight tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
-                    {{ $page['hero_title'] ?? $page['title'] }}
+                    {!! $page['hero_title'] ?? $page['title'] !!}
                 </h1>
 
                 @if (!empty($page['hero_subtitle']))
                     <p class="max-w-2xl text-lg leading-relaxed text-slate-700">
-                        {{ $page['hero_subtitle'] }}
+                        {!! $page['hero_subtitle'] !!}
                     </p>
                 @endif
 
@@ -34,7 +34,7 @@
                     <div class="flex flex-wrap gap-2">
                         @foreach ($trustBadges as $badge)
                             <span class="rounded-full border border-rose-200 bg-white px-3 py-1 text-xs font-semibold text-rose-800">
-                                {{ $badge }}
+                                {!! $badge !!}
                             </span>
                         @endforeach
                     </div>
@@ -44,14 +44,14 @@
                     @if (!empty($page['hero_cta_text']) && !empty($page['hero_cta_url']))
                         <a href="{{ $page['hero_cta_url'] }}"
                            class="inline-flex items-center rounded-full bg-rose-700 px-7 py-3.5 text-sm font-bold text-white shadow-lg shadow-rose-300/40 hover:bg-rose-800 transition">
-                            {{ $page['hero_cta_text'] }}
+                            {!! $page['hero_cta_text'] !!}
                         </a>
                     @endif
 
                     @if (!empty($secondaryCtaText) && !empty($secondaryCtaUrl))
                         <a href="{{ $secondaryCtaUrl }}"
                            class="inline-flex items-center rounded-full border border-slate-300 bg-white px-7 py-3.5 text-sm font-semibold text-slate-900 hover:bg-slate-50 transition">
-                            {{ $secondaryCtaText }}
+                            {!! $secondaryCtaText !!}
                         </a>
                     @endif
                 </div>
@@ -79,7 +79,7 @@
                             @foreach ($quickFacts as $fact)
                                 <li class="flex items-start gap-2">
                                     <span class="mt-1.5 h-2 w-2 rounded-full bg-rose-500"></span>
-                                    <span>{{ $fact }}</span>
+                                    <span>{!! $fact !!}</span>
                                 </li>
                             @endforeach
                         </ul>
@@ -92,8 +92,8 @@
             <section class="grid gap-3 sm:grid-cols-3">
                 @foreach ($impactStats as $stat)
                     <div class="rounded-2xl border border-rose-200 bg-white px-4 py-4">
-                        <p class="text-xs font-semibold uppercase tracking-widest text-rose-700">{{ $stat['label'] ?? 'Impact' }}</p>
-                        <p class="mt-2 text-2xl font-black text-slate-900">{{ $stat['value'] ?? '' }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-widest text-rose-700">{!! $stat['label'] ?? 'Impact' !!}</p>
+                        <p class="mt-2 text-2xl font-black text-slate-900">{!! $stat['value'] ?? '' !!}</p>
                     </div>
                 @endforeach
             </section>
@@ -102,7 +102,7 @@
         <section class="grid gap-6 lg:grid-cols-12">
             <div class="lg:col-span-8">
                 <div class="prose prose-slate max-w-none prose-headings:font-black prose-headings:tracking-tight prose-p:leading-relaxed prose-li:leading-relaxed">
-                    <p class="text-slate-700">{{ $page['description'] }}</p>
+                    <p class="text-slate-700">{!! $page['description'] !!}</p>
                     <div class="mt-5">{!! $page['content'] !!}</div>
                 </div>
             </div>
@@ -110,8 +110,8 @@
             <aside class="lg:col-span-4 space-y-4">
                 <div class="rounded-2xl border border-rose-200 bg-white p-5 shadow-sm">
                     <p class="text-xs font-semibold uppercase tracking-widest text-rose-700">Need clarity?</p>
-                    <p class="mt-2 text-lg font-bold text-slate-900">{{ $faqTitle ?? 'Have questions before you give?' }}</p>
-                    <p class="mt-2 text-sm text-slate-600">{{ $faqBody ?? 'Learn how outreach works, where we serve, and how your support is used.' }}</p>
+                    <p class="mt-2 text-lg font-bold text-slate-900">{!! $faqTitle ?? 'Have questions before you give?' !!}</p>
+                    <p class="mt-2 text-sm text-slate-600">{!! $faqBody ?? 'Learn how outreach works, where we serve, and how your support is used.' !!}</p>
                     <a href="{{ url('/') }}#faq-grid" class="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 transition">
                         Read FAQ
                     </a>

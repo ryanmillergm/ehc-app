@@ -16,10 +16,10 @@
                     dir="rtl"
                 @endif
             >
-                <h1 class="mb-2">{{ $translation->title }}</h1>
+                <h1 class="mb-2">{!! $translation->title !!}</h1>
 
                 <p class="text-lg text-slate-600">
-                    {{ $translation->description }}
+                    {!! $translation->description !!}
                 </p>
 
                 <div class="mt-4">

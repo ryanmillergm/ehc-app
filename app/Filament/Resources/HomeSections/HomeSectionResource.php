@@ -44,28 +44,36 @@ class HomeSectionResource extends Resource
                 )->all())
                 ->required()
                 ->helperText('Choose which home page section this row powers.'),
-            TextInput::make('eyebrow')
-                ->maxLength(255),
-            TextInput::make('heading')
-                ->maxLength(255),
-            TextInput::make('subheading')
-                ->maxLength(255),
+            Textarea::make('eyebrow')
+                ->rows(2)
+                ->helperText('Plain text or HTML accepted. Sanitized on save.'),
+            Textarea::make('heading')
+                ->rows(3)
+                ->helperText('Plain text or HTML accepted. Sanitized on save.'),
+            Textarea::make('subheading')
+                ->rows(2)
+                ->helperText('Plain text or HTML accepted. Sanitized on save.'),
             Textarea::make('body')
                 ->rows(4)
+                ->helperText('Plain text or HTML accepted. Sanitized on save.')
                 ->columnSpanFull(),
             Textarea::make('note')
                 ->rows(3)
+                ->helperText('Plain text or HTML accepted. Sanitized on save.')
                 ->columnSpanFull(),
-            TextInput::make('cta_primary_label')
-                ->maxLength(255),
+            Textarea::make('cta_primary_label')
+                ->rows(2)
+                ->helperText('Plain text or HTML accepted. Sanitized on save.'),
             TextInput::make('cta_primary_url')
                 ->maxLength(255),
-            TextInput::make('cta_secondary_label')
-                ->maxLength(255),
+            Textarea::make('cta_secondary_label')
+                ->rows(2)
+                ->helperText('Plain text or HTML accepted. Sanitized on save.'),
             TextInput::make('cta_secondary_url')
                 ->maxLength(255),
-            TextInput::make('cta_tertiary_label')
-                ->maxLength(255),
+            Textarea::make('cta_tertiary_label')
+                ->rows(2)
+                ->helperText('Plain text or HTML accepted. Sanitized on save.'),
             TextInput::make('cta_tertiary_url')
                 ->maxLength(255),
             Select::make('image_id')
@@ -76,6 +84,7 @@ class HomeSectionResource extends Resource
             KeyValue::make('meta')
                 ->keyLabel('Key')
                 ->valueLabel('Value')
+                ->helperText('Optional structured metadata only (for example: location, meeting_schedule, map_embed_url).')
                 ->columnSpanFull(),
             TextInput::make('sort_order')
                 ->numeric()

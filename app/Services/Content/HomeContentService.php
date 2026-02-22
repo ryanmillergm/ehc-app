@@ -191,10 +191,16 @@ class HomeContentService
         $visitMeta = (array) ($visit?->meta ?? []);
         $finalCta = $byKey->get(HomeSectionKey::FinalCta->value);
 
+        $defaultHeading = 'Help restore lives through
+            <span class="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-rose-700">
+                God’s Word
+            </span>
+            and practical support.';
+
         return [
             'hero' => [
                 'eyebrow' => $hero?->eyebrow ?: 'Bread of Grace Ministries',
-                'heading' => $hero?->heading ?: 'Help restore lives through God\'s Word and practical support.',
+                'heading' => $hero?->heading ?: $defaultHeading,
                 'subheading' => $hero?->subheading ?: 'Serving since 2010',
                 'note' => $hero?->note ?: 'Church Without Walls • Thu + Sun 11am',
                 'intro' => $hero?->body

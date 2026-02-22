@@ -135,4 +135,51 @@ class HomeSectionResourceTest extends TestCase
             ->assertSee('Home Sections Docs')
             ->assertSee(HomeSectionsDocumentation::getUrl());
     }
+
+    public function test_create_home_section_sanitizes_rich_html_heading_and_preserves_tailwind_classes(): void
+    {
+        $language = Language::factory()->english()->create();
+
+        Livewire::test(CreateHomeSection::class)
+            ->fillForm([
+                'language_id' => $language->id,
+                'section_key' => HomeSectionKey::Hero->value,
+                'heading' => '<script>alert(1)</script>Help <span class="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-rose-700">God\'s Word</span>',
+                'is_active' => true,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $section = HomeSection::query()
+            ->where('language_id', $language->id)
+            ->where('section_key', HomeSectionKey::Hero->value)
+            ->firstOrFail();
+
+        $this->assertStringNotContainsString('<script', (string) $section->heading);
+        $this->assertStringContainsString('bg-gradient-to-r from-rose-500 to-rose-700', (string) $section->heading);
+    }
+
+    public function test_edit_home_section_sanitizes_body_html_column(): void
+    {
+        $language = Language::factory()->english()->create();
+        $section = HomeSection::factory()->create([
+            'language_id' => $language->id,
+            'section_key' => HomeSectionKey::About->value,
+            'meta' => [],
+        ]);
+
+        Livewire::test(EditHomeSection::class, ['record' => $section->getKey()])
+            ->fillForm([
+                'body' => '<a href="javascript:alert(1)" class="text-red-600">Bad</a><a href="https://example.org" class="underline">Good</a>',
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $section->refresh();
+        $html = (string) $section->body;
+
+        $this->assertStringNotContainsString('javascript:', $html);
+        $this->assertStringContainsString('https://example.org', $html);
+        $this->assertStringContainsString('class="underline"', $html);
+    }
 }

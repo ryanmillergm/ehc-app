@@ -43,11 +43,14 @@ class HomePageContentResource extends Resource
                 ->columnSpanFull(),
             Textarea::make('hero_intro')
                 ->rows(3)
+                ->helperText('Plain text or HTML accepted. Sanitized on save.')
                 ->columnSpanFull(),
-            TextInput::make('meeting_schedule')
-                ->maxLength(255),
-            TextInput::make('meeting_location')
-                ->maxLength(255),
+            Textarea::make('meeting_schedule')
+                ->rows(2)
+                ->helperText('Plain text or HTML accepted. Sanitized on save.'),
+            Textarea::make('meeting_location')
+                ->rows(2)
+                ->helperText('Plain text or HTML accepted. Sanitized on save.'),
             Select::make('hero_image_id')
                 ->relationship('heroImage', 'path')
                 ->searchable()

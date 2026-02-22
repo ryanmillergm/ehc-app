@@ -30,7 +30,7 @@ class HomeSectionSeeder extends Seeder
 
         $hero = $this->upsertSection($english->id, HomeSectionKey::Hero->value, [
             'eyebrow' => 'Bread of Grace Ministries',
-            'heading' => 'Help restore lives through God\'s Word and practical support.',
+            'heading' => 'Help restore lives through <span class="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-rose-700">God\'s Word</span> and practical support.',
             'subheading' => 'Serving since 2010',
             'body' => 'As a homeless ministry in Sacramento, California, we feed the hungry, help the needy, and walk with people through Christ-centered mentorship, practical support, and pathways to stable housing.',
             'note' => 'Church Without Walls • Thu + Sun 11am',

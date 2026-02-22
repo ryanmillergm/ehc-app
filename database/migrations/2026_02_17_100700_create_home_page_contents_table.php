@@ -14,8 +14,8 @@ return new class extends Migration
             $table->id();
             $table->foreignIdFor(Language::class)->nullable()->constrained()->nullOnDelete();
             $table->text('hero_intro')->nullable();
-            $table->string('meeting_schedule')->nullable();
-            $table->string('meeting_location')->nullable();
+            $table->text('meeting_schedule')->nullable();
+            $table->text('meeting_location')->nullable();
             $table->foreignIdFor(Image::class, 'hero_image_id')->nullable()->constrained('images')->nullOnDelete();
             $table->foreignIdFor(Image::class, 'featured_image_id')->nullable()->constrained('images')->nullOnDelete();
             $table->foreignIdFor(Image::class, 'og_image_id')->nullable()->constrained('images')->nullOnDelete();

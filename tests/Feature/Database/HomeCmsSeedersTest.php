@@ -50,7 +50,8 @@ class HomeCmsSeedersTest extends TestCase
             ->firstOrFail();
 
         $this->assertSame('Bread of Grace Ministries', $heroSection->eyebrow);
-        $this->assertSame('Help restore lives through God\'s Word and practical support.', $heroSection->heading);
+        $this->assertStringContainsString('Help restore lives through', (string) $heroSection->heading);
+        $this->assertStringContainsString('bg-gradient-to-r', (string) $heroSection->heading);
         $this->assertNotEmpty($heroSection->items);
 
         $preGiveCta = HomeSection::query()
@@ -139,6 +140,13 @@ class HomeCmsSeedersTest extends TestCase
             FaqItemSeeder::class,
         ]);
 
+        $english = Language::query()->where('iso_code', 'en')->firstOrFail();
+        $heroSection = HomeSection::query()
+            ->where('language_id', $english->id)
+            ->where('section_key', 'hero')
+            ->firstOrFail();
+        $headingAfterFirst = (string) $heroSection->heading;
+
         $countsAfterSecond = [
             'images' => Image::query()->count(),
             'defaults' => SiteMediaDefault::query()->count(),
@@ -148,5 +156,9 @@ class HomeCmsSeedersTest extends TestCase
         ];
 
         $this->assertSame($countsAfterFirst, $countsAfterSecond);
+
+        $heroSection->refresh();
+        $this->assertSame($headingAfterFirst, (string) $heroSection->heading);
+        $this->assertStringContainsString('bg-gradient-to-r', (string) $heroSection->heading);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\SanitizesCmsHtml;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,6 +12,7 @@ use Illuminate\Support\Arr;
 class HomePageContent extends Model
 {
     use HasFactory;
+    use SanitizesCmsHtml;
 
     /** @var array<string, mixed> */
     protected array $pendingSeoMeta = [];
@@ -75,6 +77,12 @@ class HomePageContent extends Model
 
     protected static function booted(): void
     {
+        static::saving(function (self $model): void {
+            $model->hero_intro = $model->sanitizeCmsField($model->hero_intro);
+            $model->meeting_schedule = $model->sanitizeCmsField($model->meeting_schedule);
+            $model->meeting_location = $model->sanitizeCmsField($model->meeting_location);
+        });
+
         static::saved(function (self $model): void {
             $model->syncPendingSeoMeta();
         });

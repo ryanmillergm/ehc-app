@@ -95,6 +95,29 @@ return [
             'AutoFormat.AutoParagraph' => false,
         ],
 
+        'cms_rich_text' => [
+            'Core.Encoding' => 'utf-8',
+            'HTML.Doctype' => 'HTML 4.01 Transitional',
+            'URI.AllowedSchemes' => [
+                'http' => true,
+                'https' => true,
+                'mailto' => true,
+                'tel' => true,
+            ],
+            'HTML.Allowed' => implode(',', [
+                'h1[class]','h2[class]','h3[class]','h4[class]','h5[class]','h6[class]',
+                'p[class]','span[class]','br',
+                'strong[class]','b[class]','em[class]','i[class]','u[class]','s[class]',
+                'a[href|title|target|rel|class]',
+                'ul[class]','ol[class]','li[class]',
+                'div[class]',
+            ]),
+            'HTML.TargetBlank' => true,
+            'Attr.AllowedFrameTargets' => ['_blank'],
+            'AutoFormat.RemoveEmpty' => false,
+            'AutoFormat.AutoParagraph' => false,
+        ],
+
     ],
 
     /*

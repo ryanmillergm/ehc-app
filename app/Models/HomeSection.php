@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\SanitizesCmsHtml;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class HomeSection extends Model
 {
     use HasFactory;
+    use SanitizesCmsHtml;
 
     protected $fillable = [
         'language_id',
@@ -35,6 +37,20 @@ class HomeSection extends Model
         'meta' => 'array',
         'is_active' => 'boolean',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $section): void {
+            $section->eyebrow = $section->sanitizeCmsField($section->eyebrow);
+            $section->heading = $section->sanitizeCmsField($section->heading);
+            $section->subheading = $section->sanitizeCmsField($section->subheading);
+            $section->body = $section->sanitizeCmsField($section->body);
+            $section->note = $section->sanitizeCmsField($section->note);
+            $section->cta_primary_label = $section->sanitizeCmsField($section->cta_primary_label);
+            $section->cta_secondary_label = $section->sanitizeCmsField($section->cta_secondary_label);
+            $section->cta_tertiary_label = $section->sanitizeCmsField($section->cta_tertiary_label);
+        });
+    }
 
     public function language(): BelongsTo
     {

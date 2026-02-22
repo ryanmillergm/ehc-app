@@ -11,6 +11,12 @@
         $giveSection = $sections['give'] ?? [];
         $visitSection = $sections['visit'] ?? [];
         $finalCta = $sections['final_cta'] ?? [];
+
+        $defaultHeading = 'Help restore lives through
+            <span class="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-rose-700">
+                God’s Word
+            </span>
+            and practical support.';
     @endphp
 
     {{-- HERO --}}
@@ -28,32 +34,32 @@
                 <div class="lg:col-span-6 space-y-6">
                     <div class="flex flex-wrap items-center gap-2">
                         <span class="inline-flex items-center gap-2 rounded-full bg-slate-900 text-white px-4 py-1.5 text-xs font-semibold tracking-wide">
-                            {{ $heroSection['eyebrow'] ?? 'Bread of Grace Ministries' }}
+                            {!! $heroSection['eyebrow'] ?? 'Bread of Grace Ministries' !!}
                             <span class="h-1.5 w-1.5 rounded-full bg-rose-400"></span>
                             {{ $heroSection['location'] ?? 'Sacramento, CA' }}
                         </span>
                         <span class="inline-flex items-center rounded-full bg-rose-50 text-rose-700 px-4 py-1.5 text-xs font-semibold">
-                            {{ $heroSection['subheading'] ?? 'Serving since 2010' }}
+                            {!! $heroSection['subheading'] ?? 'Serving since 2010' !!}
                         </span>
                         <span class="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 px-4 py-1.5 text-xs font-semibold">
-                            {{ $heroSection['note'] ?? 'Church Without Walls • Thu + Sun 11am' }}
+                            {!! $heroSection['note'] ?? 'Church Without Walls • Thu + Sun 11am' !!}
                         </span>
                     </div>
 
                     <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.05]">
-                        {{ $heroSection['heading'] ?? "Help restore lives through God's Word and practical support." }}
+                        {!! $heroSection['heading'] ?? $defaultHeading !!}
                     </h1>
 
-                    <p class="text-lg sm:text-xl text-slate-600 leading-relaxed max-w-2xl">
-                        {{ $heroIntro }}
-                    </p>
+                    <div class="text-lg sm:text-xl text-slate-600 leading-relaxed max-w-2xl">
+                        {!! $heroIntro !!}
+                    </div>
 
-                    <p class="text-sm text-slate-600">
+                    {{-- <p class="text-sm text-slate-600">
                         Learn more about our
                         <a href="{{ url('/pages/homeless-ministry-sacramento') }}" class="font-semibold text-rose-700 hover:text-rose-800 underline underline-offset-2">
                             homeless ministry in Sacramento
                         </a>.
-                    </p>
+                    </p> --}}
 
                     {{-- Image --}}
                     <div class="md:hidden">
@@ -74,7 +80,7 @@
                            class="inline-flex items-center justify-center rounded-full bg-rose-700 px-7 py-3.5
                                   text-lg font-semibold text-white shadow-sm hover:bg-rose-800
                                   focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 transition">
-                            {{ $heroSection['ctas'][0]['label'] ?? 'Give today' }}
+                            {!! $heroSection['ctas'][0]['label'] ?? 'Give today' !!}
                             <svg class="ml-2 h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                 <path d="M10.75 5.75a.75.75 0 0 0-1.5 0V9.25H5.75a.75.75 0 0 0 0 1.5H9.25v3.5a.75.75 0 0 0 1.5 0v-3.5h3.5a.75.75 0 0 0 0-1.5h-3.5V5.75Z" />
                             </svg>
@@ -83,12 +89,12 @@
                         <a href="{{ $heroSection['ctas'][1]['url'] ?? '#serve' }}"
                            class="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-7 py-3.5
                                   text-lg font-semibold text-slate-800 hover:bg-slate-50 transition">
-                            {{ $heroSection['ctas'][1]['label'] ?? 'Volunteer with us' }}
+                            {!! $heroSection['ctas'][1]['label'] ?? 'Volunteer with us' !!}
                         </a>
 
                         <a href="{{ $heroSection['ctas'][2]['url'] ?? '#visit' }}"
                            class="inline-flex items-center justify-center rounded-full text-sm font-semibold text-slate-600 hover:text-slate-900 transition">
-                            {{ $heroSection['ctas'][2]['label'] ?? 'Visit Thursday/Sunday →' }}
+                            {!! $heroSection['ctas'][2]['label'] ?? 'Visit Thursday/Sunday →' !!}
                         </a>
                     </div>
 
@@ -132,7 +138,7 @@
                                 <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                                     <p class="text-xs font-semibold text-slate-600">Scripture that shapes our work</p>
                                     <p class="mt-2 text-sm text-slate-800 leading-relaxed italic">
-                                        {{ $heroSection['scripture_text'] ?? '“And whoever gives one of these little ones only a cup of cold water... shall by no means lose his reward.”' }}
+                                        {!! $heroSection['scripture_text'] ?? '“And whoever gives one of these little ones only a cup of cold water... shall by no means lose his reward.”' !!}
                                     </p>
                                     <p class="mt-2 text-xs font-semibold text-slate-900">— {{ $heroSection['scripture_reference'] ?? 'Matthew 10:42' }}</p>
                                 </div>
@@ -179,14 +185,16 @@
 
                 <div class="lg:col-span-5 space-y-5">
                     <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight">
-                        {{ $aboutSection['heading'] ?? 'A simple path to restoration.' }}
+                        {!! $aboutSection['heading'] ?? 'A simple path to restoration.' !!}
                     </h2>
-                    <p class="text-lg text-slate-600 leading-relaxed">
-                        {{ $aboutSection['body'] ?? 'We believe transformation is spiritual and practical. So we combine consistent discipleship with tangible steps that rebuild stability and dignity.' }}
-                    </p>
+                    <div class="text-lg text-slate-600 leading-relaxed">
+                        {!! $aboutSection['body'] ?? 'We believe transformation is spiritual and practical. So we combine consistent discipleship with tangible steps that rebuild stability and dignity.' !!}
+                    </div>
 
                     <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                        <p class="text-sm font-semibold text-slate-900">{{ $aboutSection['note'] ?? "What you'll see in our outreach" }}</p>
+                        <p class="text-sm font-semibold text-slate-900">
+                            {!! $aboutSection['note'] ?? "What you'll see in our outreach" !!}
+                        </p>
                         <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-slate-700">
                             @foreach (($aboutSection['bullets'] ?? []) as $bullet)
                                 <div class="flex items-center gap-2">
@@ -202,7 +210,9 @@
                     <div class="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                         <div class="px-6 sm:px-8 py-6 border-b border-slate-200 bg-gradient-to-r from-rose-50 to-indigo-50">
                             <h3 class="text-xl sm:text-3xl sm:font-extrabold font-extrabold">{{ $pathwaySection['heading'] ?? '3 phases to rehabilitation' }}</h3>
-                            <p class="mt-1 text-slate-600 font-medium">{{ $pathwaySection['subheading'] ?? 'Built for real life: spiritual foundation + next practical step.' }}</p>
+                            <p class="mt-1 text-slate-600 font-medium">
+                                {!! $pathwaySection['subheading'] ?? 'Built for real life: spiritual foundation + next practical step.' !!}
+                            </p>
                         </div>
 
                         <ol class="p-6 sm:p-8 space-y-4">
@@ -241,12 +251,12 @@
                 </div>
 
                 <h2 class="mt-5 text-white text-3xl md:text-5xl font-extrabold tracking-tight">
-                    {{ $parallaxSection['heading'] ?? 'Nobody rebuilds alone.' }}
+                    {!! $parallaxSection['heading'] ?? 'Nobody rebuilds alone.' !!}
                 </h2>
 
-                <p class="mt-4 text-white/90 max-w-3xl mx-auto leading-relaxed text-lg">
-                    {{ $parallaxSection['body'] ?? 'We walk alongside people with consistent spiritual guidance, practical life coaching, and Christ-centered community - helping restore identity, purpose, and momentum.' }}
-                </p>
+                <div class="mt-4 text-white/90 max-w-3xl mx-auto leading-relaxed text-lg">
+                    {!! $parallaxSection['body'] ?? 'We walk alongside people with consistent spiritual guidance, practical life coaching, and Christ-centered community - helping restore identity, purpose, and momentum.' !!}
+                </div>
             </div>
         </div>
     </section>
@@ -276,30 +286,30 @@
                                 </div>
 
                                 <h2 class="mt-4 text-3xl sm:text-4xl font-extrabold tracking-tight text-white drop-shadow">
-                                    {{ $serveSection['heading'] ?? 'Serve with Bread of Grace.' }}
+                                    {!! $serveSection['heading'] ?? 'Serve with Bread of Grace.' !!}
                                 </h2>
 
-                                <p class="mt-3 text-lg leading-relaxed text-white/95 max-w-2xl drop-shadow">
-                                    {{ $serveSection['body'] ?? "Some people give. Some people show up. Some do both. There's a place for you - prayer, food service, conversations, discipleship, logistics." }}
-                                </p>
+                                <div class="mt-3 text-lg leading-relaxed text-white/95 max-w-2xl drop-shadow">
+                                    {!! $serveSection['body'] ?? "Some people give. Some people show up. Some do both. There's a place for you - prayer, food service, conversations, discipleship, logistics." !!}
+                                </div>
 
                                 <div class="mt-6 flex flex-col sm:flex-row gap-3">
                                     <a href="{{ $serveSection['ctas'][0]['url'] ?? route('volunteer.apply', ['need' => 'general']) }}"
                                        class="inline-flex items-center justify-center rounded-full bg-white/90 px-7 py-3.5
                                               text-sm font-semibold text-black ring-1 ring-white/60 hover:bg-white/65 transition">
-                                        {{ $serveSection['ctas'][0]['label'] ?? 'Sign up to Volunteer' }}
+                                        {!! $serveSection['ctas'][0]['label'] ?? 'Sign up to Volunteer' !!}
                                     </a>
 
                                     <a href="{{ $serveSection['ctas'][1]['url'] ?? '#give-form' }}"
                                        class="inline-flex items-center justify-center rounded-full bg-rose-600 px-7 py-3.5
                                               text-sm font-semibold text-white shadow-sm hover:bg-rose-700 transition">
-                                        {{ $serveSection['ctas'][1]['label'] ?? 'Support the work' }}
+                                        {!! $serveSection['ctas'][1]['label'] ?? 'Support the work' !!}
                                     </a>
 
                                     <a href="{{ $serveSection['ctas'][2]['url'] ?? '#visit' }}"
                                        class="inline-flex items-center justify-center rounded-full bg-white/10 px-7 py-3.5
                                               text-sm font-semibold text-white ring-1 ring-white/20 hover:bg-white/15 transition">
-                                        {{ $serveSection['ctas'][2]['label'] ?? 'Come this Thursday/Sunday' }}
+                                        {!! $serveSection['ctas'][2]['label'] ?? 'Come this Thursday/Sunday' !!}
                                     </a>
                                 </div>
                             </div>
@@ -320,7 +330,8 @@
                         </ul>
                         <div class="mt-6 rounded-2xl bg-rose-50 border border-rose-100 p-4">
                             <p class="text-sm text-rose-900">
-                                <span class="font-semibold">Pro tip:</span> {{ $serveSupportSection['tip'] ?? 'People remember warmth and consistency more than speeches. Just showing up matters.' }}
+                                <span class="font-semibold">Pro tip:</span>
+                                {!! $serveSupportSection['tip'] ?? 'People remember warmth and consistency more than speeches. Just showing up matters.' !!}
                             </p>
                         </div>
                     </div>
@@ -340,20 +351,20 @@
                 <div class="relative px-6 py-7 sm:px-10 sm:py-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
                     <div>
                         <div class="text-xs font-semibold tracking-widest uppercase text-rose-700">
-                            {{ $preGiveCta['eyebrow'] ?? 'Next step' }}
+                        {!! $preGiveCta['eyebrow'] ?? 'Next step' !!}
                         </div>
                         <div class="mt-2 text-2xl sm:text-3xl font-extrabold text-slate-900">
-                            {{ $preGiveCta['heading'] ?? 'Ready to make a real difference today?' }}
+                            {!! $preGiveCta['heading'] ?? 'Ready to make a real difference today?' !!}
                         </div>
-                        <p class="mt-2 text-slate-600 max-w-2xl">
-                            {{ $preGiveCta['body'] ?? 'Your gift helps meals, supplies, and consistent discipleship happen every week.' }}
-                        </p>
+                        <div class="mt-2 text-slate-600 max-w-2xl">
+                            {!! $preGiveCta['body'] ?? 'Your gift helps meals, supplies, and consistent discipleship happen every week.' !!}
+                        </div>
                     </div>
 
                     <a href="{{ $preGiveCta['url'] ?? '#give-form' }}"
                        class="shrink-0 inline-flex items-center justify-center rounded-full bg-rose-700 px-7 py-3.5
                               text-sm font-semibold text-white shadow-sm hover:bg-rose-800 transition">
-                        {{ $preGiveCta['label'] ?? 'Jump to donation form →' }}
+                        {!! $preGiveCta['label'] ?? 'Jump to donation form →' !!}
                     </a>
                 </div>
             </div>
@@ -368,16 +379,16 @@
 
                 <div class="lg:col-span-6 space-y-6">
                     <div class="inline-flex items-center gap-2 rounded-full bg-rose-50 text-rose-700 px-4 py-1.5 text-xs font-semibold">
-                        {{ $giveSection['eyebrow'] ?? 'Give • One-time or Monthly' }}
+                        {!! $giveSection['eyebrow'] ?? 'Give • One-time or Monthly' !!}
                     </div>
 
                     <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight">
-                        {{ $giveSection['heading'] ?? 'Make outreach possible this week.' }}
+                        {!! $giveSection['heading'] ?? 'Make outreach possible this week.' !!}
                     </h2>
 
-                    <p class="text-lg text-slate-600 leading-relaxed max-w-2xl">
-                        {{ $giveSection['body'] ?? 'Your gift helps feed the hungry and help those in need through meals, survival supplies, discipleship, and practical next steps toward stability. Monthly giving helps us plan with confidence.' }}
-                    </p>
+                    <div class="text-lg text-slate-600 leading-relaxed max-w-2xl">
+                        {!! $giveSection['body'] ?? 'Your gift helps feed the hungry and help those in need through meals, survival supplies, discipleship, and practical next steps toward stability. Monthly giving helps us plan with confidence.' !!}
+                    </div>
 
                     <div class="relative h-[600px] sm:h-[400px] overflow-hidden rounded-3xl text-white p-6 sm:p-8">
                         {{-- Background image --}}
@@ -393,10 +404,10 @@
                         {{-- Content --}}
                         <div class="relative flex h-full flex-col">
                             <div class="mt-auto">
-                                <p class="text-sm font-semibold text-white/85 drop-shadow">{{ $giveSection['heart_label'] ?? 'Our heart' }}</p>
+                                <p class="text-sm font-semibold text-white/85 drop-shadow">{!! $giveSection['heart_label'] ?? 'Our heart' !!}</p>
 
                                 <p class="mt-3 text-lg leading-relaxed italic text-white/95 drop-shadow">
-                                    {{ $giveSection['scripture'] ?? '“For I was hungry and you gave Me food; I was thirsty and you gave Me drink; I was a stranger and you took Me in...”' }}
+                                    {!! $giveSection['scripture'] ?? '“For I was hungry and you gave Me food; I was thirsty and you gave Me drink; I was a stranger and you took Me in...”' !!}
                                 </p>
 
                                 <p class="mt-3 text-sm font-semibold text-white/90 drop-shadow">— {{ $giveSection['scripture_reference'] ?? 'Matthew 25:35' }}</p>
@@ -455,7 +466,7 @@
 
                 <div class="lg:col-span-5 space-y-5">
                     <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight uppercase">
-                        {{ $visitSection['heading'] ?? 'Visit us' }}
+                        {!! $visitSection['heading'] ?? 'Visit us' !!}
                     </h2>
 
                     <div class="h-1 w-24 bg-slate-900 rounded-full"></div>
@@ -471,7 +482,7 @@
                             class="inline-flex items-center justify-center rounded-full bg-slate-900 px-6 py-3
                                    text-sm font-semibold text-white hover:bg-slate-800 transition"
                         >
-                            {{ $visitSection['directions_label'] ?? 'Get Directions' }}
+                            {!! $visitSection['directions_label'] ?? 'Get Directions' !!}
                         </a>
 
                         {{-- Need to add an about page with what to expect when you visit --}}

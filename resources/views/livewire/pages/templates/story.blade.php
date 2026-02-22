@@ -13,16 +13,16 @@
         <section class="grid gap-8 lg:grid-cols-12 lg:items-center">
             <div class="space-y-6 lg:col-span-7">
                 <div class="inline-flex items-center rounded-full bg-slate-100 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-slate-700">
-                    {{ $eyebrow }}
+                    {!! $eyebrow !!}
                 </div>
 
                 <h1 class="text-4xl font-black leading-tight tracking-tight text-slate-900 sm:text-5xl">
-                    {{ $page['hero_title'] ?? $page['title'] }}
+                    {!! $page['hero_title'] ?? $page['title'] !!}
                 </h1>
 
                 @if (!empty($page['hero_subtitle']))
                     <p class="max-w-2xl text-lg leading-relaxed text-slate-700">
-                        {{ $page['hero_subtitle'] }}
+                        {!! $page['hero_subtitle'] !!}
                     </p>
                 @endif
 
@@ -30,7 +30,7 @@
                     <div class="flex flex-wrap gap-2">
                         @foreach ($trustBadges as $badge)
                             <span class="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
-                                {{ $badge }}
+                                {!! $badge !!}
                             </span>
                         @endforeach
                     </div>
@@ -40,14 +40,14 @@
                     @if (!empty($page['hero_cta_text']) && !empty($page['hero_cta_url']))
                         <a href="{{ $page['hero_cta_url'] }}"
                            class="inline-flex items-center rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">
-                            {{ $page['hero_cta_text'] }}
+                            {!! $page['hero_cta_text'] !!}
                         </a>
                     @endif
 
                     @if (!empty($secondaryCtaText) && !empty($secondaryCtaUrl))
                         <a href="{{ $secondaryCtaUrl }}"
                            class="inline-flex items-center rounded-full border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-900 hover:bg-slate-50 transition">
-                            {{ $secondaryCtaText }}
+                            {!! $secondaryCtaText !!}
                         </a>
                     @endif
                 </div>
@@ -72,7 +72,7 @@
         <section class="grid gap-6 lg:grid-cols-12">
             <div class="lg:col-span-8">
                 <div class="prose prose-slate max-w-none prose-headings:font-black prose-headings:tracking-tight prose-p:leading-relaxed prose-li:leading-relaxed">
-                    <p class="text-slate-600">{{ $page['description'] }}</p>
+                    <p class="text-slate-600">{!! $page['description'] !!}</p>
                     <div class="mt-5">{!! $page['content'] !!}</div>
                 </div>
             </div>
