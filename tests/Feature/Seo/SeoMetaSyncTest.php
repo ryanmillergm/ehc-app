@@ -16,6 +16,64 @@ class SeoMetaSyncTest extends TestCase
     use RefreshDatabase;
 
     #[Test]
+    public function page_translation_creation_auto_creates_blank_canonical_seo_row(): void
+    {
+        $language = Language::factory()->english()->create();
+        $page = Page::factory()->create(['is_active' => true]);
+
+        $translation = PageTranslation::factory()->create([
+            'page_id' => $page->id,
+            'language_id' => $language->id,
+            'title' => 'Page Title',
+            'description' => 'Page Description',
+            'is_active' => true,
+        ]);
+
+        $this->assertDatabaseHas('seo_meta', [
+            'seoable_type' => $translation->getMorphClass(),
+            'seoable_id' => $translation->id,
+            'target_key' => '',
+            'language_id' => $language->id,
+            'seo_title' => null,
+            'seo_description' => null,
+            'seo_og_image' => null,
+            'is_active' => true,
+        ]);
+    }
+
+    #[Test]
+    public function page_translation_canonical_seo_row_auto_create_is_idempotent(): void
+    {
+        $language = Language::factory()->english()->create();
+        $page = Page::factory()->create(['is_active' => true]);
+
+        $translation = PageTranslation::factory()->create([
+            'page_id' => $page->id,
+            'language_id' => $language->id,
+            'title' => 'Page Title',
+            'description' => 'Page Description',
+            'is_active' => true,
+        ]);
+
+        $translation->update([
+            'title' => 'Updated once',
+        ]);
+
+        $translation->update([
+            'title' => 'Updated twice',
+        ]);
+
+        $count = SeoMeta::query()
+            ->where('seoable_type', $translation->getMorphClass())
+            ->where('seoable_id', $translation->id)
+            ->where('target_key', '')
+            ->where('language_id', $translation->language_id)
+            ->count();
+
+        $this->assertSame(1, $count);
+    }
+
+    #[Test]
     public function page_translation_seo_fields_sync_to_seo_meta_row(): void
     {
         $language = Language::factory()->english()->create();
@@ -60,16 +118,18 @@ class SeoMetaSyncTest extends TestCase
             'is_active' => true,
         ]);
 
-        SeoMeta::query()->create([
-            'seoable_type' => $translation->getMorphClass(),
-            'seoable_id' => $translation->id,
-            'target_key' => '',
-            'language_id' => $language->id,
-            'seo_title' => 'SEO Title',
-            'seo_description' => 'SEO Description',
-            'seo_og_image' => 'https://cdn.example.org/page-og.jpg',
-            'is_active' => true,
-        ]);
+        $translation->seoMeta()->updateOrCreate(
+            [
+                'target_key' => '',
+                'language_id' => $language->id,
+            ],
+            [
+                'seo_title' => 'SEO Title',
+                'seo_description' => 'SEO Description',
+                'seo_og_image' => 'https://cdn.example.org/page-og.jpg',
+                'is_active' => true,
+            ]
+        );
 
         $translation->seo_title = null;
         $translation->seo_description = null;

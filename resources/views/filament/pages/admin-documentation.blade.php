@@ -408,7 +408,7 @@ HTML;
 
             <ul class="list-disc space-y-1.5 pl-4 text-sm text-gray-800">
                 <li><span class="font-semibold">Route SEO resource</span> manages indexable route metadata for <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">/give</code>, <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">/pages</code>, and <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">/emails/subscribe</code>.</li>
-                <li><span class="font-semibold">Page Translations</span> manage SEO for detail pages <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">/pages/{slug}</code>.</li>
+                <li><span class="font-semibold">Page Translations</span> manage SEO for detail pages <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">/pages/{slug}</code> through the <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">SEO Meta (Canonical)</code> relation manager (canonical row auto-created per translation/language).</li>
                 <li><span class="font-semibold">Home Page Content</span> manages homepage title/description + OG behavior.</li>
                 <li><span class="font-semibold">Noindex system routes</span> remain code-controlled: donation thank-you and tokenized email preference/unsubscribe pages.</li>
                 <li><span class="font-semibold">Google integrations</span> are environment-driven via <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">SEO_GOOGLE_SITE_VERIFICATION</code> and <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">SEO_GA4_MEASUREMENT_ID</code>.</li>

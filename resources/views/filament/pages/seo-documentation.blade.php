@@ -116,6 +116,10 @@
             <h2 class="text-sm font-semibold tracking-tight text-gray-900">Page Translation SEO Guide</h2>
             <ul class="list-disc space-y-1.5 pl-4 text-sm text-gray-800">
                 <li>Page translation SEO is resolved from related <code>seo_meta</code> rows for that translation/language.</li>
+                <li>Primary editor workflow: open a translation record and use <span class="font-semibold">SEO Meta (Canonical)</span> relation manager to edit canonical SEO.</li>
+                <li>The canonical row is auto-created when a Page Translation is created, so each translation has a direct SEO row to edit.</li>
+                <li>Relation manager actions are available from both <span class="font-semibold">View</span> and <span class="font-semibold">Edit</span> record pages.</li>
+                <li>For page translations, canonical SEO uses exactly one row per translation/language with <code>target_key=''</code>.</li>
                 <li>If SEO row is missing, the app falls back to translation title/description automatically.</li>
                 <li>Canonical URL uses the resolved active translation slug.</li>
             </ul>

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\SanitizesCmsHtml;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Forms\Components\Select;
@@ -20,6 +21,7 @@ use Illuminate\Support\Str;
 class PageTranslation extends Model
 {
     use HasFactory;
+    use SanitizesCmsHtml;
 
     /** @var array<string, mixed> */
     protected array $pendingSeoMeta = [];
@@ -72,7 +74,8 @@ class PageTranslation extends Model
                 ->label('Language')
                 ->relationship('language', 'title')
                 ->required(),
-            TextInput::make('title')
+            Textarea::make('title')
+                ->rows(2)
                 ->live(onBlur: true)
                 ->afterStateUpdated(function (Get $get, Set $set, ?string $old, ?string $state) {
                     if (($get('slug') ?? '') !== Str::slug($old)) {
@@ -82,15 +85,17 @@ class PageTranslation extends Model
                     $set('slug', Str::slug($state));
                 })
                 ->required()
-                ->maxLength(255),
+                ->helperText('Plain text or HTML accepted. Sanitized on save.'),
             TextInput::make('slug')
                 ->required()
                 ->maxLength(255),
             Textarea::make('description')
                 ->required()
+                ->helperText('Plain text or HTML accepted. Sanitized on save.')
                 ->columnSpanFull(),
             Textarea::make('content')
                 ->required()
+                ->helperText('Plain text or HTML accepted. Sanitized on save.')
                 ->columnSpanFull(),
             Select::make('template')
                 ->options([
@@ -117,19 +122,16 @@ class PageTranslation extends Model
                 ])
                 ->default('none')
                 ->required(),
-            TextInput::make('hero_title')
-                ->maxLength(255),
+            Textarea::make('hero_title')
+                ->rows(2)
+                ->helperText('Plain text or HTML accepted. Sanitized on save.'),
             Textarea::make('hero_subtitle')
+                ->helperText('Plain text or HTML accepted. Sanitized on save.')
                 ->columnSpanFull(),
-            TextInput::make('hero_cta_text')
-                ->maxLength(255),
+            Textarea::make('hero_cta_text')
+                ->rows(2)
+                ->helperText('Plain text or HTML accepted. Sanitized on save.'),
             TextInput::make('hero_cta_url')
-                ->maxLength(500),
-            TextInput::make('seo_title')
-                ->maxLength(255),
-            Textarea::make('seo_description')
-                ->columnSpanFull(),
-            TextInput::make('seo_og_image')
                 ->maxLength(500),
             Toggle::make('is_active')
                 ->required(),
@@ -174,9 +176,77 @@ class PageTranslation extends Model
 
     protected static function booted(): void
     {
+        static::saving(function (self $model): void {
+            $model->title = $model->sanitizeCmsField($model->title);
+            $model->description = $model->sanitizeCmsField($model->description);
+            $model->content = $model->sanitizeCmsField($model->content);
+            $model->hero_title = $model->sanitizeCmsField($model->hero_title);
+            $model->hero_subtitle = $model->sanitizeCmsField($model->hero_subtitle);
+            $model->hero_cta_text = $model->sanitizeCmsField($model->hero_cta_text);
+            $model->layout_data = $model->sanitizeLayoutData($model->layout_data);
+        });
+
         static::saved(function (self $model): void {
             $model->syncPendingSeoMeta();
         });
+
+        static::created(function (self $model): void {
+            $model->ensureCanonicalSeoMetaRow();
+        });
+    }
+
+    /**
+     * @param mixed $layoutData
+     * @return array<string, mixed>|null
+     */
+    protected function sanitizeLayoutData($layoutData): ?array
+    {
+        if (! is_array($layoutData)) {
+            return null;
+        }
+
+        $singleKeys = [
+            'eyebrow',
+            'cta_secondary_text',
+            'faq_teaser_title',
+            'faq_teaser_body',
+        ];
+
+        foreach ($singleKeys as $key) {
+            if (isset($layoutData[$key]) && is_string($layoutData[$key])) {
+                $layoutData[$key] = $this->sanitizeCmsField($layoutData[$key]);
+            }
+        }
+
+        foreach (['trust_badges', 'quick_facts'] as $listKey) {
+            if (! isset($layoutData[$listKey]) || ! is_array($layoutData[$listKey])) {
+                continue;
+            }
+
+            $layoutData[$listKey] = array_map(function ($value) {
+                return is_string($value) ? $this->sanitizeCmsField($value) : $value;
+            }, $layoutData[$listKey]);
+        }
+
+        if (isset($layoutData['impact_stats']) && is_array($layoutData['impact_stats'])) {
+            $layoutData['impact_stats'] = array_map(function ($item) {
+                if (! is_array($item)) {
+                    return $item;
+                }
+
+                if (isset($item['label']) && is_string($item['label'])) {
+                    $item['label'] = $this->sanitizeCmsField($item['label']);
+                }
+
+                if (isset($item['value']) && is_string($item['value'])) {
+                    $item['value'] = $this->sanitizeCmsField($item['value']);
+                }
+
+                return $item;
+            }, $layoutData['impact_stats']);
+        }
+
+        return $layoutData;
     }
 
     public function getSeoTitleAttribute(): ?string
@@ -266,6 +336,26 @@ class PageTranslation extends Model
             ->where('language_id', $this->language_id)
             ->where('is_active', true)
             ->first();
+    }
+
+    protected function ensureCanonicalSeoMetaRow(): void
+    {
+        if (! $this->exists || ! $this->language_id) {
+            return;
+        }
+
+        $this->seoMeta()->updateOrCreate(
+            [
+                'target_key' => '',
+                'language_id' => $this->language_id,
+            ],
+            [
+                'seo_title' => null,
+                'seo_description' => null,
+                'seo_og_image' => null,
+                'is_active' => true,
+            ]
+        );
     }
 
 
