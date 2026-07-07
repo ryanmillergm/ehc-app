@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Filament;
 
+use App\Filament\Pages\PageAuthoringHelp;
 use App\Filament\Pages\SeoDocumentation;
 use App\Filament\Resources\PageTranslationResource;
 use App\Filament\Resources\PageTranslationResource\Pages\CreatePageTranslation;
@@ -9,19 +10,20 @@ use App\Filament\Resources\PageTranslationResource\Pages\EditPageTranslation;
 use App\Filament\Resources\PageTranslationResource\Pages\ListPageTranslations;
 use App\Filament\Resources\PageTranslationResource\Pages\ViewPageTranslation;
 use App\Filament\Resources\PageTranslationResource\RelationManagers\SeoMetaRelationManager;
+use App\Models\Image;
+use App\Models\Language;
+use App\Models\Page;
+use App\Models\PageTranslation;
 use App\Models\SeoMeta;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\Testing\TestAction;
-use App\Models\Language;
-use App\Models\Page;
-use App\Models\PageTranslation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\TestCase;
-use Illuminate\Support\Str;
 
 class PageTranslationResourceTest extends TestCase
 {
@@ -92,14 +94,50 @@ class PageTranslationResourceTest extends TestCase
         $this->get(PageTranslationResource::getUrl('create'))->assertSuccessful();
     }
 
-    public function test_page_translation_index_shows_docs_header_action(): void
+    public function test_page_translation_index_shows_docs_header_actions(): void
     {
         $this->signInWithPermissions(null, ['pages.read', 'admin.panel']);
 
         $this->get(PageTranslationResource::getUrl('index'))
             ->assertOk()
+            ->assertSee('Page Docs')
+            ->assertSee(PageAuthoringHelp::getUrl())
             ->assertSee('SEO Docs')
             ->assertSee(SeoDocumentation::getUrl());
+    }
+
+    public function test_page_translation_create_shows_page_docs_header_action(): void
+    {
+        $this->signInWithPermissions(null, ['pages.read', 'pages.create', 'admin.panel']);
+
+        $this->get(PageTranslationResource::getUrl('create'))
+            ->assertOk()
+            ->assertSee('Page Docs')
+            ->assertSee(PageAuthoringHelp::getUrl());
+    }
+
+    public function test_page_translation_edit_shows_page_docs_header_action(): void
+    {
+        $this->signInWithPermissions(null, ['pages.read', 'pages.update', 'pages.delete', 'admin.panel']);
+
+        $translation = PageTranslation::factory()->create();
+
+        $this->get(PageTranslationResource::getUrl('edit', ['record' => $translation]))
+            ->assertOk()
+            ->assertSee('Page Docs')
+            ->assertSee(PageAuthoringHelp::getUrl());
+    }
+
+    public function test_page_translation_view_shows_page_docs_header_action(): void
+    {
+        $this->signInWithPermissions(null, ['pages.read', 'pages.update', 'admin.panel']);
+
+        $translation = PageTranslation::factory()->create();
+
+        $this->get(PageTranslationResource::getUrl('view', ['record' => $translation]))
+            ->assertOk()
+            ->assertSee('Page Docs')
+            ->assertSee(PageAuthoringHelp::getUrl());
     }
 
     /**
@@ -246,6 +284,188 @@ class PageTranslationResourceTest extends TestCase
         $this->assertStringContainsString('class="font-bold"', (string) $translation->hero_title);
         $this->assertStringContainsString('class="italic"', (string) $translation->hero_subtitle);
         $this->assertStringContainsString('class="tracking-wide"', (string) $translation->hero_cta_text);
+    }
+
+    public function test_create_page_translation_supports_custom_render_mode_with_trusted_html_flag(): void
+    {
+        $this->signInWithPermissions(null, ['pages.read', 'pages.create', 'pages.update', 'pages.delete', 'pages.render_unsafe_html', 'admin.panel']);
+
+        $page = Page::factory()->create();
+        $language = Language::factory()->create();
+
+        Livewire::test(CreatePageTranslation::class)
+            ->fillForm([
+                'page_id' => $page->id,
+                'language_id' => $language->id,
+                'title' => 'Custom Mode Page',
+                'slug' => 'custom-mode-page',
+                'description' => 'Description',
+                'content' => '<p>Fallback body</p>',
+                'render_mode' => 'custom',
+                'custom_html' => '<div onclick="alert(1)">Hello<script>alert(2)</script></div>',
+                'custom_html_is_trusted' => true,
+                'is_active' => true,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $translation = PageTranslation::query()->where('slug', 'custom-mode-page')->firstOrFail();
+        $this->assertSame('custom', $translation->render_mode);
+        $this->assertTrue((bool) $translation->custom_html_is_trusted);
+        $this->assertStringNotContainsString('<script', (string) $translation->custom_html);
+        $this->assertStringNotContainsString('onclick=', (string) $translation->custom_html);
+        $this->assertStringContainsString('Hello', (string) $translation->custom_html);
+    }
+
+    public function test_create_page_translation_supports_block_hero_media_mode(): void
+    {
+        $this->signInWithPermissions(null, ['pages.read', 'pages.create', 'pages.update', 'pages.delete', 'admin.panel']);
+
+        $page = Page::factory()->create();
+        $language = Language::factory()->create();
+
+        Livewire::test(CreatePageTranslation::class)
+            ->fillForm([
+                'page_id' => $page->id,
+                'language_id' => $language->id,
+                'title' => 'Block Hero Media Page',
+                'slug' => 'block-hero-media-page',
+                'description' => 'Description',
+                'content' => '<p>Fallback body</p>',
+                'render_mode' => 'blocks',
+                'content_blocks' => [
+                    [
+                        'type' => 'hero',
+                        'data' => [
+                            'heading' => 'Block Hero Heading',
+                            'hero_mode' => 'video',
+                        ],
+                    ],
+                ],
+                'is_active' => true,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $translation = PageTranslation::query()
+            ->where('slug', 'block-hero-media-page')
+            ->firstOrFail();
+
+        $block = $translation->content_blocks[0] ?? [];
+
+        $this->assertSame('blocks', $translation->render_mode);
+        $this->assertSame('hero', $block['type'] ?? null);
+        $this->assertSame('video', $block['data']['hero_mode'] ?? null);
+    }
+
+    public function test_create_page_translation_supports_structured_block_repeaters(): void
+    {
+        $this->signInWithPermissions(null, ['pages.read', 'pages.create', 'pages.update', 'pages.delete', 'admin.panel']);
+
+        $page = Page::factory()->create();
+        $language = Language::factory()->create();
+        $image = Image::factory()->create([
+            'title' => 'Reusable Gallery Image',
+        ]);
+
+        Livewire::test(CreatePageTranslation::class)
+            ->fillForm([
+                'page_id' => $page->id,
+                'language_id' => $language->id,
+                'title' => 'Structured Blocks Page',
+                'slug' => 'structured-blocks-page',
+                'description' => 'Description',
+                'content' => '<p>Fallback body</p>',
+                'render_mode' => 'blocks',
+                'content_blocks' => [
+                    [
+                        'type' => 'gallery',
+                        'data' => [
+                            'items' => [
+                                [
+                                    'source_type' => 'existing',
+                                    'image_id' => $image->id,
+                                    'alt' => 'Selected image alt',
+                                    'caption' => 'Selected image caption',
+                                ],
+                            ],
+                        ],
+                    ],
+                    [
+                        'type' => 'icon_list',
+                        'data' => [
+                            'items' => [
+                                ['text' => 'Structured icon list item'],
+                            ],
+                        ],
+                    ],
+                    [
+                        'type' => 'pricing',
+                        'data' => [
+                            'items' => [
+                                [
+                                    'name' => 'Starter',
+                                    'price' => '$10',
+                                    'features' => [
+                                        ['text' => 'Nested feature item'],
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+                'is_active' => true,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $translation = PageTranslation::query()
+            ->where('slug', 'structured-blocks-page')
+            ->firstOrFail();
+
+        $gallery = $translation->content_blocks[0] ?? [];
+        $iconList = $translation->content_blocks[1] ?? [];
+        $pricing = $translation->content_blocks[2] ?? [];
+
+        $this->assertSame('gallery', $gallery['type'] ?? null);
+        $this->assertSame('existing', $gallery['data']['items'][0]['source_type'] ?? null);
+        $this->assertSame($image->id, $gallery['data']['items'][0]['image_id'] ?? null);
+        $this->assertSame('Selected image caption', $gallery['data']['items'][0]['caption'] ?? null);
+        $this->assertArrayNotHasKey('images_json', $gallery['data']);
+
+        $this->assertSame('icon_list', $iconList['type'] ?? null);
+        $this->assertSame('Structured icon list item', $iconList['data']['items'][0]['text'] ?? null);
+        $this->assertArrayNotHasKey('items_json', $iconList['data']);
+
+        $this->assertSame('pricing', $pricing['type'] ?? null);
+        $this->assertSame('Nested feature item', $pricing['data']['items'][0]['features'][0]['text'] ?? null);
+    }
+
+    public function test_create_page_translation_forces_trusted_flag_off_without_permission(): void
+    {
+        $this->signInWithPermissions(null, ['pages.read', 'pages.create', 'pages.update', 'pages.delete', 'admin.panel']);
+
+        $page = Page::factory()->create();
+        $language = Language::factory()->create();
+
+        Livewire::test(CreatePageTranslation::class)
+            ->fillForm([
+                'page_id' => $page->id,
+                'language_id' => $language->id,
+                'title' => 'Untrusted Custom Mode Page',
+                'slug' => 'untrusted-custom-mode-page',
+                'description' => 'Description',
+                'content' => '<p>Fallback body</p>',
+                'render_mode' => 'custom',
+                'custom_html' => '<div>Safe Content</div>',
+                'custom_html_is_trusted' => true,
+                'is_active' => true,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $translation = PageTranslation::query()->where('slug', 'untrusted-custom-mode-page')->firstOrFail();
+        $this->assertFalse((bool) $translation->custom_html_is_trusted);
     }
 
     public function test_seo_meta_relation_manager_renders_for_page_translation(): void

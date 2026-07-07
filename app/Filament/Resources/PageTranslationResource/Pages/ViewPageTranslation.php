@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\PageTranslationResource\Pages;
 
+use App\Filament\Pages\PageAuthoringHelp;
+use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use App\Filament\Resources\PageTranslationResource;
 use Filament\Actions;
@@ -14,6 +16,11 @@ class ViewPageTranslation extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('page_docs')
+                ->label('Page Docs')
+                ->icon('heroicon-o-book-open')
+                ->url(PageAuthoringHelp::getUrl())
+                ->openUrlInNewTab(),
             EditAction::make(),
         ];
     }

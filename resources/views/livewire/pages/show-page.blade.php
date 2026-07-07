@@ -7,9 +7,9 @@
     @endif
 
     @if ($translation)
-        @includeIf('livewire.pages.templates.' . $template, ['page' => $pageView])
+        @includeIf('livewire.pages.renderers.' . $renderMode, ['page' => $pageView, 'template' => $template])
 
-        @if (!view()->exists('livewire.pages.templates.' . $template))
+        @if (!view()->exists('livewire.pages.renderers.' . $renderMode))
             <article
                 class="prose prose-slate max-w-none"
                 @if(optional($translation->language)->right_to_left)

@@ -1,90 +1,107 @@
 @php
     $rtl = (bool) ($page['right_to_left'] ?? false);
-    $layout = $page['layout_data'] ?? [];
-    $eyebrow = $layout['eyebrow'] ?? 'Story';
-    $trustBadges = $layout['trust_badges'] ?? [];
-    $secondaryCtaText = $layout['cta_secondary_text'] ?? null;
-    $secondaryCtaUrl = $layout['cta_secondary_url'] ?? null;
+    $isFullBleed = ($page['hero_style'] ?? 'contained') === 'full_bleed';
+    $heroMode = (string) ($page['hero_mode'] ?? 'none');
+    $firstSlide = $page['hero_slides'][0] ?? null;
+    $heroImage = match ($heroMode) {
+        'slider' => $firstSlide,
+        'image' => $page['hero_image'] ?? null,
+        default => null,
+    };
+    $hasVideo = $heroMode === 'video' && !empty($page['hero_video']);
+    $hasImage = is_array($heroImage) && !empty($heroImage['url']);
+    $hasMedia = $hasVideo || $hasImage;
+    $heightClass = match ((string) ($page['hero_height'] ?? '80')) {
+        '70' => 'min-h-[46vh] md:min-h-[62vh]',
+        '100' => 'min-h-[54vh] md:min-h-[82vh]',
+        default => 'min-h-[50vh] md:min-h-[70vh]',
+    };
+    $overlayClass = match ((string) ($page['hero_overlay'] ?? 'medium')) {
+        'none' => '',
+        'light' => 'bg-slate-950/20',
+        'dark' => 'bg-slate-950/60',
+        default => 'bg-slate-950/40',
+    };
+    $textAlignClass = match ((string) ($page['hero_text_align'] ?? 'left')) {
+        'center' => 'text-center items-center mx-auto',
+        'right' => 'text-right items-end ml-auto',
+        default => 'text-left items-start',
+    };
+    $textWidthClass = match ((string) ($page['hero_text_width'] ?? 'normal')) {
+        'narrow' => 'max-w-2xl',
+        'wide' => 'max-w-4xl',
+        default => 'max-w-3xl',
+    };
+    $hasCta = !empty($page['hero_cta_text']) && !empty($page['hero_cta_url']);
 @endphp
 
-<article class="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-xl shadow-slate-200/60" @if($rtl) dir="rtl" @endif>
-    <div class="absolute inset-0 bg-gradient-to-br from-white via-slate-50 to-amber-50/40"></div>
-    <div class="relative space-y-10 p-6 sm:p-10 lg:p-12">
-        <section class="grid gap-8 lg:grid-cols-12 lg:items-center">
-            <div class="space-y-6 lg:col-span-7">
-                <div class="inline-flex items-center rounded-full bg-slate-100 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-slate-700">
-                    {!! $eyebrow !!}
+<article data-page-template="story" class="overflow-x-hidden bg-[#fffaf3] text-slate-900" @if($rtl) dir="rtl" @endif>
+    <section class="{{ $isFullBleed ? 'relative left-1/2 right-1/2 -mx-[50vw] w-screen' : 'mx-auto max-w-screen-2xl px-5 sm:px-8 lg:px-12 2xl:px-20 pt-8 sm:pt-10' }}">
+        <div class="relative overflow-hidden {{ $isFullBleed ? '' : 'rounded-2xl border border-amber-100 shadow-sm' }} {{ $hasMedia ? $heightClass . ' bg-slate-950 text-white' : 'bg-gradient-to-br from-amber-50 via-white to-rose-50' }}">
+            @if ($hasVideo)
+                <div class="absolute inset-0">
+                    <x-media.video
+                        :video="$page['hero_video']"
+                        variant="hero"
+                        layout="full_bleed"
+                        :min-height="(string) ($page['hero_height'] ?? '80')"
+                        :rounded="false"
+                    />
                 </div>
+            @elseif ($hasImage)
+                <img src="{{ $heroImage['url'] }}" alt="{{ $heroImage['alt'] ?? $page['title'] }}" class="absolute inset-0 h-full w-full object-cover" />
+            @endif
 
-                <h1 class="text-4xl font-black leading-tight tracking-tight text-slate-900 sm:text-5xl">
-                    {!! $page['hero_title'] ?? $page['title'] !!}
-                </h1>
+            @if ($hasMedia)
+                <div class="absolute inset-0 {{ $overlayClass }}"></div>
+            @endif
 
-                @if (!empty($page['hero_subtitle']))
-                    <p class="max-w-2xl text-lg leading-relaxed text-slate-700">
-                        {!! $page['hero_subtitle'] !!}
-                    </p>
-                @endif
-
-                @if (!empty($trustBadges))
-                    <div class="flex flex-wrap gap-2">
-                        @foreach ($trustBadges as $badge)
-                            <span class="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
-                                {!! $badge !!}
-                            </span>
-                        @endforeach
-                    </div>
-                @endif
-
-                <div class="flex flex-wrap items-center gap-3">
-                    @if (!empty($page['hero_cta_text']) && !empty($page['hero_cta_url']))
-                        <a href="{{ $page['hero_cta_url'] }}"
-                           class="inline-flex items-center rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">
+            <div class="relative flex {{ $hasMedia ? $heightClass : 'min-h-[24rem]' }} items-center px-5 py-12 sm:px-8 lg:px-14">
+                <div class="min-w-0 w-full {{ $textAlignClass }} {{ $textWidthClass }} space-y-6">
+                    <p class="text-sm font-semibold uppercase tracking-[0.18em] {{ $hasMedia ? 'text-white/75' : 'text-rose-700' }}">A ministry story</p>
+                    <h1 class="break-words text-3xl font-black leading-tight tracking-tight sm:text-5xl lg:text-6xl">
+                        {!! $page['hero_title'] ?? $page['title'] !!}
+                    </h1>
+                    @if (!empty($page['hero_subtitle']))
+                        <div class="max-w-3xl text-lg leading-8 {{ $hasMedia ? 'text-white/90' : 'text-slate-700' }}">
+                            {!! $page['hero_subtitle'] !!}
+                        </div>
+                    @endif
+                    @if ($hasCta)
+                        <a href="{{ $page['hero_cta_url'] }}" class="inline-flex items-center justify-center rounded-full {{ $hasMedia ? 'bg-white text-slate-950 hover:bg-slate-100' : 'bg-slate-950 text-white hover:bg-slate-800' }} px-6 py-3 text-sm font-semibold transition">
                             {!! $page['hero_cta_text'] !!}
                         </a>
                     @endif
-
-                    @if (!empty($secondaryCtaText) && !empty($secondaryCtaUrl))
-                        <a href="{{ $secondaryCtaUrl }}"
-                           class="inline-flex items-center rounded-full border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-900 hover:bg-slate-50 transition">
-                            {!! $secondaryCtaText !!}
-                        </a>
-                    @endif
                 </div>
             </div>
+        </div>
+    </section>
 
-            <div class="lg:col-span-5">
-                @if (($page['hero_mode'] ?? null) === 'video' && !empty($page['hero_video']))
-                    <div class="overflow-hidden rounded-3xl shadow-xl ring-1 ring-slate-200">
-                        <x-media.video :video="$page['hero_video']" variant="hero" />
-                    </div>
-                @elseif (($page['hero_mode'] ?? null) === 'slider' && !empty($page['hero_slides']))
-                    @php($firstSlide = $page['hero_slides'][0] ?? null)
-                    @if ($firstSlide)
-                        <img src="{{ $firstSlide['url'] }}" alt="{{ $firstSlide['alt'] ?? $page['title'] }}" class="w-full rounded-3xl object-cover shadow-xl ring-1 ring-slate-200" />
-                    @endif
-                @elseif (!empty($page['hero_image']['url']))
-                    <img src="{{ $page['hero_image']['url'] }}" alt="{{ $page['hero_image']['alt'] ?? $page['title'] }}" class="w-full rounded-3xl object-cover shadow-xl ring-1 ring-slate-200" />
-                @endif
+    <section class="mx-auto max-w-screen-2xl px-5 py-12 sm:px-8 sm:py-16 lg:px-12 2xl:px-20">
+        <div class="mx-auto max-w-5xl">
+            <div class="mb-10 border-y border-amber-200 py-6 text-xl font-medium leading-9 text-slate-700">
+                {!! $page['description'] !!}
             </div>
-        </section>
 
-        <section class="grid gap-6 lg:grid-cols-12">
-            <div class="lg:col-span-8">
-                <div class="prose prose-slate max-w-none prose-headings:font-black prose-headings:tracking-tight prose-p:leading-relaxed prose-li:leading-relaxed">
-                    <p class="text-slate-600">{!! $page['description'] !!}</p>
-                    <div class="mt-5">{!! $page['content'] !!}</div>
+            <div class="prose prose-lg prose-slate max-w-none prose-headings:font-black prose-headings:tracking-tight prose-p:leading-9 prose-li:leading-8">
+                {!! $page['content'] !!}
+            </div>
+
+            @if ($hasCta)
+                <div class="mt-12 border-t border-amber-200 pt-8">
+                    <a href="{{ $page['hero_cta_url'] }}" class="inline-flex items-center justify-center rounded-full bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800">
+                        {!! $page['hero_cta_text'] !!}
+                    </a>
                 </div>
-            </div>
+            @endif
+        </div>
+    </section>
 
-            <aside class="lg:col-span-4">
-                <blockquote class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <p class="text-sm font-semibold uppercase tracking-widest text-slate-500">Why This Matters</p>
-                    <p class="mt-3 text-lg font-semibold leading-relaxed text-slate-900">
-                        “Consistent presence is often the first step toward restored hope.”
-                    </p>
-                </blockquote>
-            </aside>
+    @if (!empty($page['content_blocks']))
+        <section class="mx-auto max-w-5xl space-y-8 px-5 pb-14 sm:px-8">
+            @foreach ($page['content_blocks'] as $block)
+                @includeIf('livewire.pages.blocks.' . ($block['type'] ?? ''), ['data' => $block['data'] ?? [], 'page' => $page])
+            @endforeach
         </section>
-    </div>
+    @endif
 </article>

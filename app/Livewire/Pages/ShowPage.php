@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Pages;
 
+use App\Enums\PageRenderMode;
+use App\Enums\PageTemplate;
 use App\Models\Language;
 use App\Models\PageTranslation;
 use App\Services\Media\ImageResolver;
@@ -17,7 +19,18 @@ class ShowPage extends Component
     /** Stable slug from the URL we mounted with */
     public string $slug;
 
-    protected array $allowedTemplates = ['standard', 'campaign', 'story'];
+    protected array $allowedTemplates = [
+        PageTemplate::Standard->value,
+        PageTemplate::Campaign->value,
+        PageTemplate::Story->value,
+        PageTemplate::Immersive->value,
+    ];
+
+    protected array $allowedRenderModes = [
+        PageRenderMode::Template->value,
+        PageRenderMode::Blocks->value,
+        PageRenderMode::Custom->value,
+    ];
 
     public function mount(string $slug): void
     {
@@ -115,6 +128,7 @@ class ShowPage extends Component
     public function render()
     {
         $template = $this->resolvedTemplate();
+        $renderMode = $this->resolvedRenderMode();
         $resolvedSeo = $this->translation
             ? app(SeoMetaResolver::class)->forModel($this->translation, $this->translation->language_id, [
                 'title' => $this->translation->title,
@@ -133,6 +147,7 @@ class ShowPage extends Component
         return view('livewire.pages.show-page', [
             'translation' => $this->translation,
             'template' => $template,
+            'renderMode' => $renderMode,
             'pageView' => $this->buildPageView($template),
         ])->layout('components.layouts.app', [
             'title' => $metaTitle ?: 'Page',
@@ -150,11 +165,20 @@ class ShowPage extends Component
 
     protected function resolvedTemplate(): string
     {
-        $template = (string) ($this->translation?->template ?? 'standard');
+        $template = (string) ($this->translation?->template ?? PageTemplate::Standard->value);
 
         return in_array($template, $this->allowedTemplates, true)
             ? $template
-            : 'standard';
+            : PageTemplate::Standard->value;
+    }
+
+    protected function resolvedRenderMode(): string
+    {
+        $mode = (string) ($this->translation?->render_mode ?? PageRenderMode::Template->value);
+
+        return in_array($mode, $this->allowedRenderModes, true)
+            ? $mode
+            : PageRenderMode::Template->value;
     }
 
     protected function resolvedOgImage(): ?string
@@ -224,6 +248,11 @@ class ShowPage extends Component
             'template' => $template,
             'theme' => (string) ($this->translation->theme ?: 'default'),
             'hero_mode' => $heroMode,
+            'hero_style' => (string) ($this->translation->hero_style ?: 'contained'),
+            'hero_height' => (string) ($this->translation->hero_height ?: '80'),
+            'hero_overlay' => (string) ($this->translation->hero_overlay ?: 'medium'),
+            'hero_text_align' => (string) ($this->translation->hero_text_align ?: 'left'),
+            'hero_text_width' => (string) ($this->translation->hero_text_width ?: 'normal'),
             'hero_title' => $this->translation->hero_title ?: $this->translation->title,
             'hero_subtitle' => $this->translation->hero_subtitle ?: $this->translation->description,
             'hero_cta_text' => $this->translation->hero_cta_text,
@@ -231,7 +260,9 @@ class ShowPage extends Component
             'hero_image' => $heroImage,
             'hero_video' => $heroVideo,
             'hero_slides' => $heroSlides,
-            'layout_data' => $this->normalizedLayoutData(),
+            'render_mode' => $this->resolvedRenderMode(),
+            'content_blocks' => $this->normalizedContentBlocks(),
+            'custom_html' => $this->translation->custom_html,
             'title' => $this->translation->title,
             'description' => $this->translation->description,
             'content' => $this->translation->content,
@@ -242,50 +273,33 @@ class ShowPage extends Component
     /**
      * @return array<string, mixed>
      */
-    protected function normalizedLayoutData(): array
+    protected function normalizedContentBlocks(): array
     {
-        $layout = $this->translation?->layout_data;
-        if (! is_array($layout)) {
-            $layout = [];
+        $blocks = $this->translation?->content_blocks;
+        if (! is_array($blocks)) {
+            return [];
         }
 
-        $layout['eyebrow'] = (string) ($layout['eyebrow'] ?? '');
-        $layout['cta_secondary_text'] = (string) ($layout['cta_secondary_text'] ?? '');
-        $layout['cta_secondary_url'] = (string) ($layout['cta_secondary_url'] ?? '');
-        $layout['faq_teaser_title'] = (string) ($layout['faq_teaser_title'] ?? '');
-        $layout['faq_teaser_body'] = (string) ($layout['faq_teaser_body'] ?? '');
-
-        $layout['trust_badges'] = collect($layout['trust_badges'] ?? [])
-            ->filter(fn ($badge) => is_string($badge) && filled(trim($badge)))
-            ->values()
-            ->all();
-
-        $layout['quick_facts'] = collect($layout['quick_facts'] ?? [])
-            ->filter(fn ($fact) => is_string($fact) && filled(trim($fact)))
-            ->values()
-            ->all();
-
-        $layout['impact_stats'] = collect($layout['impact_stats'] ?? [])
-            ->map(function ($item) {
-                if (! is_array($item)) {
+        return collect($blocks)
+            ->map(function ($block) {
+                if (! is_array($block)) {
                     return null;
                 }
 
-                $label = trim((string) ($item['label'] ?? ''));
-                $value = trim((string) ($item['value'] ?? ''));
-                if ($label === '' && $value === '') {
+                $type = (string) ($block['type'] ?? '');
+                $data = $block['data'] ?? [];
+
+                if ($type === '' || ! is_array($data)) {
                     return null;
                 }
 
                 return [
-                    'label' => $label,
-                    'value' => $value,
+                    'type' => $type,
+                    'data' => $data,
                 ];
             })
             ->filter()
             ->values()
             ->all();
-
-        return $layout;
     }
 }

@@ -56,29 +56,35 @@ class HomelessMinistrySacramentoPageSeeder extends Seeder
                     <p>If you want to help the homeless in Sacramento, you can give today, join outreach in person, or subscribe for ministry updates and prayer needs.</p>
                     HTML,
                 'template' => 'campaign',
+                'render_mode' => 'template',
                 'theme' => 'warm',
                 'hero_mode' => 'image',
                 'hero_title' => 'Homeless Ministry in Sacramento, CA',
                 'hero_subtitle' => 'Serving people experiencing homelessness through outreach, meals, discipleship, and practical support every week.',
                 'hero_cta_text' => 'Give to Support Outreach',
                 'hero_cta_url' => '/give',
-                'layout_data' => [
-                    'eyebrow' => 'Bread of Grace Ministries - Sacramento',
-                    'trust_badges' => ['Serving since 2010', 'Weekly outreach', 'Christ-centered care'],
-                    'impact_stats' => [
-                        ['label' => 'Weekly Outreach', 'value' => '2 Days'],
-                        ['label' => 'Location', 'value' => 'Township 9 Park'],
-                        ['label' => 'Focus', 'value' => 'Meals + Mentorship'],
+                'content_blocks' => [
+                    [
+                        'type' => 'stats',
+                        'data' => [
+                            'items_json' => '[{"label":"Weekly Outreach","value":"2 Days"},{"label":"Location","value":"Township 9 Park"},{"label":"Focus","value":"Meals + Mentorship"}]',
+                        ],
                     ],
-                    'quick_facts' => [
-                        'Thursday + Sunday • 11:00am',
-                        'Sacramento, California',
-                        'Volunteer-friendly team',
+                    [
+                        'type' => 'icon_list',
+                        'data' => [
+                            'items_json' => '["Thursday + Sunday • 11:00am","Sacramento, California","Volunteer-friendly team"]',
+                        ],
                     ],
-                    'cta_secondary_text' => 'Volunteer With Us',
-                    'cta_secondary_url' => '/#serve',
-                    'faq_teaser_title' => 'Questions about helping the homeless in Sacramento?',
-                    'faq_teaser_body' => 'Visit our homepage FAQ section for how donations are used, where outreach happens, and how to get involved.',
+                    [
+                        'type' => 'faq_teaser',
+                        'data' => [
+                            'title' => 'Questions about helping the homeless in Sacramento?',
+                            'body' => 'Visit our homepage FAQ section for how donations are used, where outreach happens, and how to get involved.',
+                            'button_text' => 'Read FAQ',
+                            'button_url' => '/#faq-grid',
+                        ],
+                    ],
                 ],
                 'seo_title' => 'Homeless Ministry in Sacramento, CA | Bread of Grace Ministries',
                 'seo_description' => 'Homeless ministry in Sacramento providing meals, outreach, discipleship, and practical support. Give to help Bread of Grace Ministries serve weekly.',

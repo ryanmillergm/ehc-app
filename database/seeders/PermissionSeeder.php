@@ -70,6 +70,7 @@ class PermissionSeeder extends Seeder
             'pages.create',
             'pages.update',
             'pages.delete',
+            'pages.render_unsafe_html',
         ];
 
         foreach ($permissions as $name) {
