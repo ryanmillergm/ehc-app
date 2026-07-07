@@ -530,9 +530,6 @@
         visitHref="#visit"
     />
 
-    {{-- FOOTER--}}
-    <x-footer />
-
     {{-- Smooth scroll for anchor links --}}
     @once
         <script>

@@ -114,9 +114,6 @@
             </div>
         </section>
 
-        {{-- FOOTER --}}
-        <x-footer />
-
         {{-- Smooth scroll for anchor links --}}
         @once
             <script>

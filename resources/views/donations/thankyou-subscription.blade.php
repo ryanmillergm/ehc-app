@@ -237,8 +237,6 @@
             </div>
         </section>
 
-        <x-footer />
-
         @once
             <style>
                 @media print {
