@@ -71,6 +71,7 @@ class ImageGroupableResource extends Resource
                 ->options([
                     'gallery' => 'Gallery',
                     'carousel' => 'Carousel',
+                    'hero_slider' => 'Hero Slider',
                 ])
                 ->nullable(),
             TextInput::make('sort_order')

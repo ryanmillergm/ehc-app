@@ -82,6 +82,12 @@
                 set target type to <span class="font-semibold">Page Translation</span>, select that translation record, and set role to <span class="font-semibold">Hero Video</span>.
                 If Hero Video is not assigned, the resolver falls back to Featured Video.
             </div>
+
+            <div class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+                <span class="font-semibold">Embed URL fields expect the URL only, not iframe HTML.</span>
+                Page Translation Hero Mode must be set to Video for the hero renderer to request a video.
+                YouTube/Vimeo hero embeds are rendered as best-effort backgrounds; uploaded MP4/WebM videos are preferred for clean hero playback.
+            </div>
         </section>
 
         <section class="rounded-2xl border border-gray-200/80 bg-white p-5 shadow-sm shadow-gray-100 space-y-3">

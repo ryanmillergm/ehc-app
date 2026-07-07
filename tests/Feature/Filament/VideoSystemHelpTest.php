@@ -19,7 +19,11 @@ class VideoSystemHelpTest extends TestCase
             ->assertOk()
             ->assertSee('Video System Help')
             ->assertSee('Hero Video')
-            ->assertSee('Featured Video');
+            ->assertSee('Featured Video')
+            ->assertSee('Embed URL fields expect the URL only, not iframe HTML')
+            ->assertSee('Page Translation Hero Mode must be set to Video')
+            ->assertSee('YouTube/Vimeo hero embeds are rendered as best-effort backgrounds')
+            ->assertSee('uploaded MP4/WebM videos are preferred');
     }
 
     public function test_user_without_permission_cannot_access_video_system_help(): void

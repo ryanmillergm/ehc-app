@@ -70,6 +70,33 @@ class ImageGroupableResourceTest extends TestCase
         ]);
     }
 
+    public function test_hero_slider_image_group_relationship_can_be_created(): void
+    {
+        $group = ImageGroup::factory()->create();
+        $target = PageTranslation::factory()->create();
+
+        Livewire::actingAs(User::first())
+            ->test(CreateImageGroupable::class)
+            ->fillForm([
+                'image_group_id' => $group->id,
+                'image_groupable_type' => PageTranslation::class,
+                'image_groupable_id' => $target->id,
+                'role' => 'hero_slider',
+                'sort_order' => 0,
+                'is_active' => true,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas(ImageGroupable::class, [
+            'image_group_id' => $group->id,
+            'image_groupable_type' => PageTranslation::class,
+            'image_groupable_id' => $target->id,
+            'role' => 'hero_slider',
+            'is_active' => true,
+        ]);
+    }
+
     public function test_image_groupable_id_fails_when_target_does_not_exist_for_selected_type(): void
     {
         $group = ImageGroup::factory()->create();
