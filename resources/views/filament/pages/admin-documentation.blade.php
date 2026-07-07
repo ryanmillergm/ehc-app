@@ -138,6 +138,15 @@ HTML;
                     Open SEO Documentation
                 </x-filament::button>
             </div>
+
+            <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-700">
+                <div class="font-semibold text-gray-900">Codebase Guides</div>
+                <div class="mt-2 grid gap-1">
+                    <code>docs/pages-authoring.md</code>
+                    <code>docs/pages-block-catalog.md</code>
+                    <code>docs/pages-rollout.md</code>
+                </div>
+            </div>
         </header>
 
         {{-- Overview cards --}}
@@ -276,7 +285,25 @@ HTML;
             <ul class="list-disc space-y-1.5 pl-4 text-sm text-gray-800">
                 <li>Prefer stable slugs; change labels/titles instead.</li>
                 <li>Translations should be complete for the target locale before switching live traffic.</li>
+                <li>Choose one render mode per translation: <span class="font-semibold">Template</span>, <span class="font-semibold">Block Builder</span>, or <span class="font-semibold">Custom HTML</span>.</li>
+                <li>Trusted custom HTML is only available to users with <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">pages.render_unsafe_html</code>.</li>
             </ul>
+
+            <div class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                Operator docs:
+                <code class="rounded bg-white px-1.5 py-0.5 text-xs">docs/pages-authoring.md</code>,
+                <code class="rounded bg-white px-1.5 py-0.5 text-xs">docs/pages-block-catalog.md</code>,
+                <code class="rounded bg-white px-1.5 py-0.5 text-xs">docs/pages-rollout.md</code>.
+            </div>
+
+            <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <div class="font-semibold text-gray-900">Mode QA quick checklist</div>
+                <ul class="mt-2 list-disc space-y-1.5 pl-4 text-sm text-gray-800">
+                    <li><span class="font-semibold">Template:</span> hero media + CTA render correctly, no fallback surprises.</li>
+                    <li><span class="font-semibold">Blocks:</span> block order and JSON-driven block outputs render as expected.</li>
+                    <li><span class="font-semibold">Custom:</span> scripts/event handlers are stripped; trusted mode only for permitted users.</li>
+                </ul>
+            </div>
         </section>
 
         {{-- Homepage CMS --}}
@@ -416,6 +443,7 @@ HTML;
 
             {!! $callout('info', 'Resolver fallback order', 'Route SEO resolves in order: current language active row → default language active row → safe defaults. Keep English complete as the fallback language.') !!}
             {!! $callout('warn', 'Noindex safety', 'Do not move tokenized/system pages into DB-managed SEO. They are intentionally code-controlled to prevent accidental indexing.') !!}
+            {!! $callout('muted', 'Post-deploy checklist', 'Use <code class="rounded bg-white px-1.5 py-0.5 text-[0.7rem]">docs/seo-production-checklist.md</code> after every SEO deploy to validate tags, canonicals, GA4, and Search Console status.') !!}
         </section>
 
         {{-- Seed Data / Recovery --}}

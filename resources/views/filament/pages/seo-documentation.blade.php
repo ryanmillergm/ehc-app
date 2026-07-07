@@ -61,6 +61,16 @@
                 <x-filament::button tag="a" :href="$pageTranslationsUrl" icon="heroicon-o-language" color="gray">Open Page Translations</x-filament::button>
                 <x-filament::button tag="a" :href="$adminDocsUrl" icon="heroicon-o-book-open" color="gray">Back to Admin Documentation</x-filament::button>
             </div>
+
+            <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-700">
+                <div class="font-semibold text-gray-900">Companion Guides</div>
+                <div class="mt-2 grid gap-1">
+                    <code>docs/pages-authoring.md</code>
+                    <code>docs/pages-block-catalog.md</code>
+                    <code>docs/pages-rollout.md</code>
+                    <code>docs/seo-production-checklist.md</code>
+                </div>
+            </div>
         </header>
 
         <section id="overview" class="scroll-mt-24 rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
@@ -119,10 +129,20 @@
                 <li>Primary editor workflow: open a translation record and use <span class="font-semibold">SEO Meta (Canonical)</span> relation manager to edit canonical SEO.</li>
                 <li>The canonical row is auto-created when a Page Translation is created, so each translation has a direct SEO row to edit.</li>
                 <li>Relation manager actions are available from both <span class="font-semibold">View</span> and <span class="font-semibold">Edit</span> record pages.</li>
+                <li>SEO behavior is the same across page render modes (<code>template</code>, <code>blocks</code>, <code>custom</code>).</li>
                 <li>For page translations, canonical SEO uses exactly one row per translation/language with <code>target_key=''</code>.</li>
                 <li>If SEO row is missing, the app falls back to translation title/description automatically.</li>
                 <li>Canonical URL uses the resolved active translation slug.</li>
             </ul>
+            <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <div class="font-semibold text-gray-900">Per-mode SEO validation</div>
+                <ul class="mt-2 list-disc space-y-1.5 pl-4 text-sm text-gray-800">
+                    <li>Check one <code>template</code> page for title/description/canonical.</li>
+                    <li>Check one <code>blocks</code> page for the same tags.</li>
+                    <li>Check one <code>custom</code> page for the same tags.</li>
+                    <li>Render mode changes should not alter SEO resolver behavior.</li>
+                </ul>
+            </div>
         </section>
 
         <section id="home-seo" class="scroll-mt-24 rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
@@ -193,7 +213,12 @@
                 <li>OG image URL is valid and publicly accessible.</li>
                 <li>Indexable pages show <code>index,follow</code>.</li>
                 <li>System/token pages show <code>noindex,nofollow</code>.</li>
+                <li>One page in each render mode has been checked after deployment.</li>
             </ul>
+            <p class="text-sm text-gray-700">
+                For production deploy verification, follow:
+                <code>docs/seo-production-checklist.md</code>
+            </p>
         </section>
 
         <section id="troubleshooting" class="scroll-mt-24 rounded-2xl border border-gray-200 bg-white p-5 space-y-3">

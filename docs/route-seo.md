@@ -41,6 +41,16 @@ For a given route key, resolver order is:
 
 If no SEO row exists for a route/language, metadata still resolves from route defaults and global `config/seo.php` values.
 
+## Route SEO vs Page Translation SEO
+
+Keep these responsibilities separate:
+
+- Route SEO (`seoable_type=route`) manages fixed route-level pages like `/give` and `/pages`.
+- Page Translation SEO (`seoable_type=App\Models\PageTranslation`) manages `/pages/{slug}` content pages.
+
+For page translations, canonical SEO is edited from the translation record via the **SEO Meta (Canonical)** relation manager.
+This remains true regardless of page render mode (`template`, `blocks`, `custom`).
+
 ## Routes intentionally code-controlled
 
 These remain hardcoded to enforce `noindex,nofollow` safety:
@@ -57,3 +67,8 @@ Seeder:
 - `Database\\Seeders\\RouteSeoSeeder`
 
 Included in `DatabaseSeeder`.
+
+## Related docs
+
+- `docs/pages-authoring.md`
+- `docs/seo-production-checklist.md`

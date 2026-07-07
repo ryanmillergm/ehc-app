@@ -43,6 +43,8 @@ php artisan config:clear
    - Track clicks, impressions, CTR, position trend.
 4. GA4 > Traffic acquisition:
    - Track organic sessions and landing pages.
+5. Page mode SEO parity:
+   - Validate at least one `template`, one `blocks`, and one `custom` page for expected title/description/canonical output.
 
 ## 5) Monthly checks
 
@@ -68,7 +70,22 @@ Use this when index coverage drops or traffic declines unexpectedly.
    - `php artisan config:clear`
 6. Re-test and request reindexing in Search Console.
 
-## 7) Ownership and cadence
+## 7) Page render modes and SEO
+
+`PageTranslation` SEO resolution is mode-agnostic:
+
+- `template`
+- `blocks`
+- `custom`
+
+Changing render mode should not change canonical/title/description resolution logic. If SEO changes unexpectedly after mode edits, inspect canonical SEO relation rows first.
+
+## 8) Ownership and cadence
 
 - Owner: engineering + content owner
 - Cadence: weekly checks, monthly review, incident-driven triage
+
+## Related docs
+
+- `docs/pages-authoring.md`
+- `docs/pages-rollout.md`

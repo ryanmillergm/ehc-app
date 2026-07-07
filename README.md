@@ -489,6 +489,11 @@ Key test files for the new homepage CMS stack:
 - `tests/Feature/Filament/ImageGroupResourceTest.php`
 - `tests/Feature/Filament/AdminDocumentationTest.php`
 - `tests/Feature/Seo/SeoInfrastructureTest.php`
+- `tests/Unit/PageTranslationsTest.php`
+- `tests/Feature/Livewire/Pages/ShowPageTest.php`
+- `tests/Feature/Filament/PageTranslationResourceTest.php`
+- `tests/Feature/Database/HomelessMinistrySacramentoPageSeederTest.php`
+- `tests/Feature/Database/PermissionSeederTest.php`
 
 ### Search Console + GA4 monitoring
 
@@ -504,6 +509,8 @@ The tags are rendered from `resources/views/components/seo/head.blade.php` and a
 Monitoring and operations checklist:
 
 - `docs/seo-monitoring.md`
+- `docs/seo-production-checklist.md`
+- `docs/pages-rollout.md`
 
 ### Route-level SEO CMS
 
@@ -551,6 +558,42 @@ Internal link support is included from:
 
 - Homepage (`resources/views/livewire/home.blade.php`)
 - Give page (`resources/views/donations/give.blade.php`)
+
+### Page authoring modes (new)
+
+`PageTranslation` now supports explicit render modes:
+
+- `template`: curated visual templates (`standard`, `campaign`, `story`, `immersive`)
+- `blocks`: marketing block builder (`content_blocks`)
+- `custom`: full custom body HTML (`custom_html`) rendered inside the normal app layout
+
+Security rules:
+
+- custom HTML is sanitized on save
+- scripts/event handlers are blocked
+- trusted mode is permission-gated by `pages.render_unsafe_html`
+
+Deep guides:
+
+- `docs/pages-authoring.md`
+- `docs/pages-block-catalog.md`
+- `docs/pages-rollout.md`
+
+Rollout quick sequence:
+
+```bash
+php artisan migrate
+php artisan db:seed --class=PermissionSeeder
+php artisan db:seed --class=HomelessMinistrySacramentoPageSeeder
+php artisan config:clear
+php artisan optimize:clear
+```
+
+Validation quick checks:
+
+- verify one page in each mode (`template`, `blocks`, `custom`)
+- verify custom mode strips scripts/event handlers
+- verify canonical/title/description still render correctly
 
 ---
 
