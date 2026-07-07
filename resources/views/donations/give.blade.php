@@ -1,4 +1,17 @@
-<x-layouts.app title="Give">
+<x-layouts.app
+    :title="$seo['title']"
+    :meta-title="$seo['metaTitle']"
+    :meta-description="$seo['metaDescription']"
+    :meta-robots="$seo['metaRobots']"
+    :canonical-url="$seo['canonicalUrl']"
+    :og-type="$seo['ogType']"
+    :og-title="$seo['ogTitle']"
+    :og-description="$seo['ogDescription']"
+    :og-image="$seo['ogImage']"
+    :twitter-title="$seo['twitterTitle']"
+    :twitter-description="$seo['twitterDescription']"
+    :twitter-image="$seo['twitterImage']"
+>
     <main class="bg-white text-slate-900">
         {{-- Simple hero header --}}
         <section class="relative overflow-hidden">
@@ -66,6 +79,10 @@
 
                             {{-- helper links --}}
                             <div class="pt-6 mt-6 border-t border-slate-200 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between text-sm">
+                                <a href="{{ url('/pages/homeless-ministry-sacramento') }}" class="text-slate-600 hover:text-slate-900 transition">
+                                    Learn how we help the homeless in Sacramento →
+                                </a>
+
                                 <a href="{{ url('/#serve') }}" class="text-slate-600 hover:text-slate-900 transition">
                                     Want to serve too? Volunteer →
                                 </a>
@@ -96,9 +113,6 @@
                 </div>
             </div>
         </section>
-
-        {{-- FOOTER --}}
-        <x-footer />
 
         {{-- Smooth scroll for anchor links --}}
         @once

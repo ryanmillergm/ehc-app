@@ -1,5 +1,11 @@
 {{-- resources/views/emails/unsubscribe.blade.php --}}
-<x-guest-layout>
+<x-layouts.app
+    title="Unsubscribed"
+    meta-title="Email Unsubscribe | Bread of Grace Ministries"
+    meta-description="Your email unsubscribe request has been processed."
+    :canonical-url="url()->current()"
+    :meta-robots="config('seo.robots.noindex')"
+>
     <div class="mx-auto max-w-xl px-6 py-12">
         <h1 class="text-2xl font-bold text-slate-900">You’re unsubscribed</h1>
 
@@ -20,4 +26,4 @@
             </a>
         </div>
     </div>
-</x-guest-layout>
+</x-layouts.app>

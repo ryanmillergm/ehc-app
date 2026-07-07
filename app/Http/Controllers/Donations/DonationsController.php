@@ -8,6 +8,8 @@ use App\Models\Address;
 use App\Models\Pledge;
 use App\Models\Transaction;
 use App\Services\StripeService;
+use App\Services\Seo\RouteSeoResolver;
+use App\Support\Seo\RouteSeoTarget;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -26,7 +28,11 @@ class DonationsController extends Controller
 
     public function show()
     {
-        return view('donations.give');
+        $seo = app(RouteSeoResolver::class)->resolve(RouteSeoTarget::DONATIONS_SHOW);
+
+        return view('donations.give', [
+            'seo' => $seo,
+        ]);
     }
 
     public function start(Request $request)

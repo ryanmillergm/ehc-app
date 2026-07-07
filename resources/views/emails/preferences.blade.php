@@ -1,4 +1,10 @@
-<x-guest-layout>
+<x-layouts.app
+    title="Email Preferences"
+    meta-title="Email Preferences | Bread of Grace Ministries"
+    meta-description="Manage your Bread of Grace Ministries email preferences."
+    :canonical-url="url('/email-preferences/' . $token)"
+    :meta-robots="config('seo.robots.noindex')"
+>
     <div class="mx-auto max-w-3xl px-6 py-12">
         <h1 class="text-3xl font-extrabold text-slate-900">Email preferences</h1>
         <p class="mt-3 text-slate-600">
@@ -13,4 +19,4 @@
             <a href="{{ url('/') }}" class="underline">Back to home</a>
         </div>
     </div>
-</x-guest-layout>
+</x-layouts.app>

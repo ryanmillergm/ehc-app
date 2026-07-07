@@ -30,4 +30,24 @@ class Language extends Model
     {
         return $this->hasMany(PageTranslation::class);
     }
+
+    public function faqItems(): HasMany
+    {
+        return $this->hasMany(FaqItem::class);
+    }
+
+    public function homePageContents(): HasMany
+    {
+        return $this->hasMany(HomePageContent::class);
+    }
+
+    public function homeSections(): HasMany
+    {
+        return $this->hasMany(HomeSection::class);
+    }
+
+    public function seoMetas(): HasMany
+    {
+        return $this->hasMany(SeoMeta::class);
+    }
 }

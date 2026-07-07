@@ -17,7 +17,7 @@ return new class extends Migration
             $table->id();
             $table->foreignIdFor(Page::class)->constrained()->cascadeOnDelete();
             $table->foreignIdFor(Language::class)->constrained()->cascadeOnDelete();
-            $table->string('title');
+            $table->text('title');
             $table->string('slug');
             $table->text('description');
             $table->text('content');

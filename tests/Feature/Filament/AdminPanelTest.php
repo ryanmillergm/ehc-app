@@ -4,6 +4,8 @@ namespace Tests\Feature\Filament;
 
 use Tests\TestCase;
 use App\Models\User;
+use Livewire\Livewire;
+use App\Filament\Widgets\DocumentationWidget;
 use Spatie\Permission\PermissionRegistrar;
 use Illuminate\Foundation\Testing\WithFaker;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -57,6 +59,15 @@ public function test_an_authenticated_user_with_permissions_can_visit_admin_page
 
     $this->get('/admin')->assertOk();
 }
+
+    public function test_admin_dashboard_shows_documentation_widget_media_copy(): void
+    {
+        $user = User::factory()->create();
+        $this->signInWithPermissions($user, ['admin.panel']);
+
+        Livewire::test(DocumentationWidget::class)
+            ->assertSee('media (images/videos)');
+    }
 
     /**
      * An authenticated user with Super Admin role can visit admin page.

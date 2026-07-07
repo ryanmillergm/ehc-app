@@ -15,6 +15,10 @@ export default defineConfig({
     }),
   ],
 
+  build: {
+    // GrapesJS is intentionally lazy-loaded as a large admin-only chunk.
+    chunkSizeWarningLimit: 1200,
+  },
   server: {
     // prevent Vite from choosing IPv6 ::1
     host: '127.0.0.1',

@@ -29,6 +29,15 @@ class PageTranslationFactory extends Factory
             'slug'        => $base . '-' . $this->faker->unique()->numberBetween(1000, 9999),
             'description' => $this->faker->paragraph(2),
             'content'     => '<p>' . $this->faker->paragraph(4) . '</p>',
+            'render_mode' => 'template',
+            'template' => 'standard',
+            'theme' => 'default',
+            'hero_mode' => 'none',
+            'hero_style' => 'contained',
+            'hero_height' => '80',
+            'hero_overlay' => 'medium',
+            'hero_text_align' => 'left',
+            'hero_text_width' => 'normal',
             'is_active'   => true,
         ];
     }

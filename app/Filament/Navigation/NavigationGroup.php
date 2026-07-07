@@ -9,6 +9,7 @@ enum NavigationGroup implements HasLabel
     case Email;
     case Forms;
     case Pages;
+    case Images;
     case Donations;
     case UserSettings;
     case GeneralSettings;
@@ -19,6 +20,7 @@ enum NavigationGroup implements HasLabel
             self::Email => 'Email',
             self::Forms => 'Forms',
             self::Pages => 'Pages',
+            self::Images => 'Images',
             self::Donations => 'Donations',
             self::UserSettings => 'User Settings',
             self::GeneralSettings => 'General Settings',

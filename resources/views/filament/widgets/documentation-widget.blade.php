@@ -5,7 +5,7 @@
                 Admin Documentation
             </div>
             <div class="text-xs text-gray-600">
-                Quick reference for Email Lists, Subscribers, Campaigns, Deliveries, and the sending pipeline.
+                Quick reference for content, media (images/videos), email workflows, and operations playbooks.
             </div>
         </div>
 

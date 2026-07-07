@@ -12,6 +12,7 @@ use App\Filament\Resources\PageTranslationResource\Pages\ListPageTranslations;
 use App\Filament\Resources\PageTranslationResource\Pages\CreatePageTranslation;
 use App\Filament\Resources\PageTranslationResource\Pages\ViewPageTranslation;
 use App\Filament\Resources\PageTranslationResource\Pages\EditPageTranslation;
+use App\Filament\Resources\PageTranslationResource\RelationManagers\SeoMetaRelationManager;
 use App\Filament\Resources\PageTranslationResource\Pages;
 use App\Filament\Resources\PageTranslationResource\RelationManagers;
 use App\Models\PageTranslation;
@@ -85,7 +86,7 @@ class PageTranslationResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            SeoMetaRelationManager::class,
         ];
     }
 

@@ -13,10 +13,10 @@ This repo is built to be **admin-friendly** in Filament, with access controlled 
 
 ## Tech stack
 
-- **Laravel**: v11.x
-- **PHP**: 8.2.x
+- **Laravel**: v12.x
+- **PHP**: 8.2+
 - **Database**: MySQL 8.x (recommended)
-- **Filament**: v3.x
+- **Filament**: v4.x
 - **Livewire**: v3.x
 - **Jetstream**: v5.x
 - **Testing**: PHPUnit 11.x (plus Laravel testing helpers)
@@ -72,6 +72,115 @@ General rules of thumb:
   - wrong tenant selected
   - missing permission
   - policy denying access
+
+---
+
+## Homepage CMS + SEO architecture
+
+Homepage content is now managed through database-backed CMS resources with safe fallbacks.
+
+Primary runtime components:
+
+- `App\Services\Content\HomeContentService`
+- `App\Services\Media\ImageResolver`
+
+Primary models/tables:
+
+- `HomePageContent` (`home_page_contents`)
+- `FaqItem` (`faq_items`)
+- `Image` (`images`)
+- `SiteMediaDefault` (`site_media_defaults`)
+- `ImageGroup` + `ImageGroupItem`
+- `ImageType` (`image_types`)
+- `Imageable` (`imageables`)
+- `ImageGroupable` (`image_groupables`)
+
+### Fallback behavior (high level)
+
+- Home copy and FAQ resolve by current language, then default language.
+- Image roles use fallback chains (for example `header -> featured -> site default`).
+- If CMS rows are missing, `HomeContentService` includes safe hard-coded fallbacks so the homepage still renders.
+
+### Filament resources added for CMS/media
+
+- `Images`
+- `Image Groups`
+- `Image Types`
+- `Home Page Content`
+- `Home Sections`
+- `FAQ Items`
+- `Image Relationships`
+- `Image Group Relationships`
+
+`Image Group Items` are managed from the `Image Groups` edit page via a relation manager (not as a primary sidebar workflow).
+
+### Home Sections documentation page
+
+A dedicated admin guide exists for homepage section editing:
+
+- `App\Filament\Pages\HomeSectionsDocumentation`
+- View: `resources/views/filament/pages/home-sections-documentation.blade.php`
+
+How to access it in Filament:
+
+- From `Home Sections` list page via the `Home Sections Docs` header button
+- From `Admin Documentation` via `Open Home Sections Documentation`
+
+This page documents section keys, field behavior, item key mappings, fallback logic, troubleshooting, and QA steps.
+
+### Attachable type allowlist
+
+Allowed polymorphic attach targets are controlled by:
+
+- `App\Enums\Media\ImageAttachableType`
+
+Current supported attachable models:
+
+- `PageTranslation`
+- `HomePageContent`
+
+### Image group ordering behavior
+
+`ImageGroupItem` ordering uses insertion semantics:
+
+- inserting at `sort_order = N` shifts existing items at `N+` down
+- moving/reordering adjusts surrounding rows to keep order consistent
+- deleting an item closes the gap in that group
+
+---
+
+## Homepage CMS seed baseline
+
+The following seeders are used to restore baseline home/SEO/media data in an idempotent way:
+
+- `Database\Seeders\ImageSeeder`
+- `Database\Seeders\SiteMediaDefaultSeeder`
+- `Database\Seeders\HomePageContentSeeder`
+- `Database\Seeders\HomeSectionSeeder`
+- `Database\Seeders\FaqItemSeeder`
+
+These use `updateOrCreate`, so they are safe to re-run in production.
+`HomePageContentSeeder` restores SEO/fallback fields, while `HomeSectionSeeder` restores section-level homepage blocks (including `pre_give_cta` and `final_cta`).
+
+### Recovery / rollout commands
+
+```bash
+php artisan db:seed --class=ImageSeeder
+php artisan db:seed --class=SiteMediaDefaultSeeder
+php artisan db:seed --class=HomePageContentSeeder
+php artisan db:seed --class=HomeSectionSeeder
+php artisan db:seed --class=FaqItemSeeder
+```
+
+Typical production sequence:
+
+```bash
+php artisan migrate
+php artisan db:seed
+```
+
+Then verify homepage content, FAQ visibility, and meta/OG tags.
+If homepage copy appears stale, verify both `home_page_contents` and `home_sections` rows for the active language are present and active.
 
 ---
 
@@ -366,6 +475,126 @@ Your `phpunit.xml` includes:
 
 These are good defaults for deterministic tests.
 
+### CMS / SEO tests
+
+Key test files for the new homepage CMS stack:
+
+- `tests/Feature/Database/HomeCmsSeedersTest.php`
+- `tests/Feature/Livewire/HomeCmsContentTest.php`
+- `tests/Unit/Media/ImageResolverTest.php`
+- `tests/Unit/Media/ImageAttachableTypeTest.php`
+- `tests/Feature/Filament/ImageResourceTest.php`
+- `tests/Feature/Filament/ImageableResourceTest.php`
+- `tests/Feature/Filament/ImageGroupableResourceTest.php`
+- `tests/Feature/Filament/ImageGroupResourceTest.php`
+- `tests/Feature/Filament/AdminDocumentationTest.php`
+- `tests/Feature/Seo/SeoInfrastructureTest.php`
+- `tests/Unit/PageTranslationsTest.php`
+- `tests/Feature/Livewire/Pages/ShowPageTest.php`
+- `tests/Feature/Filament/PageTranslationResourceTest.php`
+- `tests/Feature/Database/HomelessMinistrySacramentoPageSeederTest.php`
+- `tests/Feature/Database/PermissionSeederTest.php`
+
+### Search Console + GA4 monitoring
+
+This app supports production verification/analytics tags via environment variables:
+
+```env
+SEO_GOOGLE_SITE_VERIFICATION=your-google-verification-token
+SEO_GA4_MEASUREMENT_ID=G-XXXXXXXXXX
+```
+
+The tags are rendered from `resources/views/components/seo/head.blade.php` and apply to pages using the shared layouts.
+
+Monitoring and operations checklist:
+
+- `docs/seo-monitoring.md`
+- `docs/seo-production-checklist.md`
+- `docs/pages-rollout.md`
+
+### Route-level SEO CMS
+
+Indexable marketing routes now use DB-managed SEO metadata via unified `seo_meta` rows (`seoable_type=route`):
+
+- `donations.show` (`/give`)
+- `pages.index` (`/pages`)
+- `emails.subscribe` (`/emails/subscribe`)
+
+Managed in Filament through the `Route SEO` resource with per-language rows and fallback logic.
+Implementation uses a single persistence model: `App\\Models\\SeoMeta` (no route-specific SEO model).
+Supported route targets are centralized in `App\\Support\\Seo\\RouteSeoTarget`.
+If no SEO row exists for a page/route, runtime falls back to model content (`title`/`description`) and then `config/seo.php` defaults.
+For day-to-day usage guidance in admin, use the dedicated in-panel SEO guide:
+
+- `app/Filament/Pages/SeoDocumentation.php`
+- `resources/views/filament/pages/seo-documentation.blade.php`
+
+Quick access buttons labeled **SEO Docs** are available on:
+
+- Route SEO
+- Home Page Content
+- Page Translations
+
+Details and fallback rules:
+
+- `docs/route-seo.md`
+
+### Dedicated keyword landing page
+
+A seeded, CMS-editable keyword page is included for local-intent SEO targeting:
+
+- URL: `/pages/homeless-ministry-sacramento`
+- Source model: `page_translations`
+- Dedicated seeder: `Database\\Seeders\\HomelessMinistrySacramentoPageSeeder`
+- Primary conversion CTA: `/give`
+
+Run only this page seed if needed:
+
+```bash
+php artisan db:seed --class=HomelessMinistrySacramentoPageSeeder
+```
+
+Internal link support is included from:
+
+- Homepage (`resources/views/livewire/home.blade.php`)
+- Give page (`resources/views/donations/give.blade.php`)
+
+### Page authoring modes (new)
+
+`PageTranslation` now supports explicit render modes:
+
+- `template`: curated visual templates (`standard`, `campaign`, `story`, `immersive`)
+- `blocks`: marketing block builder (`content_blocks`)
+- `custom`: full custom body HTML (`custom_html`) rendered inside the normal app layout
+
+Security rules:
+
+- custom HTML is sanitized on save
+- scripts/event handlers are blocked
+- trusted mode is permission-gated by `pages.render_unsafe_html`
+
+Deep guides:
+
+- `docs/pages-authoring.md`
+- `docs/pages-block-catalog.md`
+- `docs/pages-rollout.md`
+
+Rollout quick sequence:
+
+```bash
+php artisan migrate
+php artisan db:seed --class=PermissionSeeder
+php artisan db:seed --class=HomelessMinistrySacramentoPageSeeder
+php artisan config:clear
+php artisan optimize:clear
+```
+
+Validation quick checks:
+
+- verify one page in each mode (`template`, `blocks`, `custom`)
+- verify custom mode strips scripts/event handlers
+- verify canonical/title/description still render correctly
+
 ---
 
 ## Filament documentation pages
@@ -374,8 +603,10 @@ This repo includes in-panel documentation pages for admins, for example:
 
 - `resources/views/filament/pages/email-system-help.blade.php`
 - `resources/views/filament/pages/admin-documentation.blade.php`
+- `resources/views/filament/pages/seo-documentation.blade.php`
 
 These are intended to keep operational knowledge **inside the admin panel** so staff can self-serve answers.
+The admin documentation page includes sections for homepage CMS, media library, SEO controls, seeding/recovery commands, and troubleshooting.
 
 ---
 
@@ -390,6 +621,13 @@ composer dump-autoload
 
 # Queue worker
 php artisan queue:work
+
+# Home CMS seed recovery
+php artisan db:seed --class=ImageSeeder
+php artisan db:seed --class=SiteMediaDefaultSeeder
+php artisan db:seed --class=HomePageContentSeeder
+php artisan db:seed --class=HomeSectionSeeder
+php artisan db:seed --class=FaqItemSeeder
 
 # Run migrations fresh (local only)
 php artisan migrate:fresh --seed

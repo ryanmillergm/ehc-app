@@ -46,7 +46,10 @@ class HomeTest extends TestCase
             ->assertSee('Give now')
 
             // VISIT
-            ->assertSee('Visit us');
+            ->assertSee('Visit us')
+
+            // FINAL CTA BAR
+            ->assertSee('Visit →');
     }
 
     #[Test]
@@ -70,6 +73,6 @@ class HomeTest extends TestCase
         $response = $this->get('/');
 
         $response->assertOk()
-            ->assertSee('<title>Bread of Grace Ministries</title>', false);
+            ->assertSee('<title>Homeless Ministry in Sacramento, CA | Bread of Grace Ministries</title>', false);
     }
 }

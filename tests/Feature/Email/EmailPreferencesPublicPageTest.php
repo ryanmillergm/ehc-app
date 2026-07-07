@@ -23,7 +23,8 @@ class EmailPreferencesPublicPageTest extends TestCase
         $this->get(route('emails.preferences', ['token' => $subscriber->unsubscribe_token]))
             ->assertOk()
             ->assertSee('Email preferences')
-            ->assertSee('test@example.com');
+            ->assertSee('test@example.com')
+            ->assertSee('<meta name="robots" content="noindex,nofollow">', false);
     }
 
     #[Test]

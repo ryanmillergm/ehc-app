@@ -236,4 +236,15 @@ class IndexPageTest extends TestCase
             ->assertSee($esTx->title)
             ->assertDontSee($enTx->title);
     }
+
+    #[Test]
+    public function pages_index_route_renders_expected_seo_meta_tags(): void
+    {
+        $this->get('/pages')
+            ->assertOk()
+            ->assertSee('<title>Community Outreach Pages | Bread of Grace Ministries</title>', false)
+            ->assertSee('<meta name="description" content="Explore Bread of Grace Ministries pages on outreach, discipleship, and ways to serve and give in Sacramento.">', false)
+            ->assertSee('<meta name="robots" content="index,follow">', false)
+            ->assertSee('<link rel="canonical" href="' . url('/pages') . '">', false);
+    }
 }

@@ -1,6 +1,9 @@
 <x-filament-panels::page>
     @php
         $emailHelpUrl = \App\Filament\Pages\EmailSystemHelp::getUrl();
+        $homeSectionsHelpUrl = \App\Filament\Pages\HomeSectionsDocumentation::getUrl();
+        $videoHelpUrl = \App\Filament\Pages\VideoSystemHelp::getUrl();
+        $seoHelpUrl = \App\Filament\Pages\SeoDocumentation::getUrl();
 
         // $donationsHelpUrl = \App\Filament\Pages\DonationsSystemHelp::getUrl();
 
@@ -11,6 +14,11 @@
             ['id' => 'teams', 'label' => 'Teams / Tenancy'],
             ['id' => 'addresses', 'label' => 'Addresses'],
             ['id' => 'pages', 'label' => 'Pages & Translations'],
+            ['id' => 'homepage-cms', 'label' => 'Homepage CMS'],
+            ['id' => 'media-library', 'label' => 'Media Library'],
+            ['id' => 'seo-management', 'label' => 'SEO Management'],
+            ['id' => 'seed-data', 'label' => 'Seed Data / Recovery'],
+            ['id' => 'cms-troubleshooting', 'label' => 'CMS Troubleshooting'],
             ['id' => 'email-system', 'label' => 'Email System'],
             ['id' => 'email-workflows', 'label' => 'Email Workflows'],
             ['id' => 'email-queue', 'label' => 'Email Queue Pipeline'],
@@ -105,6 +113,39 @@ HTML;
                 >
                     Open Email System Help (Quick Start)
                 </x-filament::button>
+                <x-filament::button
+                    tag="a"
+                    :href="$homeSectionsHelpUrl"
+                    icon="heroicon-o-book-open"
+                    color="gray"
+                >
+                    Open Home Sections Documentation
+                </x-filament::button>
+                <x-filament::button
+                    tag="a"
+                    :href="$videoHelpUrl"
+                    icon="heroicon-o-film"
+                    color="gray"
+                >
+                    Open Video System Help
+                </x-filament::button>
+                <x-filament::button
+                    tag="a"
+                    :href="$seoHelpUrl"
+                    icon="heroicon-o-magnifying-glass-circle"
+                    color="gray"
+                >
+                    Open SEO Documentation
+                </x-filament::button>
+            </div>
+
+            <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-700">
+                <div class="font-semibold text-gray-900">Codebase Guides</div>
+                <div class="mt-2 grid gap-1">
+                    <code>docs/pages-authoring.md</code>
+                    <code>docs/pages-block-catalog.md</code>
+                    <code>docs/pages-rollout.md</code>
+                </div>
             </div>
         </header>
 
@@ -244,7 +285,246 @@ HTML;
             <ul class="list-disc space-y-1.5 pl-4 text-sm text-gray-800">
                 <li>Prefer stable slugs; change labels/titles instead.</li>
                 <li>Translations should be complete for the target locale before switching live traffic.</li>
+                <li>Choose one render mode per translation: <span class="font-semibold">Template</span>, <span class="font-semibold">Block Builder</span>, or <span class="font-semibold">Custom HTML</span>.</li>
+                <li>Trusted custom HTML is only available to users with <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">pages.render_unsafe_html</code>.</li>
             </ul>
+
+            <div class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                Operator docs:
+                <code class="rounded bg-white px-1.5 py-0.5 text-xs">docs/pages-authoring.md</code>,
+                <code class="rounded bg-white px-1.5 py-0.5 text-xs">docs/pages-block-catalog.md</code>,
+                <code class="rounded bg-white px-1.5 py-0.5 text-xs">docs/pages-rollout.md</code>.
+            </div>
+
+            <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <div class="font-semibold text-gray-900">Mode QA quick checklist</div>
+                <ul class="mt-2 list-disc space-y-1.5 pl-4 text-sm text-gray-800">
+                    <li><span class="font-semibold">Template:</span> hero media + CTA render correctly, no fallback surprises.</li>
+                    <li><span class="font-semibold">Blocks:</span> block order and JSON-driven block outputs render as expected.</li>
+                    <li><span class="font-semibold">Custom:</span> scripts/event handlers are stripped; trusted mode only for permitted users.</li>
+                </ul>
+            </div>
+        </section>
+
+        {{-- Homepage CMS --}}
+        <section id="homepage-cms" class="scroll-mt-24 rounded-2xl border border-gray-200/80 bg-white p-5 shadow-sm shadow-gray-100 space-y-4">
+            <div class="flex items-center justify-between gap-2">
+                <h2 class="text-sm font-semibold tracking-tight text-gray-900">Homepage CMS</h2>
+                {!! $sectionBadge('Content + SEO') !!}
+            </div>
+
+            <p class="text-sm text-gray-700">
+                The homepage now loads core content from the database. Admin updates happen in Filament without code deploys.
+                The most important resources are <span class="font-semibold">Home Page Content</span>, <span class="font-semibold">Home Sections</span>, and <span class="font-semibold">FAQ Items</span>.
+            </p>
+
+            <div class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                Need field-level guidance? Use the dedicated
+                <a href="{{ $homeSectionsHelpUrl }}" class="font-semibold underline underline-offset-2">
+                    Home Sections Documentation
+                </a>
+                page for section key definitions, item key mapping, and workflow checklists.
+            </div>
+
+            <div class="grid gap-4 lg:grid-cols-2">
+                <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                    <div class="font-semibold text-gray-900">What is DB-driven now</div>
+                    <ul class="mt-2 list-disc space-y-1.5 pl-4 text-sm text-gray-800">
+                        <li>SEO title + SEO description</li>
+                        <li>Section copy + CTA labels/links from Home Sections</li>
+                        <li>Hero intro + meeting schedule/location fallback fields</li>
+                        <li>FAQ question/answer grid</li>
+                        <li>Homepage OG image (when configured)</li>
+                    </ul>
+                </div>
+
+                <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                    <div class="font-semibold text-gray-900">Safe edit sequence</div>
+                    <ol class="mt-2 list-decimal space-y-1.5 pl-5 text-sm text-gray-800">
+                        <li>Edit <span class="font-semibold">Home Sections</span> for target language sections like <code class="rounded bg-white px-1.5 py-0.5 text-xs">pre_give_cta</code> and <code class="rounded bg-white px-1.5 py-0.5 text-xs">final_cta</code>.</li>
+                        <li>Edit <span class="font-semibold">Home Page Content</span> for SEO/fallback fields.</li>
+                        <li>Edit <span class="font-semibold">FAQ Items</span> for context <code class="rounded bg-white px-1.5 py-0.5 text-xs">home</code>.</li>
+                        <li>Confirm <code class="rounded bg-white px-1.5 py-0.5 text-xs">is_active</code> is enabled.</li>
+                        <li>Load homepage and verify copy + meta tags.</li>
+                    </ol>
+                </div>
+            </div>
+
+            {!! $callout('info', 'Language fallback', 'If no active row exists for the current language, the app falls back to default language content. Keep English complete even if you manage other locales.') !!}
+            {!! $callout('muted', 'CTA section ownership', 'Use <code class="rounded bg-white px-1.5 py-0.5 text-[0.7rem]">pre_give_cta</code> for the mid-page bridge above Give, and <code class="rounded bg-white px-1.5 py-0.5 text-[0.7rem]">final_cta</code> for the bottom CTA component near the footer.') !!}
+        </section>
+
+        {{-- Media Library --}}
+        <section id="media-library" class="scroll-mt-24 rounded-2xl border border-gray-200/80 bg-white p-5 shadow-sm shadow-gray-100 space-y-4">
+            <div class="flex items-center justify-between gap-2">
+                <h2 class="text-sm font-semibold tracking-tight text-gray-900">Media Library</h2>
+                {!! $sectionBadge('Images + Videos') !!}
+            </div>
+
+            <p class="text-sm text-gray-700">
+                Media is managed through image and video resources. You can upload assets, assign polymorphic relationships, and control page-level fallbacks by role.
+            </p>
+
+            <div class="grid gap-4 lg:grid-cols-2">
+                <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                    <div class="font-semibold text-gray-900">Resources</div>
+                    <ul class="mt-2 list-disc space-y-1.5 pl-4 text-sm text-gray-800">
+                        <li><span class="font-semibold">Images</span>: canonical media rows + upload + copy URL.</li>
+                        <li><span class="font-semibold">Videos</span>: upload/embed source + metadata for page/home content video playback.</li>
+                        <li><span class="font-semibold">Image Groups</span>: reusable sets (gallery/carousel).</li>
+                        <li><span class="font-semibold">Image Group Items</span>: managed inside Image Groups via the relation manager.</li>
+                        <li><span class="font-semibold">Image Types</span>: classify what the image is (logo, featured, gallery, etc).</li>
+                        <li><span class="font-semibold">Image Relationships</span>: polymorphic role assignment (header/featured/og/thumbnail).</li>
+                        <li><span class="font-semibold">Video Relationships</span>: polymorphic role assignment (hero/featured/inline video).</li>
+                        <li><span class="font-semibold">Image Group Relationships</span>: polymorphic group assignment (gallery/carousel).</li>
+                    </ul>
+                </div>
+
+                <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                    <div class="font-semibold text-gray-900">Role behavior</div>
+                    <ul class="mt-2 list-disc space-y-1.5 pl-4 text-sm text-gray-800">
+                        <li><code class="rounded bg-white px-1.5 py-0.5 text-xs">header</code> falls back to <code class="rounded bg-white px-1.5 py-0.5 text-xs">featured</code>.</li>
+                        <li><code class="rounded bg-white px-1.5 py-0.5 text-xs">og</code> falls back to <code class="rounded bg-white px-1.5 py-0.5 text-xs">featured</code>.</li>
+                        <li>If no assignment resolves, the app checks <span class="font-semibold">Site Media Defaults</span>.</li>
+                        <li>If still missing, the view may hide that image block or use hard fallback asset.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                <div class="font-semibold">Header background video setup (Pages)</div>
+                <ol class="mt-2 list-decimal space-y-1.5 pl-5">
+                    <li>Create/select a <span class="font-semibold">Video</span>.</li>
+                    <li>Create a <span class="font-semibold">Video Relationship</span>.</li>
+                    <li>Set <span class="font-semibold">Related Type</span> to <span class="font-semibold">Page Translation</span>.</li>
+                    <li>Set role to <span class="font-semibold">Hero Video</span> (Featured Video is fallback).</li>
+                    <li>Ensure both the video and relationship are active.</li>
+                    <li>Ensure the target page translation hero mode is set to video.</li>
+                </ol>
+                <div class="mt-2">
+                    Need full step-by-step details? Open
+                    <a href="{{ $videoHelpUrl }}" class="font-semibold underline underline-offset-2">
+                        Video System Help
+                    </a>.
+                </div>
+            </div>
+
+            {!! $callout('info', 'Attachable type safety', 'Relationship target types are controlled by a system enum allowlist. Unsupported model types are not selectable in admin forms.') !!}
+            {!! $callout('muted', 'Sort behavior', 'When you insert a group item at an occupied sort position, existing items shift down automatically to keep order consistent.') !!}
+            {!! $callout('warn', 'Keep defaults set', 'Always keep global default roles populated. Missing defaults increase the chance of blank image slots on new pages/locales.') !!}
+        </section>
+
+        {{-- SEO Management --}}
+        <section id="seo-management" class="scroll-mt-24 rounded-2xl border border-gray-200/80 bg-white p-5 shadow-sm shadow-gray-100 space-y-4">
+            <div class="flex items-center justify-between gap-2">
+                <h2 class="text-sm font-semibold tracking-tight text-gray-900">SEO Management</h2>
+                {!! $sectionBadge('Meta / OG / JSON-LD') !!}
+            </div>
+
+            <p class="text-sm text-gray-700">
+                SEO now follows a mixed model: indexable marketing routes are DB-managed, while system/tokenized routes remain
+                code-controlled for safety.
+            </p>
+
+            <div class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                Need full field-level instructions and fallback behavior? Open
+                <a href="{{ $seoHelpUrl }}" class="font-semibold underline underline-offset-2">
+                    SEO Documentation
+                </a>.
+            </div>
+
+            <ul class="list-disc space-y-1.5 pl-4 text-sm text-gray-800">
+                <li><span class="font-semibold">Route SEO resource</span> manages indexable route metadata for <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">/give</code>, <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">/pages</code>, and <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">/emails/subscribe</code>.</li>
+                <li><span class="font-semibold">Page Translations</span> manage SEO for detail pages <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">/pages/{slug}</code> through the <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">SEO Meta (Canonical)</code> relation manager (canonical row auto-created per translation/language).</li>
+                <li><span class="font-semibold">Home Page Content</span> manages homepage title/description + OG behavior.</li>
+                <li><span class="font-semibold">Noindex system routes</span> remain code-controlled: donation thank-you and tokenized email preference/unsubscribe pages.</li>
+                <li><span class="font-semibold">Google integrations</span> are environment-driven via <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">SEO_GOOGLE_SITE_VERIFICATION</code> and <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">SEO_GA4_MEASUREMENT_ID</code>.</li>
+            </ul>
+
+            {!! $callout('info', 'Resolver fallback order', 'Route SEO resolves in order: current language active row → default language active row → safe defaults. Keep English complete as the fallback language.') !!}
+            {!! $callout('warn', 'Noindex safety', 'Do not move tokenized/system pages into DB-managed SEO. They are intentionally code-controlled to prevent accidental indexing.') !!}
+            {!! $callout('muted', 'Post-deploy checklist', 'Use <code class="rounded bg-white px-1.5 py-0.5 text-[0.7rem]">docs/seo-production-checklist.md</code> after every SEO deploy to validate tags, canonicals, GA4, and Search Console status.') !!}
+        </section>
+
+        {{-- Seed Data / Recovery --}}
+        <section id="seed-data" class="scroll-mt-24 rounded-2xl border border-gray-200/80 bg-white p-5 shadow-sm shadow-gray-100 space-y-4">
+            <div class="flex items-center justify-between gap-2">
+                <h2 class="text-sm font-semibold tracking-tight text-gray-900">Seed Data / Recovery</h2>
+                {!! $sectionBadge('Operations') !!}
+            </div>
+
+            <p class="text-sm text-gray-700">
+                Baseline homepage CMS data is seeded using idempotent seeders. Re-running these seeders is safe and intended for recovery.
+            </p>
+
+            <div class="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-xs text-gray-800">
+                <div class="font-semibold">Recommended recovery commands</div>
+                <div class="mt-2 space-y-2">
+                    <code class="block whitespace-pre-wrap">php artisan db:seed --class=ImageSeeder</code>
+                    <code class="block whitespace-pre-wrap">php artisan db:seed --class=SiteMediaDefaultSeeder</code>
+                    <code class="block whitespace-pre-wrap">php artisan db:seed --class=HomePageContentSeeder</code>
+                    <code class="block whitespace-pre-wrap">php artisan db:seed --class=HomeSectionSeeder</code>
+                    <code class="block whitespace-pre-wrap">php artisan db:seed --class=FaqItemSeeder</code>
+                </div>
+            </div>
+
+            {!! $callout('muted', 'Idempotent behavior', 'These seeders use updateOrCreate keys, so running them multiple times updates baseline rows instead of duplicating them.') !!}
+        </section>
+
+        {{-- CMS Troubleshooting --}}
+        <section id="cms-troubleshooting" class="scroll-mt-24 rounded-2xl border border-dashed border-gray-300 bg-gray-50/90 p-5 space-y-4">
+            <div class="flex items-center justify-between">
+                <h2 class="text-sm font-semibold text-gray-900">CMS Troubleshooting</h2>
+                <span class="text-xs text-gray-500">Home content / media / SEO checks</span>
+            </div>
+
+            <div class="grid gap-3 lg:grid-cols-2">
+                <div class="rounded-xl border border-gray-200 bg-white px-4 py-3">
+                    <div class="font-semibold text-gray-900">“Homepage still shows old copy.”</div>
+                    <ul class="mt-2 list-disc space-y-1.5 pl-4 text-sm text-gray-800">
+                        <li>Confirm the correct language row exists in Home Page Content.</li>
+                        <li>Confirm the matching Home Sections row exists for the section key you are editing (for example <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">hero</code>, <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">pre_give_cta</code>, <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">final_cta</code>).</li>
+                        <li>Confirm both rows are active (<code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">is_active = true</code>).</li>
+                        <li>Clear cache in non-local environments if needed.</li>
+                    </ul>
+                </div>
+
+                <div class="rounded-xl border border-gray-200 bg-white px-4 py-3">
+                    <div class="font-semibold text-gray-900">“FAQ section disappeared.”</div>
+                    <ul class="mt-2 list-disc space-y-1.5 pl-4 text-sm text-gray-800">
+                        <li>Check FAQ items for context <code class="rounded bg-gray-100 px-1.5 py-0.5 text-xs">home</code>.</li>
+                        <li>Ensure at least one active item for current/default language.</li>
+                        <li>Verify sort order and active flags.</li>
+                    </ul>
+                </div>
+
+                <div class="rounded-xl border border-gray-200 bg-white px-4 py-3">
+                    <div class="font-semibold text-gray-900">“OG image is wrong.”</div>
+                    <ul class="mt-2 list-disc space-y-1.5 pl-4 text-sm text-gray-800">
+                        <li>Check Home Page Content OG image assignment.</li>
+                        <li>Check Site Media Defaults for fallback roles.</li>
+                        <li>Use social debugger tools to refresh external cache.</li>
+                    </ul>
+                </div>
+
+                <div class="rounded-xl border border-gray-200 bg-white px-4 py-3">
+                    <div class="font-semibold text-gray-900">“Image slot is empty.”</div>
+                    <ul class="mt-2 list-disc space-y-1.5 pl-4 text-sm text-gray-800">
+                        <li>Verify image row is active and URL/path is valid.</li>
+                        <li>Verify an Image Relationship exists for the current content target/language.</li>
+                        <li>Verify defaults are seeded.</li>
+                    </ul>
+                </div>
+
+                <div class="rounded-xl border border-gray-200 bg-white px-4 py-3">
+                    <div class="font-semibold text-gray-900">“Image order changed after insert.”</div>
+                    <ul class="mt-2 list-disc space-y-1.5 pl-4 text-sm text-gray-800">
+                        <li>Group item sort order uses insertion behavior (existing items shift down).</li>
+                        <li>Use the Image Group relation manager reorder controls for final ordering.</li>
+                        <li>Refresh after save to confirm the updated sort sequence.</li>
+                    </ul>
+                </div>
+            </div>
         </section>
 
         {{-- Email System --}}

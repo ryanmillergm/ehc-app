@@ -1,0 +1,74 @@
+# Route SEO CMS
+
+This project uses DB-managed SEO metadata for selected indexable marketing routes.
+
+## DB-managed route keys
+
+- `donations.show` -> `/give`
+- `pages.index` -> `/pages`
+- `emails.subscribe` -> `/emails/subscribe`
+
+Data is stored in unified `seo_meta` rows (`seoable_type=route`) and managed via Filament resource:
+
+- `Route SEO`
+
+In-panel end-to-end guide:
+
+- `SEO Documentation` (Filament helper page)
+
+Fields:
+
+- `target_key` (selected as `Route` in Filament; values are route names)
+- `language_id`
+- `seo_title`
+- `seo_description`
+- `seo_og_image`
+- `canonical_path` (optional override path)
+- `robots`
+- `is_active`
+
+Route key constants are centralized in:
+
+- `App\\Support\\Seo\\RouteSeoTarget`
+
+## Fallback behavior
+
+For a given route key, resolver order is:
+
+1. Active row for current language (`session('language_id')` / locale)
+2. Active row for default language (`Language::first()`)
+3. Safe hardcoded defaults in `RouteSeoResolver`
+
+If no SEO row exists for a route/language, metadata still resolves from route defaults and global `config/seo.php` values.
+
+## Route SEO vs Page Translation SEO
+
+Keep these responsibilities separate:
+
+- Route SEO (`seoable_type=route`) manages fixed route-level pages like `/give` and `/pages`.
+- Page Translation SEO (`seoable_type=App\Models\PageTranslation`) manages `/pages/{slug}` content pages.
+
+For page translations, canonical SEO is edited from the translation record via the **SEO Meta (Canonical)** relation manager.
+This remains true regardless of page render mode (`template`, `blocks`, `custom`).
+
+## Routes intentionally code-controlled
+
+These remain hardcoded to enforce `noindex,nofollow` safety:
+
+- `/donations/thank-you`
+- `/donations/thank-you-subscription`
+- `/unsubscribe/{token}`
+- `/email-preferences/{token}`
+
+## Seed baseline values
+
+Seeder:
+
+- `Database\\Seeders\\RouteSeoSeeder`
+
+Included in `DatabaseSeeder`.
+
+## Related docs
+
+- `docs/pages-authoring.md`
+- `docs/seo-production-checklist.md`

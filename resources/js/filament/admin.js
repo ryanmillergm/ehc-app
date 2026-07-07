@@ -1,9 +1,18 @@
-import grapesjs from 'grapesjs'
-import presetNewsletterImport from 'grapesjs-preset-newsletter'
-import 'grapesjs/dist/css/grapes.min.css'
+let grapesjsModulePromise
+let presetNewsletterPromise
+let grapesCssPromise
 
-// IMPORTANT: preset exports can be CJS/ESM depending on version
-const presetNewsletter = presetNewsletterImport?.default ?? presetNewsletterImport
+function loadGrapesDependencies() {
+  grapesjsModulePromise ||= import('grapesjs')
+  presetNewsletterPromise ||= import('grapesjs-preset-newsletter')
+  grapesCssPromise ||= import('grapesjs/dist/css/grapes.min.css')
+
+  return Promise.all([grapesjsModulePromise, presetNewsletterPromise, grapesCssPromise])
+    .then(([grapesModule, presetModule]) => ({
+      grapesjs: grapesModule?.default ?? grapesModule,
+      presetNewsletter: presetModule?.default ?? presetModule,
+    }))
+}
 
 
 console.count('[admin.js] loaded')
@@ -114,11 +123,21 @@ function flushOne(root, reason = 'flush') {
   })
 }
 
-function mountOne(root) {
+async function mountOne(root) {
   if (!root || root.dataset.gjsMounted === '1') return
   root.dataset.gjsMounted = '1'
 
   const key = root.dataset.gjsKey || 'gjs'
+
+  let grapesjs
+  let presetNewsletter
+  try {
+    ({ grapesjs, presetNewsletter } = await loadGrapesDependencies())
+  } catch (e) {
+    console.error('[GJS] failed to load editor dependencies', e)
+    root.dataset.gjsMounted = '0'
+    return
+  }
 
   const blocks = root.querySelector('[data-gjs-blocks]')
   const canvas = root.querySelector('[data-gjs-canvas]')
